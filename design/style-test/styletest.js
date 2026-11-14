@@ -2,8 +2,13 @@
 //
 // This is the REFERENCE IMPLEMENTATION of docs/ART_STYLE.md: the chosen look,
 // built in code (Three.js, no downloads), proven with the Step 2 capture tool.
-// Later code ports these functions (fur material, marking paint, lighting rig,
-// HUD rules) instead of reinventing them.
+//
+// The reusable half of it — tokens, materials, marking rules, the cat
+// builder, the room + lighting rig, the celebration, and the measuring
+// helpers — now lives in src/ (extracted verbatim; the captures below prove
+// the refactor is pixel-identical to the original) and is imported here.
+// What is left in this file is the STYLE TEST ITSELF: the views, the moments,
+// the HUD spec, the selfTest, and the page contract.
 //
 // In the room:
 //   - a slice of a believable, realistically lit modern apartment (floor, plaster
@@ -19,6 +24,16 @@
 // selfTest whose numbers are measured back out of the built geometry.
 
 import * as THREE from 'three';
+
+// Importing the guards first installs them before anything is built.
+import { measured, setRendering, countUnseededCalls } from '../../src/determinism.js';
+import { TOKENS } from '../../src/tokens.js';
+import { clamp, easeOutBack, seededShuffle, projectedPx, srgbLuma, contrast, round } from '../../src/util.js';
+import { buildRoom } from '../../src/room.js';
+import { buildCat, CAT_SPECS, setCatPose } from '../../src/cat.js';
+import { rulesBobo, paintPose } from '../../src/markings.js';
+import { createCelebration } from '../../src/celebrate.js';
+import { scanMarkings, contactGap } from '../../src/measure.js';
 
 /** Fixed strings. Exact. On purpose. Never "fixed". */
 const EXACT_ENDING = 'your did it! you wind';
@@ -41,39 +56,9 @@ const DURATION = 6; // seconds, the loop
 const FLOOR_Y = 0;
 
 // ---------------------------------------------------------------------------
-// 1. Design tokens — the single source for colour (docs/ART_STYLE.md §2).
-//    Everything built later imports this object; nothing is hard-coded twice.
+// 1. Views and moments. (The design tokens are in src/tokens.js — this page
+//    exports them onward through window.LC.tokens, one source, no copying.)
 // ---------------------------------------------------------------------------
-export const TOKENS = {
-  // fur
-  furBlack: 0x1b1e26, // cool near-black, NOT pure black: keeps readable shading
-  furSheen: 0x5a6480, // sunlit coat sheen (used as the material's specular tint)
-  furWhite: 0xf1ece1, // warm white markings, never clinical white
-  eyes: 0xb7c94b, // yellow-green (from Brandon's photo)
-  pupil: 0x0c0e12,
-  nose: 0xd18b8b,
-  earInner: 0x61494a,
-  whisker: 0xf6f2ea,
-  // room
-  oakFloor: 0xa87c52,
-  plaster: 0xd9d3c7,
-  rug: 0xa99a83,
-  couch: 0x3f4650,
-  pillow: 0xd9a441,
-  walnut: 0x6b4a30,
-  leaf: 0x4f7a4a,
-  metal: 0x23262b,
-  cardboard: 0xc19a67,
-  lampShade: 0xf2e6cf,
-  sky: 0xbfd8ea,
-  // UI (also in style-test.html CSS custom properties — they must match)
-  uiInk: 0x10151c,
-  uiPaper: 0xf7f4ee,
-  uiMustard: 0xe8b04a,
-  uiCoral: 0xff8f7d,
-  uiGlow: 0xffd98a,
-};
-
 const V = {
   diorama: { pos: [3.0, 2.0, 3.3], look: [-0.4, 0.55, -0.5], fov: 48 },
   'first-person': { pos: [0.75, 1.6, 2.3], look: [-0.15, 0.8, -1.0], fov: 60 },
@@ -83,59 +68,7 @@ const V = {
 const MOMENTS = ['default', 'loaf-couch', 'lineup', 'hud-score', 'hud-dag', 'win'];
 
 // ---------------------------------------------------------------------------
-// 2. Small helpers (all deterministic — no Math.random anywhere).
-// ---------------------------------------------------------------------------
-const DEG = Math.PI / 180;
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const lerp = (a, b, k) => a + (b - a) * k;
-const easeOutCubic = (u) => 1 - Math.pow(1 - u, 3);
-const easeOutBack = (u) => 1 + 2.2 * Math.pow(u - 1, 3) + 1.3 * Math.pow(u - 1, 2);
-function fract(x) { return x - Math.floor(x); }
-/** 0 outside, 1 inside, smoothed over `eps` at the boundary. */
-function sdfInside(d, eps) { return clamp(0.5 - d / eps, 0, 1); }
-function hash1(n) { return fract(Math.sin(n * 127.1 + 311.7) * 43758.5453); }
-function seededShuffle(arr, seed) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(hash1(seed * 131.1 + i * 7.13) * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Determinism guards, same as the Step 2 test scene: a call inside the seek/
-// render path that reaches for unseeded randomness or the wall clock is counted
-// (selfTest fails on it) and a render-time call throws outright.
-const REAL_RANDOM = Math.random;
-const REAL_DATE_NOW = Date.now;
-const REAL_NOW = performance.now.bind(performance);
-let unseededCalls = 0;
-let measuring = 0;
-let rendering = false;
-Math.random = (...args) => {
-  if (measuring) unseededCalls++;
-  if (rendering) throw new Error('Math.random() called during render: the frame is not deterministic');
-  return REAL_RANDOM(...args);
-};
-Date.now = () => {
-  if (measuring) unseededCalls++;
-  return REAL_DATE_NOW();
-};
-performance.now = () => {
-  if (rendering) throw new Error('performance.now() called during render: the frame is not deterministic');
-  return REAL_NOW();
-};
-const measured = (fn) => {
-  measuring++;
-  try {
-    return fn();
-  } finally {
-    measuring--;
-  }
-};
-
-// ---------------------------------------------------------------------------
-// 3. Renderer / scene / camera
+// 2. Renderer / scene / camera
 // ---------------------------------------------------------------------------
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -157,689 +90,14 @@ let momentName = 'default';
 let score = 0;
 let seekTime = 0;
 
-// -- procedural textures (seeded, built once at boot, never in the render path)
-function canvasTexture(size, draw, { srgb = true, repeat = [1, 1] } = {}) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  draw(ctx, size);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(repeat[0], repeat[1]);
-  t.anisotropy = 4;
-  return t;
-}
-const floorMap = canvasTexture(256, (ctx, s) => {
-  const plank = s / 4;
-  for (let i = 0; i < 4; i++) {
-    const tint = 0.92 + hash1(i * 3 + 1) * 0.14;
-    ctx.fillStyle = `rgb(${Math.round(255 * tint)},${Math.round(250 * tint)},${Math.round(244 * tint)})`;
-    ctx.fillRect(0, i * plank, s, plank - 1);
-    ctx.fillStyle = 'rgba(60,40,25,0.55)';
-    ctx.fillRect(0, (i + 1) * plank - 2, s, 2);
-    for (let k = 0; k < 5; k++) {
-      const gx = hash1(i * 9 + k * 5 + 2) * s;
-      const gy = i * plank + hash1(i * 5 + k) * plank;
-      ctx.fillStyle = 'rgba(120,90,60,0.12)';
-      ctx.fillRect(gx, gy, 26 + hash1(k + i) * 40, 1.5);
-    }
-  }
-}, { repeat: [4, 3.5] });
-const floorRough = canvasTexture(256, (ctx, s) => {
-  ctx.fillStyle = '#b4b4b4';
-  ctx.fillRect(0, 0, s, s);
-  for (let i = 0; i < 900; i++) {
-    const g = Math.round(150 + hash1(i) * 90);
-    ctx.fillStyle = `rgb(${g},${g},${g})`;
-    ctx.fillRect(hash1(i + 7) * s, hash1(i + 13) * s, 2, 2);
-  }
-}, { srgb: false, repeat: [4, 3.5] });
-const plasterMap = canvasTexture(256, (ctx, s) => {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, s, s);
-  for (let i = 0; i < 2200; i++) {
-    const g = Math.round(235 + hash1(i * 1.7) * 20);
-    ctx.fillStyle = `rgb(${g},${g},${g})`;
-    ctx.fillRect(hash1(i + 3) * s, hash1(i + 5) * s, 2.5, 2.5);
-  }
-}, { repeat: [3, 2] });
-const rugMap = canvasTexture(256, (ctx, s) => {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, s, s);
-  ctx.strokeStyle = 'rgba(90,70,50,0.16)';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(s * 0.07, s * 0.07, s * 0.86, s * 0.86);
-  ctx.strokeStyle = 'rgba(90,70,50,0.10)';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(s * 0.13, s * 0.13, s * 0.74, s * 0.74);
-  for (let i = 0; i < 2600; i++) {
-    const g = Math.round(215 + hash1(i * 2.3) * 40);
-    ctx.fillStyle = `rgb(${g},${g},${g})`;
-    ctx.fillRect(hash1(i + 11) * s, hash1(i + 17) * s, 1.6, 1.6);
-  }
-});
-const couchMap = canvasTexture(256, (ctx, s) => {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, s, s);
-  for (let y = 0; y < s; y += 12) {
-    for (let x = 0; x < s; x += 12) {
-      const g = Math.round(205 + hash1(x * 0.31 + y * 0.17) * 50);
-      ctx.fillStyle = `rgb(${g},${g},${g})`;
-      ctx.beginPath();
-      ctx.arc(x + 6, y + 6, 5, 0, 7);
-      ctx.fill();
-    }
-  }
-}, { repeat: [3, 2] });
+// ---------------------------------------------------------------------------
+// 3. The apartment slice + the lighting rig (src/room.js). The support heights
+//    the cats stand on come back MEASURED from the builder.
+// ---------------------------------------------------------------------------
+const { SUPPORTS, sun, WALL_Z } = buildRoom(scene);
 
 // ---------------------------------------------------------------------------
-// 4. The materials library (docs/ART_STYLE.md §3). One place, reused everywhere.
-// ---------------------------------------------------------------------------
-function std(color, opts = {}) {
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.8, metalness: 0, ...opts });
-}
-/** Fur: a standard PBR material with vertex colours, because the markings are
- *  painted into the mesh (see §5). `sheenTint` is only a specular tint: black
- *  cat fur is a mirror with a mood, not a matte blob. */
-function furMaterial({ sheen = false, white = false } = {}) {
-  return new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: white ? 0.62 : 0.48, // black fur is glossier than white
-    metalness: 0,
-    sheen: sheen ? 0.6 : 0.25,
-    sheenRoughness: 0.35,
-    sheenColor: new THREE.Color(TOKENS.furSheen),
-  });
-}
-/** The soft silhouette: a BackSide shell, slightly inflated, that fakes the
- *  fuzz edge without any fur shader cost. Max 2 per cat (selfTest counts). */
-function fuzzShell(source, material) {
-  const m = new THREE.Mesh(source.geometry, material);
-  m.scale.multiplyScalar(1.045);
-  m.userData.fuzz = true;
-  m.userData.noContact = true;
-  return m;
-}
-const fuzzMaterial = () =>
-  new THREE.MeshBasicMaterial({
-    color: new THREE.Color(TOKENS.furBlack).lerp(new THREE.Color(TOKENS.furSheen), 0.35),
-    side: THREE.BackSide,
-    transparent: true,
-    opacity: 0.5,
-    depthWrite: false,
-  });
-
-// ---------------------------------------------------------------------------
-// 5. Markings as SDF rules, painted into vertex colours.
-//
-//    Both cats come from the same builder; what makes Bobo Bobo is WHICH rules
-//    are switched on. That is the whole design system for the characters, and
-//    it is why selfTest can measure "does the tell read at distance" instead of
-//    trusting that someone drew the right spot.
-//
-//    Rules are authored in cat-root space (metres, +z forward, feet at y=0)
-//    per pose, so they stay put when the cat changes pose or grows.
-// ---------------------------------------------------------------------------
-const MARK_EPS = 0.008; // 8 mm of soft edge: fur markings are never a hard decal
-
-function ellSDF(p, c, r) {
-  const dx = (p.x - c[0]) / r[0];
-  const dy = (p.y - c[1]) / r[1];
-  const dz = (p.z - c[2]) / r[2];
-  const q = Math.sqrt(dx * dx + dy * dy + dz * dz);
-  return (q - 1) * Math.min(r[0], r[1], r[2]);
-}
-function boxSDF(p, c, h) {
-  const qx = Math.abs(p.x - c[0]) - h[0];
-  const qy = Math.abs(p.y - c[1]) - h[1];
-  const qz = Math.abs(p.z - c[2]) - h[2];
-  const ox = Math.max(qx, 0), oy = Math.max(qy, 0), oz = Math.max(qz, 0);
-  return Math.sqrt(ox * ox + oy * oy + oz * oz) + Math.min(Math.max(qx, qy, qz), 0);
-}
-
-/** Shared by both cats: the white muzzle. */
-function rulesMuzzle() {
-  return [{ sdf: (p) => ellSDF(p, [0, -0.03, 0.052 + 0], [0.048, 0.036, 0.04]), name: 'muzzle', head: true }];
-}
-/** BOBO ONLY — the tells, in priority order of legibility. */
-function rulesBobo(pose) {
-  const head = [
-    ...rulesMuzzle(),
-    // the thin vertical dash between the eyes: THE tell. Exaggerated from the
-    // photo's ~4 x 20 mm to a readable blaze so it survives searching distance
-    // (docs/ART_STYLE.md §5), still unmistakably the same marking.
-    { sdf: (p) => boxSDF(p, [0, 0.036, 0.058], [0.0095, 0.036, 0.032]), name: 'dash', head: true },
-  ];
-  const body = pose === 'loaf'
-    ? [
-        { sdf: (p) => ellSDF(p, [0, 0.1, 0.145], [0.075, 0.07, 0.075]), name: 'bib' },
-        { sdf: (p) => ellSDF(p, [0.086, 0.06, 0.02], [0.04, 0.03, 0.04]), name: 'belly-patch' },
-      ]
-    : [
-        { sdf: (p) => ellSDF(p, [0, 0.245, 0.122], [0.098, 0.095, 0.105]), name: 'bib' },
-        { sdf: (p) => ellSDF(p, [0.086, 0.09, 0.02], [0.04, 0.03, 0.04]), name: 'belly-patch' },
-      ];
-  return { head, body };
-}
-/** THE DECOY CAT — white feet (built as parts, not rules) and a white neck
- *  band. Explicitly no dash, no bib, no belly patch (docs/DECOY_CAT.md). */
-function rulesDecoy(pose) {
-  const head = rulesMuzzle();
-  const body = pose === 'sprawl'
-    ? [{ sdf: (p) => ellSDF(p, [0, 0.185, 0.165], [0.155, 0.115, 0.04]), name: 'collar' }]
-    : [{ sdf: (p) => ellSDF(p, [0, 0.386, 0.045], [0.125, 0.034, 0.105]), name: 'collar' }];
-  return { head, body };
-}
-
-const _vRoot = new THREE.Vector3();
-const _mPartToRoot = new THREE.Matrix4();
-const _mRootInv = new THREE.Matrix4();
-const _mHeadInv = new THREE.Matrix4();
-const isHeadPart = (mesh) => mesh.userData.tag === 'head' || mesh.userData.tag === 'ear';
-
-/** Paint one pose's marking rules into the meshes' vertex colours.
- *
- *  Head rules are evaluated in HEAD space and body rules in cat-root space, so
- *  the dash stays put when the head turns and the bib stays put when the cat
- *  changes pose. Both are authored in metres against the same template. */
-function paintPose(cat, poseName, rules, headGroup) {
-  const group = cat.poses[poseName];
-  if (!group) return;
-  cat.root.updateWorldMatrix(true, true);
-  _mRootInv.copy(cat.root.matrixWorld).invert();
-  if (headGroup) _mHeadInv.copy(headGroup.matrixWorld).invert();
-  const black = new THREE.Color(TOKENS.furBlack);
-  const white = new THREE.Color(TOKENS.furWhite);
-  group.traverse((mesh) => {
-    if (!mesh.isMesh || mesh.userData.fuzz || !mesh.geometry?.attributes?.position) return;
-    if (mesh.material?.vertexColors !== true) return; // only fur takes markings
-    const toHead = headGroup && isHeadPart(mesh);
-    const active = toHead ? rules.head : rules.body;
-    const geo = mesh.geometry;
-    const pos = geo.attributes.position;
-    if (!geo.attributes.color) {
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
-    }
-    const col = geo.attributes.color;
-    _mPartToRoot.multiplyMatrices(toHead ? _mHeadInv : _mRootInv, mesh.matrixWorld);
-    for (let i = 0; i < pos.count; i++) {
-      _vRoot.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(_mPartToRoot);
-      let w = 0;
-      for (const r of active) w = Math.max(w, sdfInside(r.sdf(_vRoot), MARK_EPS));
-      col.setXYZ(i, lerp(black.r, white.r, w), lerp(black.g, white.g, w), lerp(black.b, white.b, w));
-    }
-    col.needsUpdate = true;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// 6. The cat builder. One parametric builder, two cats: the difference is the
-//    marking rules that get switched on, and the root scale (mass).
-//    Bobo is modelled at his CURRENT ~15 lb; Brandon's photo shows him at about
-//    10 lb, so the photo gives the MARKINGS and the current spec gives the
-//    BODY (docs/ART_STYLE.md §6 — the 15 lb body shape is an assumption).
-// ---------------------------------------------------------------------------
-function ellGeo(rx, ry, rz, w = 36, h = 24) {
-  const g = new THREE.SphereGeometry(1, w, h);
-  g.userData = { ell: [rx, ry, rz] };
-  return g;
-}
-function addMesh(parent, geo, mat, pos, tag, { rot = null, cast = true, contact = false } = {}) {
-  const m = new THREE.Mesh(geo, mat);
-  if (geo.userData?.ell) m.scale.set(geo.userData.ell[0], geo.userData.ell[1], geo.userData.ell[2]);
-  m.position.set(pos[0], pos[1], pos[2]);
-  if (rot) m.rotation.set(rot[0], rot[1], rot[2]);
-  m.castShadow = cast;
-  m.receiveShadow = false;
-  if (tag) m.userData.tag = tag;
-  if (contact) m.userData.contact = true;
-  parent.add(m);
-  return m;
-}
-function cylinderBetween(a, b, r, mat, tag, segments = 1) {
-  const va = new THREE.Vector3(...a);
-  const vb = new THREE.Vector3(...b);
-  const dir = new THREE.Vector3().subVectors(vb, va);
-  const len = dir.length();
-  // more height segments than a cylinder needs, because the markings are vertex
-  // colours: a two-row cylinder has nowhere to put a white neck band.
-  const g = new THREE.CylinderGeometry(r, r * 1.06, len, 20, segments, false);
-  const m = new THREE.Mesh(g, mat);
-  m.position.copy(va).add(vb).multiplyScalar(0.5);
-  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
-  m.castShadow = true;
-  if (tag) m.userData.tag = tag;
-  return m;
-}
-function whiskers() {
-  const pts = [];
-  for (const s of [-1, 1]) {
-    const root = [s * 0.028, -0.012, 0.058];
-    for (let i = 0; i < 3; i++) {
-      pts.push(root[0], root[1], root[2]);
-      pts.push(s * (0.085 + i * 0.012), -0.02 - i * 0.009 + 0.012, 0.052 - i * 0.012);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: new THREE.Color(TOKENS.whisker) }));
-  m.userData.tag = 'whisker';
-  m.userData.noContact = true;
-  return m;
-}
-/** The head, built around its own centre so it can hang off a pivot. */
-function buildHead(mats) {
-  const g = new THREE.Group();
-  addMesh(g, ellGeo(0.09, 0.083, 0.084, 72, 48), mats.fur, [0, 0, 0], 'head');
-  g.userData.eyes = [];
-  for (const s of [-1, 1]) {
-    const eye = new THREE.Group();
-    eye.position.set(s * 0.037, 0.012, 0.061);
-    const sclera = addMesh(eye, new THREE.SphereGeometry(0.0165, 20, 14), mats.sclera, [0, 0, 0], 'eye', { cast: false });
-    sclera.scale.set(1, 1.05, 0.7);
-    const n = new THREE.Vector3(s * 0.32, 0.1, 0.94).normalize();
-    const iris = new THREE.Mesh(new THREE.CircleGeometry(0.0105, 24), mats.iris);
-    iris.position.copy(n).multiplyScalar(0.0148);
-    iris.lookAt(new THREE.Vector3().addVectors(iris.position, n));
-    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.0044, 16), mats.pupil);
-    pupil.position.copy(n).multiplyScalar(0.0156);
-    pupil.lookAt(new THREE.Vector3().addVectors(pupil.position, n));
-    g.add(eye);
-    g.userData.eyes.push(eye);
-
-    const ear = addMesh(g, new THREE.ConeGeometry(0.031, 0.054, 18), mats.fur, [s * 0.055, 0.064, -0.004], 'ear', {
-      rot: [-18 * DEG, 0, s * 17 * DEG],
-    });
-    const inner = addMesh(g, new THREE.ConeGeometry(0.018, 0.03, 16), mats.earInner, [s * 0.05, 0.058, 0.013], 'ear-inner', {
-      rot: [-18 * DEG, 0, s * 17 * DEG],
-      cast: false,
-    });
-    void inner;
-  }
-  addMesh(g, ellGeo(0.0125, 0.009, 0.008, 18, 12), mats.nose, [0, -0.018, 0.076], 'nose', { cast: false });
-  g.add(whiskers());
-  return g;
-}
-
-const CAT_SPECS = {
-  bobo: { scale: [1, 1, 1], poses: ['sit', 'loaf'], rules: rulesBobo },
-  decoy: { scale: [1.3, 1.13, 1.12], poses: ['sit', 'sprawl'], rules: rulesDecoy },
-};
-
-function buildCat(kind) {
-  const spec = CAT_SPECS[kind];
-  const root = new THREE.Group();
-  root.name = `cat-${kind}`;
-  root.scale.set(spec.scale[0], spec.scale[1], spec.scale[2]);
-  const mats = {
-    fur: furMaterial({ sheen: true }),
-    white: std(TOKENS.furWhite, { roughness: 0.62 }),
-    nose: std(TOKENS.nose, { roughness: 0.45 }),
-    earInner: std(TOKENS.earInner, { roughness: 0.75 }),
-    sclera: std(0xf3efe6, { roughness: 0.25 }),
-    iris: new THREE.MeshStandardMaterial({ color: new THREE.Color(TOKENS.eyes), roughness: 0.2, side: THREE.DoubleSide }),
-    pupil: std(TOKENS.pupil, { roughness: 0.15 }),
-    fuzz: fuzzMaterial(),
-  };
-  const cat = { kind, root, mats, poses: {}, contacts: {}, pivots: {}, current: spec.poses[0], fuzzCount: 0 };
-  for (const pose of spec.poses) {
-    const grp = new THREE.Group();
-    grp.visible = pose === cat.current;
-    const contacts = [];
-    cat.pivots[pose] = buildPose(kind, pose, grp, mats, contacts);
-    root.add(grp);
-    cat.poses[pose] = grp;
-    cat.contacts[pose] = contacts;
-    paintPose(cat, pose, spec.rules(pose), cat.pivots[pose].head);
-  }
-  root.traverse((o) => {
-    if (o.userData?.fuzz) cat.fuzzCount++;
-  });
-  return cat;
-}
-
-function setCatPose(cat, pose) {
-  if (!cat.poses[pose] || cat.current === pose) return;
-  cat.current = pose;
-  for (const [name, grp] of Object.entries(cat.poses)) grp.visible = name === pose;
-}
-
-/** One pose of one cat, authored in cat-root space (metres, feet at y = 0). */
-function buildPose(kind, pose, grp, mats, contacts) {
-  const fur = mats.fur;
-  const white = mats.white;
-  const isDecoy = kind === 'decoy';
-
-  if (pose === 'sit') {
-    const haunch = addMesh(grp, ellGeo(0.135, 0.14, 0.13, 56, 40), fur, [0, 0.14, -0.05], 'torso', { contact: true });
-    contacts.push(haunch);
-    addMesh(grp, ellGeo(0.105, 0.16, 0.125, 56, 40), fur, [0, 0.215, 0.075], 'chest');
-    grp.add(cylinderBetween([0, 0.3, 0.05], [0, 0.4, 0.038], isDecoy ? 0.062 : 0.055, fur, 'neck', 12));
-    for (const s of [-1, 1]) {
-      grp.add(cylinderBetween([s * 0.058, 0.25, 0.116], [s * 0.058, 0.065, 0.12], 0.028, fur, 'foreleg'));
-      const paw = addMesh(grp, ellGeo(0.034, 0.023, 0.054, 24, 16), white, [s * 0.058, 0.023, 0.142], 'fore-paw', { contact: true, cast: false });
-      contacts.push(paw);
-      const hind = addMesh(grp, ellGeo(0.036, 0.024, isDecoy ? 0.06 : 0.054, 24, 16), white, [s * (isDecoy ? 0.105 : 0.1), 0.024, -0.135], 'hind-foot', { contact: true, cast: false });
-      contacts.push(hind);
-    }
-  } else if (pose === 'loaf') {
-    const body = addMesh(grp, ellGeo(0.125, 0.098, 0.2, 56, 40), fur, [0, 0.098, 0.01], 'torso', { contact: true });
-    contacts.push(body);
-    for (const s of [-1, 1]) {
-      const paw = addMesh(grp, ellGeo(0.032, 0.021, 0.05, 24, 16), white, [s * 0.052, 0.021, 0.19], 'fore-paw', { contact: true, cast: false });
-      contacts.push(paw);
-    }
-  } else {
-    // sprawl: the 22 lb cat belly-down with the hips out — reads as heavy and wide
-    const body = addMesh(grp, ellGeo(0.175, 0.135, 0.25, 56, 40), fur, [0, 0.135, -0.05], 'torso', { contact: true });
-    contacts.push(body);
-    grp.add(cylinderBetween([0, 0.16, 0.18], [0, 0.17, 0.235], 0.075, fur, 'neck', 12));
-    for (const s of [-1, 1]) {
-      const paw = addMesh(grp, ellGeo(0.038, 0.022, 0.085, 24, 16), white, [s * 0.085, 0.022, 0.245], 'fore-paw', { contact: true, cast: false });
-      contacts.push(paw);
-      const hind = addMesh(grp, ellGeo(0.05, 0.026, 0.09, 24, 16), white, [s * 0.155, 0.026, -0.215], 'hind-foot', { contact: true, cast: false });
-      hind.rotation.y = s * 0.5;
-      contacts.push(hind);
-    }
-  }
-
-  const headAt = pose === 'sit' ? [0, 0.445, 0.04] : pose === 'loaf' ? [0, 0.165, 0.155] : [0, 0.17, 0.245];
-  const head = buildHead(mats);
-  head.position.set(headAt[0], headAt[1], headAt[2]);
-  if (pose !== 'sit') head.rotation.x = 0.12;
-  grp.add(head);
-
-  const tailAt = pose === 'sit' ? [0, 0.135, -0.175] : pose === 'loaf' ? [0.09, 0.02, -0.12] : [0, 0.03, -0.285];
-  const pivot = new THREE.Group();
-  pivot.position.set(tailAt[0], tailAt[1], tailAt[2]);
-  const pts =
-    pose === 'sit'
-      ? [[0, 0, 0], [0.02, -0.05, -0.07], [0.09, -0.02, -0.13], [0.14, 0.05, -0.1]]
-      : pose === 'loaf'
-        ? [[0, 0, 0], [0.07, 0.005, -0.04], [0.14, 0.01, 0.02], [0.13, 0.02, 0.09]]
-        : [[0, 0, 0], [0.02, 0, -0.09], [0.05, 0.005, -0.17], [0.02, 0.01, -0.23]];
-  const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)));
-  const tail = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, isDecoy ? 0.021 : 0.016, 10, false), fur);
-  tail.castShadow = true;
-  tail.userData.tag = 'tail';
-  pivot.add(tail);
-  grp.add(pivot);
-
-  // the fuzz silhouette: max 2 shells per cat (body + head)
-  const bodyMesh = grp.children.find((c) => c.isMesh && c.userData.tag === 'torso');
-  const shellBody = fuzzShell(bodyMesh, mats.fuzz);
-  shellBody.position.copy(bodyMesh.position);
-  shellBody.scale.copy(bodyMesh.scale).multiplyScalar(1.045);
-  shellBody.castShadow = false;
-  grp.add(shellBody);
-  const shellHead = fuzzShell(head.children[0], mats.fuzz);
-  shellHead.scale.copy(head.children[0].scale).multiplyScalar(1.05);
-  shellHead.castShadow = false;
-  head.add(shellHead);
-  return { head, tailPivot: pivot, body: bodyMesh, shells: [shellBody, shellHead], baseHeadX: head.rotation.x };
-}
-
-// ---------------------------------------------------------------------------
-// 7. The room: a slice of a believable modern apartment. Realistic lighting and
-//    materials are the art goal (VISION.md); the layout itself is a PROVISIONAL
-//    placeholder until Brandon supplies the real apartment (docs/LOCATIONS.md).
-//    No ceiling, on purpose: the diorama view reads the whole room at once.
-//
-//    Every static prop is merged into one mesh per material. That is where the
-//    render budget comes from: the whole apartment is ~18 draws instead of ~50,
-//    so the two cats (and the celebration) get the rest of the frame.
-// ---------------------------------------------------------------------------
-const room = new THREE.Group();
-scene.add(room);
-const SUPPORTS = {}; // name -> world y of the surface things stand on (measured, see below)
-
-const _xform = new THREE.Object3D();
-function partMatrix(at = [0, 0, 0], rot = [0, 0, 0], scale = [1, 1, 1]) {
-  _xform.position.set(at[0], at[1], at[2]);
-  _xform.rotation.set(rot[0], rot[1], rot[2]);
-  _xform.scale.set(scale[0], scale[1], scale[2]);
-  _xform.updateMatrix();
-  return _xform.matrix.clone();
-}
-/** Merge prop geometry into one mesh per material: fewer draws, same look. */
-function mergedMesh(entries, { tag = '', cast = true, receive = true } = {}) {
-  const byMat = new Map();
-  for (const e of entries) {
-    const g = e.geo.index ? e.geo.toNonIndexed() : e.geo.clone();
-    g.applyMatrix4(partMatrix(e.at, e.rot, e.scale));
-    if (!byMat.has(e.mat)) byMat.set(e.mat, []);
-    byMat.get(e.mat).push(g);
-  }
-  const meshes = [];
-  for (const [mat, geos] of byMat) {
-    let count = 0;
-    for (const g of geos) count += g.attributes.position.count;
-    const pos = new Float32Array(count * 3);
-    const nor = new Float32Array(count * 3);
-    const uv = new Float32Array(count * 2);
-    let o = 0;
-    for (const g of geos) {
-      const n = g.attributes.position.count;
-      pos.set(g.attributes.position.array.subarray(0, n * 3), o * 3);
-      if (g.attributes.normal) nor.set(g.attributes.normal.array.subarray(0, n * 3), o * 3);
-      if (g.attributes.uv) uv.set(g.attributes.uv.array.subarray(0, n * 2), o * 2);
-      o += n;
-    }
-    const out = new THREE.BufferGeometry();
-    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    const m = new THREE.Mesh(out, mat);
-    m.castShadow = cast;
-    m.receiveShadow = receive;
-    if (tag) m.userData.tag = tag;
-    room.add(m);
-    meshes.push(m);
-  }
-  return meshes;
-}
-const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-const cyl = (rt, rb, h, seg = 18, open = false) => new THREE.CylinderGeometry(rt, rb, h, seg, 1, open);
-
-// floor: the one surface that keeps its own mesh, because the oak grain must
-// tile across it as a single plane
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(6.4, 5.2),
-  std(TOKENS.oakFloor, { roughness: 0.55, map: floorMap, roughnessMap: floorRough }),
-);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-floor.userData.tag = 'floor';
-room.add(floor);
-SUPPORTS.floor = 0;
-
-const plasterMat = std(TOKENS.plaster, { roughness: 0.95, map: plasterMap });
-const WALL_Z = -2.6;
-// the far wall is four slabs around a window opening (x ±1.15, y 0.5..2.0):
-// it has to cast its own shadow, or the sunlight on the floor is a lie
-mergedMesh(
-  [
-    { geo: box(2.05, 2.6, 0.12), mat: plasterMat, at: [-2.175, 1.3, WALL_Z] },
-    { geo: box(2.05, 2.6, 0.12), mat: plasterMat, at: [2.175, 1.3, WALL_Z] },
-    { geo: box(2.3, 0.5, 0.12), mat: plasterMat, at: [0, 0.25, WALL_Z] },
-    { geo: box(2.3, 0.6, 0.12), mat: plasterMat, at: [0, 2.3, WALL_Z] },
-    { geo: box(0.12, 2.6, 5.2), mat: plasterMat, at: [-3.2, 1.3, 0] },
-  ],
-  { tag: 'wall' },
-);
-
-// what the window looks out on: a flat, tone-mapping-exempt sky, so the sunlit
-// opening stays bright without turning the room into a blown-out white box
-const skyMap = canvasTexture(128, (ctx, s) => {
-  const g = ctx.createLinearGradient(0, 0, 0, s);
-  g.addColorStop(0, '#8ec4ea');
-  g.addColorStop(0.62, '#cfe6f4');
-  g.addColorStop(1, '#f3ead9');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-  ctx.fillStyle = 'rgba(120,150,110,0.5)';
-  for (let i = 0; i < 7; i++) {
-    ctx.beginPath();
-    ctx.arc(hash1(i * 3.3) * s, s * (0.8 + hash1(i) * 0.12), s * (0.1 + hash1(i + 5) * 0.08), 0, 7);
-    ctx.fill();
-  }
-});
-const sky = new THREE.Mesh(
-  new THREE.PlaneGeometry(3.6, 2.4),
-  new THREE.MeshBasicMaterial({ map: skyMap, toneMapped: false }),
-);
-sky.position.set(0, 1.28, WALL_Z - 0.18);
-sky.userData.tag = 'sky';
-room.add(sky);
-
-const metalMat = std(TOKENS.metal, { roughness: 0.45, metalness: 0.5 });
-const walnutMat = std(TOKENS.walnut, { roughness: 0.6 });
-mergedMesh([
-  // window frame
-  { geo: box(0.06, 1.5, 0.06), mat: metalMat, at: [0, 1.25, WALL_Z + 0.02] },
-  { geo: box(2.3, 0.06, 0.06), mat: metalMat, at: [0, 1.25, WALL_Z + 0.02] },
-  // floor lamp: base + stem
-  { geo: cyl(0.11, 0.13, 0.03), mat: metalMat, at: [-2.0, 0.015, -2.05] },
-  { geo: cyl(0.018, 0.018, 1.42), mat: metalMat, at: [-2.0, 0.72, -2.05] },
-  // side table
-  { geo: box(0.52, 0.04, 0.52), mat: walnutMat, at: [-2.5, 0.5, -1.55] },
-  { geo: cyl(0.016, 0.016, 0.5, 10), mat: walnutMat, at: [-2.72, 0.25, -1.77] },
-  { geo: cyl(0.016, 0.016, 0.5, 10), mat: walnutMat, at: [-2.72, 0.25, -1.33] },
-  { geo: cyl(0.016, 0.016, 0.5, 10), mat: walnutMat, at: [-2.28, 0.25, -1.77] },
-  { geo: cyl(0.016, 0.016, 0.5, 10), mat: walnutMat, at: [-2.28, 0.25, -1.33] },
-  // picture frames on the far wall
-  { geo: box(0.34, 0.44, 0.03), mat: walnutMat, at: [1.7, 1.5, WALL_Z + 0.075] },
-  { geo: box(0.28, 0.36, 0.03), mat: walnutMat, at: [2.35, 1.32, WALL_Z + 0.075] },
-]);
-
-const curtainMat = std(0xe9e2d4, { roughness: 0.98 });
-mergedMesh(
-  [
-    { geo: box(0.24, 2.0, 0.05), mat: curtainMat, at: [-1.32, 1.25, WALL_Z + 0.09] },
-    { geo: box(0.24, 2.0, 0.05), mat: curtainMat, at: [1.32, 1.25, WALL_Z + 0.09] },
-  ],
-  { tag: 'curtain' },
-);
-
-// rug: the searching stage. Its top surface is measured, not assumed, because
-// the cats stand on it.
-const [rugMesh] = mergedMesh(
-  [{ geo: box(2.7, 0.012, 1.9), mat: std(TOKENS.rug, { roughness: 0.98, map: rugMap }), at: [0.1, 0.006, 0.55] }],
-  { tag: 'rug', cast: false },
-);
-SUPPORTS.rug = new THREE.Box3().setFromObject(rugMesh).max.y;
-
-// couch against the -x wall. The seat cushions are a separate mesh (identical
-// fabric) so selfTest can measure the height Bobo is actually loafing on.
-const couchMat = std(TOKENS.couch, { roughness: 0.92, map: couchMap });
-mergedMesh(
-  [
-    { geo: box(0.9, 0.32, 2.4), mat: couchMat, at: [-2.6, 0.16, 0] },
-    { geo: box(0.22, 0.78, 2.4), mat: couchMat, at: [-3.05, 0.52, 0] },
-    { geo: box(0.9, 0.56, 0.22), mat: couchMat, at: [-2.6, 0.44, 1.1] },
-    { geo: box(0.9, 0.56, 0.22), mat: couchMat, at: [-2.6, 0.44, -1.1] },
-  ],
-  { tag: 'couch' },
-);
-const [cushionMesh] = mergedMesh(
-  (() => {
-    const cushionMat = couchMat.clone();
-    return [
-      { geo: box(0.78, 0.22, 1.0), mat: cushionMat, at: [-2.5, 0.33, 0.46] },
-      { geo: box(0.78, 0.22, 1.0), mat: cushionMat, at: [-2.5, 0.33, -0.46] },
-    ];
-  })(),
-  { tag: 'cushion' },
-);
-SUPPORTS.cushion = new THREE.Box3().setFromObject(cushionMesh).max.y;
-mergedMesh(
-  [{ geo: box(0.26, 0.26, 0.26), mat: std(TOKENS.pillow, { roughness: 0.9 }), at: [-2.72, 0.57, 0.86], rot: [0, 0.5, 0.2] }],
-  { tag: 'pillow' },
-);
-
-// the small things a cat ignores, then knocks off the table
-mergedMesh([
-  { geo: cyl(0.042, 0.038, 0.09, 16), mat: std(TOKENS.uiPaper, { roughness: 0.35 }), at: [-2.42, 0.565, -1.5] },
-  { geo: cyl(0.17, 0.13, 0.3, 20), mat: std(0xb0694c, { roughness: 0.85 }), at: [2.62, 0.15, -2.05] },
-]);
-mergedMesh(
-  [{ geo: box(0.2, 0.035, 0.15), mat: std(TOKENS.uiCoral, { roughness: 0.8 }), at: [-2.6, 0.537, -1.62], rot: [0, -0.3, 0] }],
-  { tag: 'book', cast: false },
-);
-const leafMat = std(TOKENS.leaf, { roughness: 0.7 });
-const leaves = [];
-for (let i = 0; i < 6; i++) {
-  const a = (i / 6) * Math.PI * 2;
-  leaves.push({
-    geo: new THREE.SphereGeometry(1, 16, 10),
-    mat: leafMat,
-    at: [2.62 + Math.cos(a) * 0.09, 0.46 + (i % 3) * 0.06, -2.05 + Math.sin(a) * 0.09],
-    rot: [0.4 * Math.cos(a + 1), -a, 0.5 * Math.sin(a)],
-    scale: [0.05, 0.2, 0.02],
-  });
-}
-mergedMesh(leaves, { tag: 'plant', cast: false });
-
-// the cardboard box: the game's most important prop, in three of the ten moments
-const boxMat = std(TOKENS.cardboard, { roughness: 0.95 });
-boxMat.side = THREE.DoubleSide;
-mergedMesh(
-  [
-    { geo: box(0.62, 0.02, 0.44), mat: boxMat, at: [1.75, 0.01, 0.75] },
-    { geo: box(0.62, 0.32, 0.02), mat: boxMat, at: [1.75, 0.17, 0.53] },
-    { geo: box(0.62, 0.32, 0.02), mat: boxMat, at: [1.75, 0.17, 0.97] },
-    { geo: box(0.02, 0.32, 0.44), mat: boxMat, at: [1.44, 0.17, 0.75] },
-    { geo: box(0.02, 0.32, 0.44), mat: boxMat, at: [2.06, 0.17, 0.75] },
-  ],
-  { tag: 'box' },
-);
-mergedMesh(
-  [
-    { geo: box(0.28, 0.38, 0.01), mat: std(TOKENS.uiPaper, { roughness: 0.9 }), at: [1.7, 1.5, WALL_Z + 0.095] },
-    { geo: box(0.22, 0.3, 0.01), mat: std(TOKENS.uiPaper, { roughness: 0.9 }), at: [2.35, 1.32, WALL_Z + 0.095] },
-  ],
-  { tag: 'frame-print', cast: false },
-);
-
-// the lampshade is its own mesh because it glows from the inside
-const [shadeMesh] = mergedMesh(
-  [{ geo: cyl(0.13, 0.19, 0.26, 22, true), mat: std(TOKENS.lampShade, { roughness: 0.9 }), at: [-2.0, 1.5, -2.05] }],
-  { tag: 'lamp' },
-);
-shadeMesh.material.side = THREE.DoubleSide;
-shadeMesh.material.emissive = new THREE.Color(TOKENS.lampShade);
-shadeMesh.material.emissiveIntensity = 0.55;
-
-// ---------------------------------------------------------------------------
-// 8. The lighting rig (docs/ART_STYLE.md §4). One shadow-casting light — the
-//    sun through the window — plus a soft sky fill and one warm lamp.
-// ---------------------------------------------------------------------------
-const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
-scene.add(hemi);
-
-const sun = new THREE.DirectionalLight(0xfff2df, 2.8);
-sun.position.set(-1.5, 3.1, -5.4);
-sun.target.position.set(0.3, 0.25, 0.8);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -4;
-sun.shadow.camera.right = 4;
-sun.shadow.camera.top = 4;
-sun.shadow.camera.bottom = -4;
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 14;
-sun.shadow.bias = -0.0006;
-sun.shadow.normalBias = 0.02;
-scene.add(sun, sun.target);
-
-const lampLight = new THREE.PointLight(0xffc98a, 6, 4.6, 2);
-lampLight.position.set(-2.0, 1.45, -2.05);
-lampLight.castShadow = false;
-scene.add(lampLight);
-
-// ---------------------------------------------------------------------------
-// 9. The two cats.
+// 4. The two cats (src/cat.js). One builder; the difference is the rules.
 // ---------------------------------------------------------------------------
 const bobo = buildCat('bobo');
 const decoy = buildCat('decoy');
@@ -866,138 +124,13 @@ function placeCats(moment) {
 }
 
 // ---------------------------------------------------------------------------
-// 10. Celebration: it rains little Bobo heads. Flat merged geometry, one
-//     InstancedMesh per layer (head / muzzle / dash) so the whole crowd of 42
-//     is three draw calls, plus two firework bursts as Points.
+// 5. Celebration (src/celebrate.js): it rains little Bobo heads, plus two
+//    firework bursts. Created now, hidden until a moment shows them.
 // ---------------------------------------------------------------------------
-function triGeo(a, b, c) {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...c], 3));
-  g.computeVertexNormals();
-  return g;
-}
-function mergeFlat(parts) {
-  let count = 0;
-  const geos = parts.map(({ geo, at }) => {
-    const g = geo.index ? geo.toNonIndexed() : geo;
-    if (at) g.applyMatrix4(new THREE.Matrix4().makeTranslation(at[0], at[1], at[2]));
-    count += g.attributes.position.count;
-    return g;
-  });
-  const pos = new Float32Array(count * 3);
-  const nor = new Float32Array(count * 3);
-  let o = 0;
-  for (const g of geos) {
-    pos.set(g.attributes.position.array, o * 3);
-    if (g.attributes.normal) nor.set(g.attributes.normal.array, o * 3);
-    o += g.attributes.position.count;
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  return out;
-}
-const RAIN_N = 42;
-const headGeo = mergeFlat([
-  { geo: new THREE.CircleGeometry(0.5, 20) },
-  { geo: triGeo([-0.5, 0.12, 0], [-0.16, 0.34, 0], [-0.42, 0.62, 0]) },
-  { geo: triGeo([0.5, 0.12, 0], [0.42, 0.62, 0], [0.16, 0.34, 0]) },
-]);
-const muzzleGeo = mergeFlat([{ geo: new THREE.CircleGeometry(0.2, 16), at: [0, -0.16, 0.004] }]);
-const dashGeo = mergeFlat([{ geo: new THREE.PlaneGeometry(0.1, 0.3), at: [0, 0.16, 0.004] }]);
-
-function rainLayer(geo, color) {
-  const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(color), side: THREE.DoubleSide }), RAIN_N);
-  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  m.frustumCulled = false;
-  m.visible = false;
-  m.userData.tag = 'rain';
-  scene.add(m);
-  return m;
-}
-const rainHeads = rainLayer(headGeo, TOKENS.furBlack);
-const rainMuzzles = rainLayer(muzzleGeo, TOKENS.furWhite);
-const rainDashes = rainLayer(dashGeo, TOKENS.furWhite);
-
-const rainSeeds = [];
-for (let i = 0; i < RAIN_N; i++) {
-  rainSeeds.push({
-    x: -2.4 + hash1(i * 1.7 + 0.3) * 4.6,
-    z: -1.8 + hash1(i * 2.9 + 1.7) * 3.6,
-    phase: hash1(i * 3.7 + 2.3),
-    speed: 0.55 + hash1(i * 5.1 + 4.1) * 0.5,
-    spin: hash1(i * 7.3 + 5.9) * Math.PI * 2,
-    size: 0.05 + hash1(i * 11.1 + 7.7) * 0.055,
-  });
-}
-const _rainObj = new THREE.Object3D();
-function updateRain(t) {
-  for (let i = 0; i < RAIN_N; i++) {
-    const s = rainSeeds[i];
-    const fall = fract(s.phase + (t * s.speed) / 3.3);
-    _rainObj.position.set(s.x, 3.15 - fall * 3.5, s.z);
-    _rainObj.rotation.set(0, 0, s.spin + t * s.speed * 0.9);
-    _rainObj.scale.setScalar(s.size);
-    _rainObj.updateMatrix();
-    rainHeads.setMatrixAt(i, _rainObj.matrix);
-  }
-  for (const m of [rainHeads, rainMuzzles, rainDashes]) {
-    m.instanceMatrix.needsUpdate = true;
-  }
-}
-
-function burst(at, colors, seed) {
-  const N = 90;
-  const pos = new Float32Array(N * 3);
-  const col = new Float32Array(N * 3);
-  const c = colors.map((h) => new THREE.Color(h));
-  for (let i = 0; i < N; i++) {
-    const a = hash1(i * 1.3 + seed) * Math.PI * 2;
-    const z = hash1(i * 2.7 + seed * 3) * 2 - 1;
-    const r = Math.sqrt(Math.max(0, 1 - z * z));
-    pos[i * 3] = Math.cos(a) * r;
-    pos[i * 3 + 1] = z;
-    pos[i * 3 + 2] = Math.sin(a) * r;
-    const cc = c[i % c.length];
-    col[i * 3] = cc.r;
-    col[i * 3 + 1] = cc.g;
-    col[i * 3 + 2] = cc.b;
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const m = new THREE.PointsMaterial({
-    size: 0.06,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    toneMapped: false,
-  });
-  const p = new THREE.Points(g, m);
-  p.position.set(at[0], at[1], at[2]);
-  p.frustumCulled = false;
-  p.visible = false;
-  p.userData.tag = 'firework';
-  scene.add(p);
-  return p;
-}
-const bursts = [
-  { mesh: burst([-0.5, 1.55, 0.5], [TOKENS.uiMustard, TOKENS.uiCoral, TOKENS.uiPaper], 1.1), period: 2.4, offset: 0 },
-  { mesh: burst([0.75, 1.75, 0.15], [TOKENS.uiGlow, TOKENS.uiMustard, TOKENS.uiCoral], 5.7), period: 2.4, offset: 1.2 },
-];
-function updateFireworks(t) {
-  for (const b of bursts) {
-    const u = fract((t + b.offset) / b.period);
-    const k = easeOutCubic(u);
-    b.mesh.scale.setScalar(0.14 + 1.5 * k);
-    b.mesh.material.opacity = Math.pow(1 - u, 1.6) * 0.95;
-  }
-}
+const { rainHeads, rainMuzzles, rainDashes, bursts, updateRain, updateFireworks } = createCelebration(scene);
 
 // ---------------------------------------------------------------------------
-// 11. The HUD (design system §8). DOM, not geometry: crisp at every size and
+// 6. The HUD (design system §8). DOM, not geometry: crisp at every size and
 //     free for the render budget. The strings are exact and selfTest checks them.
 // ---------------------------------------------------------------------------
 const el = {
@@ -1088,110 +221,12 @@ function resize() {
 }
 
 // ---------------------------------------------------------------------------
-// 12. selfTest. Every number is measured back out of the built geometry (and
-//     the built DOM), so a check can actually fail — including the checks that
-//     say "Bobo and the decoy are instantly distinguishable", which is the
-//     whole art-direction problem of this game.
+// 7. selfTest. Every number is measured back out of the built geometry (and
+//    the built DOM), so a check can actually fail — including the checks that
+//    say "Bobo and the decoy are instantly distinguishable", which is the
+//    whole art-direction problem of this game. The measuring itself lives in
+//    src/measure.js; the expectations it measures against are art data.
 // ---------------------------------------------------------------------------
-const DASH_EXPECT = { c: [0, 0.036, 0.058], h: [0.0095, 0.036, 0.032] }; // where the art says the dash is
-const BIB_EXPECT = {
-  sit: { c: [0, 0.245, 0.122], h: [0.098, 0.095, 0.105] },
-  loaf: { c: [0, 0.1, 0.145], h: [0.075, 0.07, 0.075] },
-};
-const COLLAR_EXPECT = {
-  sit: { c: [0, 0.386, 0.045], h: [0.125, 0.034, 0.105] },
-  sprawl: { c: [0, 0.185, 0.165], h: [0.155, 0.115, 0.04] },
-};
-const LIN_WHITE = new THREE.Color(TOKENS.furWhite).r;
-const LIN_BLACK = new THREE.Color(TOKENS.furBlack).r;
-
-/** How much of each marking actually landed where the art says it should.
- *  Head rules are measured in head space, body rules in cat-root space. */
-function scanMarkings(cat, pose) {
-  cat.root.updateWorldMatrix(true, true);
-  const group = cat.poses[pose];
-  const headGroup = cat.pivots[pose].head;
-  const invRoot = new THREE.Matrix4().copy(cat.root.matrixWorld).invert();
-  const invHead = new THREE.Matrix4().copy(headGroup.matrixWorld).invert();
-  const out = { dash: 0, bib: 0, collar: 0, shells: 0, whiskers: 0, dashExtent: 0 };
-  const dashPts = [];
-  const v = new THREE.Vector3();
-  const m = new THREE.Matrix4();
-  group.traverse((obj) => {
-    if (obj.userData.fuzz) {
-      out.shells++;
-      return;
-    }
-    if (obj.userData.tag === 'whisker') {
-      out.whiskers += obj.geometry.attributes.position.count / 2;
-      return;
-    }
-    if (!obj.isMesh) return;
-    const col = obj.geometry?.attributes?.color;
-    if (!col) return;
-    const toHead = isHeadPart(obj);
-    m.multiplyMatrices(toHead ? invHead : invRoot, obj.matrixWorld);
-    const pos = obj.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(m);
-      const w = (col.getX(i) - LIN_BLACK) / Math.max(1e-6, LIN_WHITE - LIN_BLACK);
-      if (toHead) {
-        const d = boxSDF(v, DASH_EXPECT.c, DASH_EXPECT.h);
-        if (d < -0.002 && w >= 0.75) out.dash++;
-        if (d < 0.006 && w >= 0.4) dashPts.push(v.x, v.y, v.z);
-      } else {
-        if (w < 0.75) continue;
-        const bib = BIB_EXPECT[pose];
-        const collar = COLLAR_EXPECT[pose];
-        if (bib && ellSDF(v, bib.c, bib.h) < -0.002) out.bib++;
-        if (collar && ellSDF(v, collar.c, collar.h) < -0.002) out.collar++;
-      }
-    }
-  });
-  if (dashPts.length >= 3) {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(dashPts, 3));
-    const box3 = new THREE.Box3().setFromBufferAttribute(g.attributes.position);
-    const size = box3.getSize(new THREE.Vector3());
-    out.dashExtent = Math.max(size.x, size.y, size.z) * cat.root.scale.y;
-  }
-  return out;
-}
-/** Lowest point of a cat's feet/body minus the surface it is standing on. */
-function contactGap(cat) {
-  const support = (LAYOUT[momentName] ?? LAYOUT.default)[cat.kind].pos[1];
-  const y0 = SUPPORTS[support] ?? 0;
-  cat.root.updateWorldMatrix(true, true);
-  let lowest = Infinity;
-  let who = '';
-  for (const mesh of cat.contacts[cat.current]) {
-    const min = new THREE.Box3().setFromObject(mesh).min.y;
-    if (min < lowest) {
-      lowest = min;
-      who = mesh.userData.tag ?? 'part';
-    }
-  }
-  return { gap: lowest - y0, support, who };
-}
-/** How tall a `extent`-metre mark looks at `dist` metres, in 1080p pixels. */
-function projectedPx(extent, dist, fovDeg, heightPx = 1080) {
-  return (extent * heightPx) / (2 * dist * Math.tan((fovDeg / 2) * DEG));
-}
-const srgbLuma = (hex) => {
-  const ch = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((v) => {
-    const s = v / 255;
-    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
-};
-const contrast = (a, b) => {
-  const la = srgbLuma(a);
-  const lb = srgbLuma(b);
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-};
-
-const round = (v) => (typeof v === 'number' ? Number(v.toPrecision(6)) : v);
-
 /** Everything a frame's state must be reproducible from: moments and seeks are
  *  only order-independent if this string comes back identical. */
 function poseSignature() {
@@ -1294,7 +329,7 @@ function selfTest() {
 
   // --- feet on surfaces ---------------------------------------------------
   for (const cat of [bobo, decoy]) {
-    const { gap, support, who } = contactGap(cat);
+    const { gap, support, who } = contactGap(cat, (LAYOUT[momentName] ?? LAYOUT.default)[cat.kind].pos[1], SUPPORTS);
     add(
     `${cat.kind}-contact`,
     gap,
@@ -1388,7 +423,7 @@ function selfTest() {
     order.worstDiff <= 1e-9,
     `${order.visits} visits, declared order vs a seeded shuffle${order.worst ? ` (worst: ${order.worst})` : ''}`,
   );
-  add('seek-no-unseeded-random', unseededCalls, '0 calls', unseededCalls === 0, 'Math.random / Date.now inside seek / setMoment');
+  add('seek-no-unseeded-random', countUnseededCalls(), '0 calls', countUnseededCalls() === 0, 'Math.random / Date.now inside seek / setMoment');
   add('duration-positive', DURATION, '>0 s', DURATION > 0, null);
 
   const stats = window.LC?.getStats ? window.LC.getStats() : { drawCalls: 0 };
@@ -1412,8 +447,8 @@ function restoreAfterSelfTest() {
 }
 
 // ---------------------------------------------------------------------------
-// 13. The window.LC contract (docs/CAPTURE.md), so the Step 2 tool can drive
-//     this page exactly like the test scene.
+// 8. The window.LC contract (docs/CAPTURE.md), so the Step 2 tool can drive
+//    this page exactly like the test scene.
 // ---------------------------------------------------------------------------
 const state = { moment: 'default', time: 0, view: 'diorama', playing: false };
 let viewName = 'diorama';
@@ -1460,11 +495,11 @@ function installContract() {
     },
     renderNow() {
       resizeIfNeeded();
-      rendering = true;
+      setRendering(true);
       try {
         renderer.render(scene, camera);
       } finally {
-        rendering = false;
+        setRendering(false);
       }
     },
     getStats() {
