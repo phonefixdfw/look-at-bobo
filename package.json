@@ -11,7 +11,8 @@
     "capture:all": "node tools/capture.mjs tools/testscene.html --out captures/testscene-all --selftest --determinism",
     "capture:weak": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview --moments default --out captures/testscene-weaklaptop --gpu swiftshader --selftest",
     "capture:planted": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview,contact --moments default,cardboard-box --out captures/testscene-planted --param plant=lift --selftest",
-    "gate": "node tools/gate.mjs"
+    "gate": "node tools/gate.mjs",
+    "capture:style": "node tools/capture.mjs design/style-test.html --times 0,2.4,5 --views diorama,first-person,cats-close,bobo-face --moments default,lineup,loaf-couch,hud-score,hud-dag,win --out captures/style-test --selftest"
   },
   "devDependencies": {
     "playwright-core": "^1.65.1",

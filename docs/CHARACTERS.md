@@ -4,7 +4,7 @@
 
 ## Bobo (the star)
 - **Identity:** A real cat. The star of the game — never a villain, never a prop, never in danger.
-- **Size/build:** About 15 lb. (Exact body proportions/posture references to come from Brandon's photos/videos if available — TBD.)
+- **Size/build:** About 15 lb. **First reference photo is on file:** [`docs/reference/bobo-01.png`](reference/bobo-01.png) (supplied during Step 3). It shows Bobo at roughly **10 lb**, so it is authoritative for his **markings**, while the current **15 lb body shape is an assumption** (see `docs/ART_STYLE.md` §6). A recent ~15 lb photo and more angles (side/back/tail/belly) are still wanted; nothing beyond photo + Brandon's words is invented.
 - **Color/markings (from vision, confirmed):**
   - Mostly black coat.
   - White feet.
@@ -12,7 +12,7 @@
   - White muzzle.
   - White vertical dash on his forehead.
 - **Eyes:** Yellow-green.
-- **In-game look (vision direction):** A softly stylized, fur-shaded cat built from reference photos so he reads clearly as Bobo without trying to be a photograph. (Execution is a later art step; Step 1 records the identity/constraints.)
+- **In-game look (vision direction):** A softly stylized, fur-shaded cat built from reference photos so he reads clearly as Bobo without trying to be a photograph. **Step 3 delivered the look and his first code-built model** — markings painted as measured rules from the photo, the forehead dash exaggerated so it reads at search distance (`docs/ART_STYLE.md` §5–§6).
 - **Personality/feel in-game:** Joyful, adorable, the center of every moment. Always cute.
 - **Movement, poses, sounds (UNKNOWN — must come from Brandon or photos/videos; provisional defaults accepted for Step 1 only):**
   - How Bobo moves (walk/trot/pounce/loaf transitions, tail behavior, ear posture, typical idle animations).
@@ -28,7 +28,7 @@
   - White feet.
   - White **neck** (Bobo's is a white **bib** — the neck-vs-bib pattern is one of the tells).
   - **No white spot on his forehead.** Bobo's white vertical forehead dash is the **key tell** distinguishing the two cats.
-- **Eyes:** TBD (not supplied — do not invent).
+- **Eyes:** TBD (not supplied — do not invent). *Art placeholder only:* the Step 3 style test renders him with Bobo's yellow-green token so the scene can run; it is explicitly flagged in `docs/ART_STYLE.md` §11 and is not a claim about his real eyes.
 - **Role in gameplay:** If the player aims at him and shouts "LOOK AT BOBO!", they get a gentle, silly X, a voice says **"DAG!"** (spelled exactly that way, on purpose), and they lose 1 of their 10 points. The score floors at 0; there is no game over.
 - **Treatment rules:** He is never harmed, scared or mocked. He stays cute and oblivious, exactly like the scenery he is.
 - **In-game look:** Same build approach as Bobo (softly stylized, fur-shaded, built in code). He should read similarly to Bobo at a glance — that's the joke — while the forehead dash, the neck-vs-bib pattern and the size difference keep him clearly distinguishable on a second look.
@@ -44,5 +44,5 @@
 - **The decoy cat (above)**, added by Brandon's design change, is the only other character in scope. No other humans or animals (aligns with "not goals": no multiplayer; vision describes a solo apartment search). If Brandon later wants another presence (e.g. offscreen owner voice), that remains an optional future change.
 
 ## Casting / reference needs (provisional defaults accepted; real references still TBD if not supplied)
-- Reference photos/videos of Bobo (multiple angles, markings, eyes, typical poses) would guide Step 3+ art and Step 5 character work; if not supplied, proceed from the written description only and do not invent specifics.
+- **Partially supplied:** one Bobo photo is on file ([`docs/reference/bobo-01.png`](reference/bobo-01.png), shows him at ~10 lb). **Still wanted:** a recent ~15 lb photo, more angles (side/back/tail/belly), a pose video if you have one, and a photo of the decoy cat if he has one — each would replace an assumption, none is invented in the meantime. Without them, art proceeds from the written description + this photo only.
 - **Accepted provisional default / Step 1 direction:** Use **generic "normal cat stuff"** (lounging, rolling over, stretching, napping, curling up, etc.) as placeholders. **No claims are made about Bobo's specific real habits**; Bobo-specific habits remain not specified until references or descriptions are provided.
