@@ -11,7 +11,7 @@ deliberately trivial test scene; the real game arrives in later steps.
 npm install
 npm run serve      # see the scene yourself: http://127.0.0.1:8123/tools/testscene.html
 npm run capture    # 36 frames -> captures/testscene/_contact-sheet.png
-npm run gate       # prove the tool catches mistakes: 1 clean run + 4 planted faults
+npm run gate       # prove the tool catches mistakes: 1 clean run + 5 planted faults
 ```
 
 - `docs/CAPTURE.md` — how the tool works and the `window.LC` page contract

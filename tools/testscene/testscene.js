@@ -587,7 +587,7 @@ function installContract() {
         geometries: renderer.info.memory.geometries,
         textures: renderer.info.memory.textures,
         programs: renderer.info.programs ? renderer.info.programs.length : 0,
-        passes: 0, // no post-processing yet; Step 3+ reports real passes here
+        passes: 1, // one pass: the scene itself. Each post-processing pass must be added here.
         realLights,
         shadowLights,
       };
@@ -656,4 +656,9 @@ if (PLANT === 'lift') box.position.y += 0.05; // 5 cm float -> box-bottom-to-flo
 else if (PLANT === 'sink') box.position.y -= 0.02; // 2 cm sunk into the floor -> box-bottom-to-floor
 else if (PLANT === 'jam') stick.position.x -= 0.1; // slide the stick into the box -> stick-no-box-clipping
 else if (PLANT === 'text') endingEl.textContent = 'you did it! you win'; // the joke "fixed" -> ending-text-exact
-else if (PLANT && PLANT !== 'none') console.warn(`Unknown plant "${PLANT}". Use lift, sink, jam or text.`);
+else if (PLANT === 'stats') {
+  // Advertise a frame cheaper than it is -> stats-understated
+  const honest = window.LC.getStats;
+  window.LC.getStats = () => ({ ...honest(), drawCalls: 1, triangles: 1 });
+}
+else if (PLANT && PLANT !== 'none') console.warn(`Unknown plant "${PLANT}". Use lift, sink, jam, text or stats.`);

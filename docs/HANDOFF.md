@@ -13,7 +13,7 @@
 | # | Step | Status | Notes |
 |---|---|---|---|
 | 1 | Story, characters and locations | ✅ **LOCKED** | `docs/STORY.md`, `docs/CHARACTERS.md`, `docs/LOCATIONS.md` are locked at the approved vision level. Q1/Q2 answered by Brandon; Q3–Q10 accepted as provisional defaults. Unknown real-Bobo/apartment details remain TBD. Step 2 not started. |
-| 2 | Visual debugging tool | ✅ **built — awaiting review** | Done per build-a-game step 2: `tools/capture.mjs` + the `window.LC` page contract + `tools/gate.mjs`. See `docs/CAPTURE.md`. Test scene captures cleanly (36-frame default run: PASS, console clean, budget PASS) and planted faults are caught (4 faults, each named by a failing `selfTest` check, exit code 1). No art-style work, trivial placeholder scene only. Not merged. |
+| 2 | Visual debugging tool | ✅ **built — awaiting review** | Done per build-a-game step 2: `tools/capture.mjs` + the `window.LC` page contract + `tools/gate.mjs`. See `docs/CAPTURE.md`. Test scene captures cleanly (36-frame default run: PASS, console clean, budget PASS) and planted faults are caught (5 faults, each named by the check that caught it, exit code 1). No art-style work, trivial placeholder scene only. Not merged. |
 | 3 | Art style and design system | ⏳ | Not started. Next step when Brandon asks: three code-built mockups of the same trivial test arrangement in three different looks, captured with the Step 2 tool into one comparison sheet, then `docs/DESIGN_SYSTEM.md` after Brandon picks a style. Palette lint / contrast / colour-blind / photosensitivity checks get added to the tool there. |
 | 4 | Voices, sound and music | ⏳ | Not started. **Only step that costs money; requires Brandon's explicit approval before any spend.** |
 | 5 | Talking-character demo | ⏳ | Not started. |
@@ -40,7 +40,8 @@
 | 2026-11-14 | Q9–Q10 scope/never-guess defaults accepted: 10 moments / ~10–15 minutes; no extra never-guess list beyond standing rule that real Bobo/apartment specifics are not invented and remain TBD until supplied | Brandon (via project manager) | Accepted provisional defaults for Step 1 lock |
 | 2026-11-14 | Built Step 2 only (capture tool + `window.LC` contract + trivial placeholder test scene); Step 3 not started | Brandon (via request) | Explicit brief for this session |
 | 2026-11-14 | Vendored Three.js r187 as plain files in `vendor/` (committed, sha256 manifest, refreshed by `npm run vendor`) instead of a build step or CDN | Agent (autonomous) | Game must deploy to Brandon's own server as plain static files; no bundler, no CDN, readable provenance. MIT licence kept |
-| 2026-11-14 | Fault injection lives in the URL (`?plant=lift\|sink\|jam\|text`), never in the scene files | Agent (autonomous) | The committed scene stays correct, and "the gate actually fails loudly" can be re-proved on demand (`npm run gate`) |
+| 2026-11-14 | Fault injection lives in the URL (`?plant=lift\|sink\|jam\|text\|stats`), never in the scene files | Agent (autonomous) | The committed scene stays correct, and "the gate actually fails loudly" can be re-proved on demand (`npm run gate`) |
+| 2026-11-14 | Budget counts are measured by hooking the WebGL context (`drawArrays`/`drawElements`/instanced variants/`bindFramebuffer`) per frame, not read from the page's `renderer.info` | Agent | Numbers the page reports about itself can only ever be as honest as the page. Three.js also assigns `renderer.render` per instance, so there is no prototype to wrap — the context is the only place below the page that can be counted |
 | 2026-11-14 | `selfTest` measures numbers back out of the built geometry (Box3 + marker world positions) rather than restating the placement code; "tip touches box" was split into a touching check **and** a clipping check | Agent | A distance-only check cannot tell "touching" from "buried" — it reported PASS on a stick jammed into the box until the clipping check was added |
 | 2026-11-14 | Every captured frame is pixel-probed (mean luma, spread, colour count) and a black/blown-out frame fails the run | Agent | A headless WebGL failure otherwise produces a plausible-looking report and a black PNG nobody notices |
 | 2026-11-14 | `captures/` gitignored as scratch; keepable images get attached to a PR or copied somewhere permanent | Agent (build-a-game rule) | Captures are reproducible output, not source |
@@ -78,9 +79,9 @@
 ## 4. Demos (never delete; how to open each)
 | Demo | How to open | Files |
 |---|---|---|
-| Capture test scene (Step 2) | `npm install` then `npm run serve` → **http://127.0.0.1:8123/tools/testscene.html**. Add `?plant=lift`, `?plant=sink`, `?plant=jam` or `?plant=text` to see a deliberately planted mistake (the on-screen label shows which). | `tools/testscene.html`, `tools/testscene/testscene.js`, `vendor/three/` |
+| Capture test scene (Step 2) | `npm install` then `npm run serve` → **http://127.0.0.1:8123/tools/testscene.html**. Add `?plant=lift`, `?plant=sink`, `?plant=jam`, `?plant=text` or `?plant=stats` to see a deliberately planted mistake (the on-screen label shows which). | `tools/testscene.html`, `tools/testscene/testscene.js`, `vendor/three/` |
 | Contact sheet from a capture | `npm run capture`, then open `captures/testscene/_contact-sheet.png`, or serve it: **http://127.0.0.1:8123/captures/testscene/_contact-sheet.html** (36 frames, labelled, failures in red). | `captures/testscene/` (scratch, gitignored) |
-| Tool self-check | `npm run gate` — clean scene must PASS, four planted faults must FAIL with the check that caught them named. | `tools/gate.mjs`, `captures/gate/` |
+| Tool self-check | `npm run gate` — clean scene must PASS, five planted faults must FAIL with whatever caught them named. | `tools/gate.mjs`, `captures/gate/` |
 | *(Step 1 was documentation only — no demo)* | — | `docs/STORY.md`, `docs/CHARACTERS.md`, `docs/LOCATIONS.md` |
 
 ## 5. Audio and credits
@@ -99,16 +100,18 @@
 |---|---|
 | `tools/capture.mjs` | jump to any moment/time/view, render one frame, screenshot it, measure it; writes PNGs + `_contact-sheet.png` + `_contact-sheet.html` + `report.json`; exits non-zero on any failure |
 | `tools/testscene.html`, `tools/testscene/testscene.js` | the reference implementation of the `window.LC` page contract on a trivial placeholder scene (floor, box, leaning stick, a capsule standing in for Bobo, a clock hand) — 12 placeholder moments, 4 views, a 6 s loop |
-| `tools/gate.mjs` | the tool's own self-check: 1 clean run must PASS, 4 planted faults must FAIL with the catching check named (`npm run gate`) |
+| `tools/gate.mjs` | the tool's own self-check: 1 clean run must PASS, 5 planted faults must FAIL with whatever caught them named (`npm run gate`) |
 | `tools/serve.mjs`, `tools/sync-vendor.mjs`, `vendor/three/` | plain static server; pinned-Three.js sync + sha256 manifest; vendored Three.js r187 (MIT) |
 | `docs/CAPTURE.md` | the contract, usage, budget, checks, fault plants, and what later steps add here |
 
 ### Measured on this machine (Node 24.22, Google Chrome 157 headless, three r187)
-- **Default run** (`npm run capture`: 4 moments × 3 times × 3 views = 36 frames): **PASS** in ~5 s; console clean; **15/15** `selfTest` checks; budget PASS (max `drawCalls 10`, `triangles 1434`, `passes 0`, `shadowLights 1`, `realLights 1`); mean luma 111–131 across frames.
-- **Full sweep** (`npm run capture:all`: all 12 moments × 4 views × 2 times = 96 frames) with `--determinism`: **96/96 frames byte-identical on re-render**, PASS in ~17 s. A capture at t = 2.4 s is the same picture every time.
+- **Default run** (`npm run capture`: 4 moments × 3 times × 3 views = 36 frames): **PASS** in ~6 s; console clean; **15/15** `selfTest` checks; budget PASS (worst frame: `drawCalls 10`, `triangles 1434`, `passes 1`, `shadowLights 1`, `realLights 1`, all counted at the WebGL context, not taken from the page); mean luma 111–131 across frames.
+- **Full sweep** (`npm run capture:all`: all 12 moments × 4 views × 3 times = 144 frames) with `--determinism`: **144/144 frames byte-identical on re-render**, PASS in ~23 s. A capture at t = 2.4 s is the same picture every time.
 - **Weak-laptop smoke test** (`npm run capture:weak`, `--gpu swiftshader`, CPU): PASS; the CPU cost per frame came out consistently higher than the default path (~0.09–0.11 ms vs ~0.03–0.07 ms over repeat runs). Headless rAF caps near 60 fps whatever the machine, so ms/frame plus the budget counts are the numbers that mean something.
-- **Planted faults, each caught** (exit code 1, check named): box floated 5 cm → `box-bottom-to-floor = 0.05 (limit ±0.001 m)`; box sunk 2 cm → `-0.02`; stick jammed into the box → `stick-no-box-clipping = 0.0398 (limit 0 m)`; ending text "fixed" to `you did it! you win` → `ending-text-exact`.
-- **A real gap the exercise found:** a distance-only "tip touches box" check reported PASS on a stick buried 10 cm inside the box (inside a box, distance is 0). A separate clipping check now covers it, and `?plant=jam` proves that check bites.
+- **Planted faults, each caught** (exit code 1, the catcher named): box floated 5 cm → `box-bottom-to-floor = 0.05 (limit ±0.001 m)`; box sunk 2 cm → `-0.02`; stick jammed into the box → `stick-no-box-clipping = 0.0398 (limit 0 m)`; ending text "fixed" to `you did it! you win` → `ending-text-exact`; a scene claiming 1 draw call for a 10-draw frame → `stats-understated`, caught by the tool's own WebGL count rather than by anything the page said.
+- **Two real gaps this exercise found, in the tool rather than in the scene:**
+  1. a distance-only "tip touches box" check reported PASS on a stick buried 10 cm inside the box (inside a box, distance to its surface is 0). A separate clipping check now covers it, and `?plant=jam` proves that check bites;
+  2. the first version read the budget numbers out of `renderer.info` on the page's say-so, and reported `passes: 0` forever — a number that could never fail. The counts now come from hooked WebGL calls (`drawArrays`/`drawElements`/instanced/`bindFramebuffer`) measured per frame, so the page can be checked against them and understating is a failure. `passes`, `shadowLights` and `realLights` stay declarations (they describe intent, not GPU work), but the measured render-target count now sits beside them in `report.json` so a wrong declaration is visible; it becomes a hard check when post-processing arrives in Step 3+.
 - Random-order compatibility is enforced, not assumed: `moment-order-independent` visits all 12 moments twice (declared order vs a seeded shuffle) and compares poses to ≤1e-9, and `seek-no-unseeded-random` counts any `Math.random`/`Date.now` inside the seek path.
 
 ### Next step — Step 3: art style and design system (**not started, waits for Brandon**)

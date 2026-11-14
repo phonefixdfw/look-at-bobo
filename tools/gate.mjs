@@ -15,13 +15,14 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** [label, extra args, expected exit, check that must fail] */
+/** [label, extra args, expected exit, what must fail (a selfTest check or a tool failure)] */
 const CASES = [
   ['clean scene', [], 0, null],
   ['box floated 5 cm', ['--param', 'plant=lift'], 1, 'box-bottom-to-floor'],
   ['box sunk into floor', ['--param', 'plant=sink'], 1, 'box-bottom-to-floor'],
   ['stick clipped into box', ['--param', 'plant=jam'], 1, 'stick-no-box-clipping'],
   ['ending text "fixed"', ['--param', 'plant=text'], 1, 'ending-text-exact'],
+  ['scene lies about its cost', ['--param', 'plant=stats'], 1, 'stats-understated'],
 ];
 
 const BASE = ['tools/capture.mjs', 'tools/testscene.html', '--times', '2.4', '--views', 'overview', '--moments', 'default,win'];
@@ -36,7 +37,7 @@ const vendorOk = vendor.status === 0;
 ok &&= vendorOk;
 console.log(`${vendorOk ? 'PASS' : 'FAIL'}  vendor/ matches the pinned three`);
 
-// 2. The captures: one clean run that must pass, four faults that must be caught.
+// 2. The captures: one clean run that must pass, each planted fault that must be caught.
 for (const [label, extra, expectedExit, expectedCheck] of CASES) {
   const out = `captures/gate/${expectedCheck ? 'planted' : 'clean'}`;
   const run = spawnSync(process.execPath, [...BASE, ...extra, '--out', out, '--no-sheet'], {
@@ -51,9 +52,16 @@ for (const [label, extra, expectedExit, expectedCheck] of CASES) {
     const report = JSON.parse(readFileSync(join(ROOT, out, 'report.json'), 'utf8'));
     const failed = report.selfTest.checks.filter((c) => !c.pass);
     if (expectedCheck) {
-      checkOk = failed.some((c) => c.name === expectedCheck);
       const hit = failed.find((c) => c.name === expectedCheck);
-      detail = hit ? `caught by ${hit.name} = ${hit.value} (limit ${hit.limit})` : `nothing failed; verdict ${report.verdict}`;
+      // Some faults are caught by the scene's own checks, some by the tool's own
+      // measurements (a budget number, or stats that under-report what the GPU saw).
+      const toolHit = (report.failures || []).find((f) => f.includes(expectedCheck));
+      checkOk = Boolean(hit || toolHit);
+      detail = hit
+        ? `caught by ${hit.name} = ${hit.value} (limit ${hit.limit})`
+        : toolHit
+          ? `caught by the tool: ${toolHit.replace(/^frame #\d+ \([^)]*\): /, '')}`
+          : `nothing named "${expectedCheck}" failed; verdict ${report.verdict}`;
     } else {
       checkOk = report.verdict === 'PASS' && failed.length === 0;
       detail = `verdict ${report.verdict}, ${report.selfTest.checks.length} checks, ${report.frames.length} frames`;

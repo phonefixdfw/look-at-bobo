@@ -28,8 +28,8 @@ npm run vendor         # copy the pinned three build into vendor/ (already commi
 npm run serve          # http://127.0.0.1:8123/tools/testscene.html  (see it in your own browser)
 
 npm run capture        # 36 frames -> captures/testscene/ + _contact-sheet.png + report.json
-npm run gate           # the tool's own self-check: clean scene passes, 4 planted faults are caught
-npm run capture:all    # every moment × every view × 2 times, with byte-for-byte determinism check
+npm run gate           # the tool's own self-check: clean scene passes, 5 planted faults are caught
+npm run capture:all    # every moment × every view × every default time, with byte-for-byte determinism check
 npm run capture:weak   # one frame on the CPU (--gpu swiftshader): a weak-laptop smoke test
 npm run capture:planted# the tool MUST fail: a 5 cm floating box, caught by selfTest (exit code 1)
 ```
@@ -48,14 +48,16 @@ It prints one line per frame plus a summary and writes:
 - `NN__moment__view__t2.40s.png` — one frame per (moment, time, view);
 - `_contact-sheet.png` — every frame in one labelled image, failures outlined in red;
 - `_contact-sheet.html` — the same sheet as a clickable page (`npm run serve` to browse it);
-- `report.json` — per frame: renderer stats, the frame's pixels (mean luma, spread, colour
-  count), `selfTest` results, and the PNG hash; plus render probes, console/page/network
-  errors, the budget verdict, and an overall `verdict`.
+- `report.json` — per frame: the tool's own counts from the WebGL context (`gpu`), the page's
+  `getStats()`, the frame's pixels (mean luma, spread, colour count), `selfTest` results, and
+  the PNG hash; plus render probes, console/page/network errors, the budget verdict, and an
+  overall `verdict`.
 
 **Exit codes:** `0` all good · `1` a check failed · `2` the page or the tool could not be used.
 A run fails when `selfTest` fails, a budget number is over, a frame is black/blown out,
-`--determinism` shows a frame that changes on re-render, or the console has errors,
-including 404s. Typos in `--views` / `--moments` are an error, not a silent skip.
+`--determinism` shows a frame that changes on re-render, the console has errors
+(including 404s), or the page reports a cheaper frame than the GPU was given.
+Typos in `--views` / `--moments` are an error, not a silent skip.
 
 ## The page contract: `window.LC`
 
@@ -73,10 +75,16 @@ window.LC = {
   renderNow() {},        // render exactly one frame, synchronously
   getStats() {},         // { drawCalls, triangles, geometries, textures, programs,
                          //   passes, realLights, shadowLights }
+                         // passes = render passes per frame including the plain scene
+                         // pass (1 today; a composer adds one per pass)
   selfTest() {},         // { pass, checks: [{ name, pass, value, limit, note }] }
 };
 window.LCError = '…';    // set instead of ready:true if the page cannot start
 ```
+
+The tool wraps `renderNow()` (and the WebGL context) to time a frame and count what it draws,
+so `renderNow` must draw synchronously before returning and must not rely on `requestAnimationFrame`
+— that is what makes "jump to t and look" mean the same thing twice.
 
 This project also uses these extensions (the test scene implements them, later pages should too):
 
@@ -94,19 +102,34 @@ This project also uses these extensions (the test scene implements them, later p
   any call inside `seek`/`setMoment` and fails `seek-no-unseeded-random`.
 - `seek(t)` fully rebuilds the pose from `t`; `play()` steps a fixed 1/60 s per frame.
 - `renderer.setPixelRatio(1)`, so a capture is pixel-exact on any display.
-- Proof: `--determinism` re-renders every frame and compares PNG hashes. The 96-frame
-  full run is 96/96 byte-identical.
+- Proof: `--determinism` re-renders every frame and compares PNG hashes. `npm run capture:all`
+  is 144/144 frames byte-identical (12 moments × 4 views × 3 times).
 
 Because a moment must be reachable in any order (moments appear in random order in the
 game), `selfTest` visits all of them twice — once in declared order, once in a seeded
 shuffle — and compares poses (`moment-order-independent`). Order-dependence would be a
 real bug in the finished game, and it is caught here, on a placeholder scene, already.
 
-## Budget (AGENTS.md ground rule 7)
+## Budget
 
 Checked on every frame, overridable with `--budget`:
 
 `drawCalls ≤ 150` · `triangles ≤ 150 000` · `passes ≤ 3` · `shadowLights ≤ 2` · `realLights ≤ 6`
+
+(The intent is VISION.md: 60 fps at 1080p on a mid-range laptop. The build-a-game process
+also wants these numbers in `AGENTS.md`, which does not exist in this repo yet — see
+`docs/HANDOFF.md`, open question 1.)
+
+**What the tool trusts and what it measures.** The tool hooks the WebGL context itself
+(`drawArrays`, `drawElements`, the instanced variants, `bindFramebuffer`) and counts, per
+`renderNow()`, how many draw calls the GPU was really given, how many triangles that is, and
+how many render targets got bound. `drawCalls` and `triangles` are budget-checked against
+those counts, so a page cannot budget its way past the limit by reporting flattering numbers —
+and a page that reports fewer than the GPU saw fails outright (`stats-understated`;
+`?plant=stats` proves it). `passes`, `shadowLights` and `realLights` stay page-reported,
+because they describe intent rather than GPU work; the measured target count is printed and
+stored in `report.json` next to them, so an off declaration is visible rather than invisible.
+When post-processing arrives, that pair is the tripwire.
 
 The `rAF` fps probe is only a smoke test: headless Chrome caps it near 60 no matter how
 slow the machine is, so the honest numbers are **ms per frame** (`renderProbe` in
@@ -140,9 +163,10 @@ node tools/capture.mjs tools/testscene.html --param plant=lift --selftest   # ex
 | `sink` | box sinks 2 cm into the floor | `box-bottom-to-floor` |
 | `jam` | stick slides 10 cm into the box | `stick-no-box-clipping` |
 | `text` | the ending text gets "fixed" to `you did it! you win` | `ending-text-exact` |
+| `stats` | the page claims 1 draw call for a 10-draw frame | the tool's own WebGL count (`stats-understated`) |
 
-`npm run gate` runs all four plus the clean scene and checks both the exit code and the
-name of the check that caught it. A tool that only ever says PASS proves nothing.
+`npm run gate` runs all five plus the clean scene, and checks both the exit code and the
+name of what caught it. A tool that only ever says PASS proves nothing.
 
 ## Notes for the next steps
 

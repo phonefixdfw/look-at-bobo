@@ -43,7 +43,10 @@ import { startStaticServer } from './serve.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Performance budget (AGENTS.md ground rule 7): 60fps at 1080p on a mid-range laptop.
+// Performance budget, documented in docs/CAPTURE.md ("Budget"). The intent behind
+// the numbers is VISION.md: 60 fps at 1080p on a mid-range laptop. Note that the
+// build-a-game process also wants these in AGENTS.md, which does not exist yet
+// (see docs/HANDOFF.md, open question 1).
 const BUDGET = {
   drawCalls: 150,
   triangles: 150_000,
@@ -379,6 +382,73 @@ try {
   if (!contract.views.length) fail(2, 'The page declares no views (window.LC.views).');
   await page.evaluate(() => window.LC.pause?.());
 
+  // Count what the GPU is actually told to do, from the WebGL context itself.
+  // Three.js assigns `render` per renderer instance, so there is no prototype to
+  // wrap, and a page that reports its own stats could always report fewer. The
+  // context's draw calls are the number nobody can argue with.
+  const gpuStats = await page.evaluate(() => {
+    if (window.__lcGlu) return 'hooked';
+    const protos = [window.WebGL2RenderingContext?.prototype, window.WebGLRenderingContext?.prototype].filter(Boolean);
+    if (!protos.length) return 'no-webgl';
+    const counters = { drawCalls: 0, triangles: 0, targets: new Set() };
+    const TRIANGLES = 4; // gl.TRIANGLES
+    const FRAMEBUFFER = 36160; // gl.FRAMEBUFFER
+    const DRAW_FRAMEBUFFER = 36603; // gl.DRAW_FRAMEBUFFER
+    const c = counters;
+    const draw = (count, mode, instances = 1) => {
+      c.drawCalls += 1;
+      if (mode === TRIANGLES && count >= 3) c.triangles += Math.floor(count / 3) * instances;
+    };
+    const bind = (target, fbo, ctx) => {
+      if (target !== FRAMEBUFFER && target !== DRAW_FRAMEBUFFER) return;
+      c.targets.add(fbo ? fbo : `${ctx.canvas?.width}x${ctx.canvas?.height}:canvas`);
+    };
+    const hooks = {
+      drawArrays: (a) => draw(a[2], a[0]), // (mode, first, count)
+      drawElements: (a) => draw(a[1], a[0]), // (mode, count, type, offset)
+      drawArraysInstanced: (a) => draw(a[2], a[0], a[3]), // (mode, first, count, instanceCount)
+      drawElementsInstanced: (a) => draw(a[1], a[0], a[4]), // (mode, count, type, offset, instanceCount)
+      bindFramebuffer: (a, ctx) => bind(a[0], a[1], ctx), // (target, framebuffer)
+    };
+    for (const proto of protos) {
+      for (const [name, onCall] of Object.entries(hooks)) {
+        const orig = proto[name];
+        if (typeof orig !== 'function' || orig.__lcGlHooked) continue;
+        const wrapped = function (...args) {
+          onCall(args, this);
+          return orig.apply(this, args);
+        };
+        wrapped.__lcGlHooked = true;
+        proto[name] = wrapped;
+      }
+    }
+    window.__lcGlu = {
+      reset() {
+        counters.drawCalls = 0;
+        counters.triangles = 0;
+        counters.targets = new Set();
+      },
+      read() {
+        return { drawCalls: counters.drawCalls, triangles: counters.triangles, renderTargets: counters.targets.size };
+      },
+    };
+    return 'hooked';
+  });
+  // Snapshot those counters per frame by taking ownership of LC.renderNow, which
+  // the contract already says is the only way the tool draws a frame.
+  if (gpuStats === 'hooked') {
+    await page.evaluate(() => {
+      const LC = window.LC;
+      const orig = LC.renderNow.bind(LC);
+      LC.renderNow = () => {
+        window.__lcGlu.reset();
+        orig();
+        window.__lcGlFrame = window.__lcGlu.read();
+      };
+    });
+  }
+  const readGpuStats = () => (gpuStats === 'hooked' ? page.evaluate(() => window.__lcGlFrame ?? null) : Promise.resolve(null));
+
   const times = opts.times ?? defaultTimes(contract.duration);
   const views = pick('views', opts.views, contract.views);
   const moments = contract.hasMoments ? pick('moments', opts.moments, contract.moments) : [null];
@@ -405,6 +475,7 @@ try {
         const sha256 = createHash('sha256').update(png).digest('hex');
 
         const stats = await page.evaluate(() => window.LC.getStats?.() ?? null);
+        const gpu = await readGpuStats();
         const probe = await probeFrame(page, png);
         const selfTest = await page.evaluate(() => window.LC.selfTest?.() ?? null);
 
@@ -417,6 +488,7 @@ try {
           bytes: png.length,
           sha256,
           stats,
+          gpu,
           probe,
           selfTest,
           failures: [],
@@ -430,9 +502,23 @@ try {
             failures.push(msg);
           }
         }
+        // A scene may describe its cost however it likes; it may not describe it as
+        // cheaper than the GPU says it was. Anything it does not report is measured
+        // here instead, so hiding a number does not remove it from the budget.
+        if (gpu) {
+          for (const key of ['drawCalls', 'triangles']) {
+            const reported = stats?.[key];
+            if (typeof reported === 'number' && gpu[key] > reported) {
+              const msg = `frame #${index} (${moment}/${view} t=${time}): stats-understated: page reports ${reported} ${key}, the GPU saw ${gpu[key]}`;
+              frame.failures.push(msg);
+              failures.push(msg);
+            }
+          }
+        }
         for (const [key, limit] of Object.entries(opts.budget)) {
-          if (stats && typeof stats[key] === 'number' && stats[key] > limit) {
-            const msg = `frame #${index} (${moment}/${view} t=${time}): budget ${key} ${stats[key]} > ${limit}`;
+          const value = gpu && typeof gpu[key] === 'number' ? gpu[key] : stats?.[key];
+          if (typeof value === 'number' && value > limit) {
+            const msg = `frame #${index} (${moment}/${view} t=${time}): budget ${key} ${value} > ${limit}`;
             frame.failures.push(msg);
             failures.push(msg);
           }
@@ -496,6 +582,7 @@ try {
     viewport: opts.size,
     budget: opts.budget,
     contract,
+    gpuStatsSource: gpuStats, // 'hooked' = counted at the WebGL context, not taken from the page
     params: Object.fromEntries(pairs),
     frames,
     renderProbe,
@@ -549,6 +636,13 @@ try {
   console.log(`  selfTest   ${report.selfTest.pass ? 'PASS' : 'FAIL'} (${checksPass}/${allChecks.length} checks passed)`);
   console.log(`  budget     ${budgetLine(frames, opts.budget)}`);
   console.log(`  pixels     luma ${range(frames.map((f) => f.probe.meanLuma))} · colours ${range(frames.map((f) => f.probe.colours))}`);
+  const claimed = frames.map((f) => f.stats?.passes).filter((v) => typeof v === 'number');
+  const targets = frames.map((f) => f.gpu?.renderTargets).filter((v) => typeof v === 'number');
+  console.log(
+    `  gpu        ${gpuStats === 'hooked' ? `counted at the WebGL context: ${worst.drawCalls ?? 0} draws, ${worst.triangles ?? 0} triangles` : 'not instrumented (the page exposed no WebGL context), using the page stats'}` +
+      (targets.length ? ` · ${Math.max(...targets)} render target(s) bound` : '') +
+      (claimed.length ? ` · page claims ${Math.max(...claimed)} pass(es)` : ''),
+  );
   console.log(`  render     ${range(renderProbe.map((p) => p.renderMs))} ms per frame · rAF ${range(renderProbe.map((p) => p.fps))} fps (headless caps rAF at ~60, so ms/frame is the honest number)`);
   if (opts.determinism) {
     const ok = frames.filter((f) => f.determinism?.identical).length;
@@ -607,10 +701,12 @@ function aggregateChecks(frames) {
 }
 
 function worstStats(frames) {
-  const keys = ['drawCalls', 'triangles', 'geometries', 'textures', 'programs', 'passes', 'shadowLights', 'realLights'];
+  const keys = ['drawCalls', 'triangles', 'geometries', 'textures', 'programs', 'passes', 'shadowLights', 'realLights', 'renderTargets'];
   const out = {};
   for (const k of keys) {
-    const vals = frames.map((f) => f.stats?.[k]).filter((v) => typeof v === 'number');
+    // Prefer what the tool measured at the WebGL context over what the page claims
+    // about the same number.
+    const vals = frames.map((f) => f.gpu?.[k] ?? f.stats?.[k]).filter((v) => typeof v === 'number');
     if (vals.length) out[k] = Math.max(...vals);
   }
   return out;
