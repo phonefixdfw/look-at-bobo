@@ -3,8 +3,9 @@ a game where you find a cat named bobo doing cute things and say "look at bobo"
 
 ## running things
 
-step 2 is in: a tool that jumps to any moment, screenshots it, and measures it, so
-"it looks fine" can be checked instead of guessed.
+**Step 2 is in.** There is a tool that jumps to any moment of the game, screenshots it, and
+measures it, so "it looks fine" can be checked instead of guessed. Right now it drives a
+deliberately trivial test scene; the real game arrives in later steps.
 
 ```bash
 npm install
