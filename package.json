@@ -7,6 +7,12 @@
   "scripts": {
     "vendor": "node tools/sync-vendor.mjs",
     "serve": "node tools/serve.mjs",
+    "audio:dry": "node tools/gen-audio.mjs",
+    "audio:status": "node tools/gen-audio.mjs --status",
+    "audio:list": "node tools/gen-audio.mjs --list-voices",
+    "audio:buy": "node tools/gen-audio.mjs --buy --max-credits 200",
+    "audio:selftest": "node tools/audio/tool-selftest.mjs",
+    "audio:pagecheck": "node tools/audio/page-check.mjs",
     "capture": "node tools/capture.mjs tools/testscene.html --times 0,2.4,5 --views overview,contact,first-person --moments default,cardboard-box,keyboard,win --out captures/testscene --selftest",
     "capture:all": "node tools/capture.mjs tools/testscene.html --out captures/testscene-all --selftest --determinism",
     "capture:weak": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview --moments default --out captures/testscene-weaklaptop --gpu swiftshader --selftest",
