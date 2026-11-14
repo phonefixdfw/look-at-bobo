@@ -4,14 +4,14 @@
 
 ## 0. Quick start
 1. Read `VISION.md` (root, approved by Brandon) and this file.
-2. Current step: **Step 1 — Story, characters and locations** (docs prepared in this PR; awaiting Brandon confirmation of real-Bobo facts/open questions).
-3. Open questions for Brandon are in **§3** below (with suggested defaults so he can answer "yes" to accept defaults).
+2. Current step: **Step 1 — Story, characters and locations** (docs prepared in this PR; moments/order answered, remaining questions pending).
+3. Open questions for Brandon are in **§3** below (Q1–Q2 answered; Q3–Q10 still pending with suggested defaults so he can answer "yes" to accept defaults).
 
 ## 1. Pipeline
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 1 | Story, characters and locations | 🔨 | Draft docs created: `docs/STORY.md`, `docs/CHARACTERS.md`, `docs/LOCATIONS.md`. Locked to vision; real-Bobo facts/layout/habits need Brandon confirmation. |
+| 1 | Story, characters and locations | 🔨 | Draft docs created: `docs/STORY.md`, `docs/CHARACTERS.md`, `docs/LOCATIONS.md`. Brandon answered Q1 (generic "normal cat stuff" moments) and Q2 (random order). Questions 3–10 remain pending with defaults. |
 | 2 | Visual debugging tool | ⏳ | Not started. |
 | 3 | Art style and design system | ⏳ | Not started. |
 | 4 | Voices, sound and music | ⏳ | Not started. **Only step that costs money; requires Brandon's explicit approval before any spend.** |
@@ -22,7 +22,7 @@
 | 9 | Polish | ⏳ | Not started. |
 | 10 | Deploy | ⏳ | Not started. Host chosen by Brandon. |
 
-**Current step:** 1. **What's happening right now:** Step 1 docs drafted on branch for PR; collecting Brandon's answers on real Bobo habits, apartment layout, and references.
+**Current step:** 1. **What's happening right now:** Step 1 docs drafted on branch for PR; moments and order are decided (generic cat behaviour + random order). Still collecting Brandon's answers on apartment layout/furniture/props, movement/sounds, references, and scope confirmations.
 
 ## 2. Decisions log
 
@@ -32,37 +32,36 @@
 | 2026-11-14 | Camera: first-person; Length: ~10–15 min (guess); Controls: keyboard+mouse; Tone: joyful/silly, no timers/failure; Platform: desktop browser; 10 catches/end text fixed as `your did it! you wind` | Vision / Brandon-approved | Recorded in `VISION.md` |
 | 2026-11-14 | No real-Bobo facts invented; unknowns recorded as questions with suggested defaults | Agent (Step 1 rule) | Vision principle: "Nothing is invented about the real Bobo. His looks and habits come from his owner." |
 | 2026-11-14 | Did not modify/override `VISION.md` or merge PR #2; noted PR #2 content in report | Agent | User instruction: mention any conflict rather than overriding it |
+| 2026-11-14 | Q1 moments: use "normal cat stuff" (lounging on furniture, rolling over, stretching, napping, curling up, etc.) as generic placeholders; no claims about Bobo's specific real habits; Bobo-specific habits remain not specified | Brandon (via project manager) | Answer to Step 1 open question Q1 |
+| 2026-11-14 | Q2 order: RANDOM moments each playthrough, no repeats within a run, still exactly 10 points; layout/respawn logic must support any moment from any valid location | Brandon (via project manager) | Answer to Step 1 open question Q2 |
 
-## 3. Open questions for Brandon (with suggested defaults)
+## 3. Open questions for Brandon (Q1–Q2 answered; Q3–Q10 pending with suggested defaults)
 
-**A. Bobo's real habits / the 10 moments (most important)**
-1. What are Bobo's **real 10 cutest habits/moments** we should capture (replacing or confirming the draft list)?
-   - *Draft list from vision:* loafing on the couch; stretching on the bed; staring at a bird from the balcony window; head in a cardboard box; sitting in the sink; batting a pen off the desk; sleeping in a laundry basket; chasing his tail in the hallway; making biscuits on a blanket; sitting on the keyboard.
-   - **Suggested default:** Use this draft list as-is for planning/placeholders until you provide the real list; swap in real habits 1:1 when confirmed.
-2. Any preferred **order** for the 10 moments, or should they appear in a set/randomized playful sequence (while still totaling 10 points)?
-   - **Suggested default:** A fixed, curated order that flows naturally through the apartment (easy to tune later).
+**A. Bobo's habits / the 10 moments (answered)**
+1. **Answered — moments:** Use **"normal cat stuff"**: lying on things, rolling over, lounging on furniture, stretching, napping, curling up, etc. Keep list generic; **no claims about Bobo's specific real habits**; Bobo-specific habits remain **not specified**.
+2. **Answered — order:** **RANDOM** order each playthrough, **no repeats within a run**, still exactly **10 points**. Layout/respawn logic must support any moment from any valid location.
 
-**B. Apartment layout and key furniture/props**
+**B. Apartment layout and key furniture/props (pending — suggested defaults remain in place)**
 3. What is the **real apartment layout** (rooms and how they connect)? A rough sketch/photo/description is enough for Step 1.
-   - **Suggested default:** Simple modern one-bedroom: living area + kitchenette, bedroom, bathroom, short hallway, and one large window (balcony optional).
+   - **Pending suggested default:** Simple modern one-bedroom: living area + kitchenette, bedroom, bathroom, short hallway, and one large window (balcony optional).
 4. Where are the key pieces for the moments: **couch, bed, desk+keyboard, pen, window/balcony, sink (kitchen or bathroom?), cardboard box, laundry basket, blanket**?
-   - **Suggested default:** Place each prop in the room implied by the draft moment (couch in living area, bed/blanket/basket options in bedroom, desk in living/bedroom, sink in kitchen *or* bathroom — TBD), treated as provisional.
+   - **Pending suggested default:** Place each prop in the room implied by the generic placeholder moments (couch in living area, bed/blanket/basket options in bedroom, desk in living/bedroom, sink in kitchen *or* bathroom — TBD), treated as provisional.
 5. Is there a **balcony** Bobo looks out from, or a **window** only? Which direction/view context matters (bird outside)?
-   - **Suggested default:** A window with a view outside (balcony access optional) sufficient for "staring at a bird".
+   - **Pending suggested default:** A window with a view outside (balcony access optional) sufficient for "staring at a bird".
 
 **C. Bobo's movement, sounds, and references**
 6. How does Bobo **move and behave** in these moments (posture, tail/ears, speed, transitions)? Any signature mannerisms?
-   - **Suggested default:** Generic cute cat motion as placeholders, refined once you describe or show references.
+   - **Pending suggested default:** Generic cute cat motion as placeholders, refined once you describe or show references.
 7. What **sounds** does Bobo make (meow/chirp/purr/silent) that we should plan for? (No audio will be made now; Step 4 needs approval.)
-   - **Suggested default:** Assume minimal/optional cute vocalizations TBD; keep "LOOK AT BOBO!" as the only required voiced line per vision.
+   - **Pending suggested default:** Assume minimal/optional cute vocalizations TBD; keep "LOOK AT BOBO!" as the only required voiced line per vision.
 8. Can you share **reference photos/videos** of Bobo (markings, face/eyes, body, typical poses) for later art steps?
-   - **Suggested default:** Proceed with the written description from vision (15 lb, mostly black, white feet/bib/muzzle/forehead dash, yellow-green eyes) until references are provided.
+   - **Pending suggested default:** Proceed with the written description from vision (15 lb, mostly black, white feet/bib/muzzle/forehead dash, yellow-green eyes) until references are provided.
 
 **D. Scope confirmations**
-9. Confirm **length feel** (~10–15 minutes) and that the draft moment count (10) is right?
-   - **Suggested default:** Yes, 10 moments / ~10–15 minutes as in vision.
+9. Confirm **length feel** (~10–15 minutes) and that the placeholder moment count (10) is right?
+   - **Pending suggested default:** Yes, 10 moments / ~10–15 minutes as in vision.
 10. Any other must-have details about the real Bobo or apartment that should never be guessed?
-   - **Suggested default:** None beyond the above; all unknown specifics remain TBD until you confirm.
+   - **Pending suggested default:** None beyond the above; all unknown specifics remain TBD until you confirm.
 
 ## 4. Demos (never delete; how to open each)
 | Demo | How to open | Files |
@@ -79,4 +78,4 @@
 
 ## 7. Next steps (Step 2 — not started)
 - **Step 2: Visual debugging tool** (`tools/capture.mjs` and `window.LC` contract per build-a-game). This requires a minimal test scene/page to capture — which implies starting technical scaffolding/code. **Do not begin until Step 1 is confirmed and you ask to proceed.**
-- Before Step 2: Brandon answers/confirms §3 questions (or accepts suggested defaults), and we mark Step 1 as locked/✅ with those decisions recorded.
+- Before Step 2: Brandon answers/confirms §3 Q3–Q10 (or accepts the pending suggested defaults), and we mark Step 1 as locked/✅ with those decisions recorded.

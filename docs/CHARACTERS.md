@@ -30,4 +30,4 @@
 
 ## Casting / reference needs (to confirm with Brandon)
 - Reference photos/videos of Bobo (multiple angles, markings, eyes, typical poses) to guide the Step 3+ art and Step 5 character work.
-- Confirmation of real habits/poses for each of the 10 moments so animations read as "Bobo", not generic cat behavior. Suggested default until provided: use the draft moments as generic cute-cat placeholders clearly labeled TBD in future docs.
+- **Pending suggested default / Step 1 direction:** Use **generic "normal cat stuff"** (lounging, rolling over, stretching, napping, curling up, etc.) as placeholders. **No claims are made about Bobo's specific real habits**; Bobo-specific habits remain not specified until references or descriptions are provided.
