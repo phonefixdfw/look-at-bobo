@@ -1,0 +1,22 @@
+  #01 idle/diorama t=1.20 ok
+  #02 idle/first-person t=1.20 ok
+  #03 catch/diorama t=1.20 ok
+  #04 catch/first-person t=1.20 ok
+  #05 wrong/diorama t=1.20 ok
+  #06 wrong/first-person t=1.20 ok
+  #07 win/diorama t=1.20 ok
+  #08 win/first-person t=1.20 ok
+
+capture: demo/talking-demo.html
+  frames     8 -> captures/talking-demo-determinism/ (_contact-sheet.png, report.json)
+  selfTest   PASS (37/37 checks passed)
+  budget     PASS (drawCalls 91<=150 · triangles 94260<=150000 · passes 1<=3 · shadowLights 1<=2 · realLights 2<=6)
+  pixels     luma 62.2..81.7 · colours 180..228
+  gpu        counted at the WebGL context: 91 draws, 94260 triangles · 2 render target(s) bound · page claims 1 pass(es)
+  render     0.16..0.22 ms per frame · rAF 22..23.8 fps (headless caps rAF at ~60, so ms/frame is the honest number)
+  determinism 8/8 frames byte-identical on re-render
+  console    clean
+
+VERDICT: PASS
+look at: captures/talking-demo-determinism/_contact-sheet.png
+exit=0

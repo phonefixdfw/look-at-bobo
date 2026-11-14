@@ -1,0 +1,20 @@
+  PASS  page-served — HTTP 200
+  PASS  page-boots — LC.ready
+  PASS  gate-locks-audio — audio + gate closed before any click
+  PASS  no-playback-before-click — yell-look-at-bobo.take1.mp3 req=0, dag-wrong-cat.take2.mp3 req=0, win-line.take2.mp3 req=0
+  PASS  click-opens-gate — gate hidden, engine unlocked by the click
+  PASS  catch-yell-played-through — started=1 ended=1 err=none
+  PASS  catch-yell-duration — 1.44s vs docs 1.44s
+  PASS  catch-score-rules — score 1, moment catch
+  PASS  wrong-yell-again — yell started=2 (shout first, it thought it was Bobo)
+  PASS  wrong-dag-played-through — started=1 ended=1 err=none
+  PASS  wrong-dag-duration — 0.84s vs docs 0.84s
+  PASS  wrong-score-rules — score floored at 0 (was 1), moment wrong
+  PASS  win-line-played-through — started=1 ended=1 err=none
+  PASS  win-line-duration — 1.86s vs docs 1.86s
+  PASS  win-score-and-text — score 10, ending "your did it! you wind"
+  PASS  no-engine-errors — yell-look-at-bobo.take1.mp3:ok, dag-wrong-cat.take2.mp3:ok, win-line.take2.mp3:ok
+  PASS  console-clean
+
+17/17 demo audio checks passed
+audio exit=0
