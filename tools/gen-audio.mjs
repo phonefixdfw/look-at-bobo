@@ -260,10 +260,14 @@ async function livePricesNote(api, models) {
   // Free call. Prints the account's own price payload for each model used, so
   // the published table above can be checked (and the ledger then settles it).
   try {
-    const { models: list } = await api('GET', '/v1/models');
+    // /v1/models has shipped in two shapes: { models: [...] } and a bare array.
+    const r = await api('GET', '/v1/models');
+    const list = Array.isArray(r) ? r : r.models ?? [];
     for (const id of models) {
       const m = list.find((x) => x.model_id === id);
-      console.log(`  model ${id}: ${m ? JSON.stringify(m.prices ?? m.price ?? '(no prices field)') : 'NOT AVAILABLE on this account'}`);
+      console.log(
+        `  model ${id}: ${m ? JSON.stringify(m.prices ?? m.price ?? '(no prices field in this account payload — published rate + ledger decide)') : 'NOT AVAILABLE on this account'}`,
+      );
     }
   } catch (e) {
     console.log(`  (couldn't read /v1/models: ${redact(e.message)})`);

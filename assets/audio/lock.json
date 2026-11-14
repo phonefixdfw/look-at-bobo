@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "entries": {
+    "yell-look-at-bobo#take1": {
+      "hash": "471546d8b1f36d13",
+      "file": "yell-look-at-bobo.take1.mp3",
+      "text": "LOOK AT BOBO!",
+      "model": "eleven_multilingual_v2",
+      "seed": 1876062199,
+      "settings": {
+        "stability": 0.3,
+        "similarity_boost": 0.8,
+        "style": 0.65,
+        "use_speaker_boost": true
+      },
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "voiceName": "Liam - Energetic, Social Media Creator",
+      "billableChars": 13,
+      "bytes": 24284,
+      "requestId": "8dxo4vtOhIopvGPMhqSS",
+      "generatedAt": "2026-11-14T22:17:52.370Z"
+    },
+    "yell-look-at-bobo#take2": {
+      "hash": "85315c6836432ca2",
+      "file": "yell-look-at-bobo.take2.mp3",
+      "text": "LOOK AT BOBO!",
+      "model": "eleven_multilingual_v2",
+      "seed": 1892839818,
+      "settings": {
+        "stability": 0.3,
+        "similarity_boost": 0.8,
+        "style": 0.65,
+        "use_speaker_boost": true
+      },
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "voiceName": "Liam - Energetic, Social Media Creator",
+      "billableChars": 13,
+      "bytes": 20941,
+      "requestId": "OoVtj2lsxahIwWqjcA1U",
+      "generatedAt": "2026-11-14T22:17:52.721Z"
+    },
+    "dag-wrong-cat#take1": {
+      "hash": "7ce36258c17901f1",
+      "file": "dag-wrong-cat.take1.mp3",
+      "text": "DAG!",
+      "model": "eleven_multilingual_v2",
+      "seed": 633787340,
+      "settings": {
+        "stability": 0.35,
+        "similarity_boost": 0.8,
+        "style": 0.5
+      },
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "voiceName": "Liam - Energetic, Social Media Creator",
+      "billableChars": 41,
+      "bytes": 16761,
+      "requestId": "DYT70UiczayqaKpiy2AB",
+      "generatedAt": "2026-11-14T22:17:53.158Z"
+    },
+    "dag-wrong-cat#take2": {
+      "hash": "169d1c9d864b7787",
+      "file": "dag-wrong-cat.take2.mp3",
+      "text": "DAG!",
+      "model": "eleven_multilingual_v2",
+      "seed": 684120197,
+      "settings": {
+        "stability": 0.35,
+        "similarity_boost": 0.8,
+        "style": 0.5
+      },
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "voiceName": "Liam - Energetic, Social Media Creator",
+      "billableChars": 41,
+      "bytes": 14253,
+      "requestId": "rs0cF3eir2jIPvLg2nld",
+      "generatedAt": "2026-11-14T22:17:53.608Z"
+    },
+    "win-line#take1": {
+      "hash": "5734b192f07d3794",
+      "file": "win-line.take1.mp3",
+      "text": "your did it! you wind",
+      "model": "eleven_multilingual_v2",
+      "seed": 2452163117,
+      "settings": {
+        "stability": 0.35,
+        "similarity_boost": 0.8,
+        "style": 0.55
+      },
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "voiceName": "Liam - Energetic, Social Media Creator",
+      "billableChars": 21,
+      "bytes": 27628,
+      "requestId": "9dvmBZIMXtSfrylEOOQ6",
+      "generatedAt": "2026-11-14T22:17:53.976Z"
+    },
+    "win-line#take2": {
+      "hash": "f62822cc9cf3612e",
+      "file": "win-line.take2.mp3",
+      "text": "your did it! you wind",
+      "model": "eleven_multilingual_v2",
+      "seed": 2401830260,
+      "settings": {
+        "stability": 0.35,
+        "similarity_boost": 0.8,
+        "style": 0.55
+      },
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "voiceName": "Liam - Energetic, Social Media Creator",
+      "billableChars": 21,
+      "bytes": 30972,
+      "requestId": "4Bb06Onfyf2R1AC6DBcn",
+      "generatedAt": "2026-11-14T22:17:54.424Z"
+    }
+  }
+}
