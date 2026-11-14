@@ -12,8 +12,10 @@
 > (`npm run serve` → voice-test page). Real cost: **60 credits posted ≈ $0.005**
 > (measured, was 250 of 10,000 before → 310 after) against a 150-credit /
 > $0.012 worst-case estimate — see "What it actually cost".
-> **V5 resolved by delegation (Brandon: "You can pick which takes to use"):
-> picks below, swap is free** — both takes of every line are already paid for.
+> **V5 take picks recorded (PROVISIONAL, on Brandon's delegation): take 1 for
+> all three lines** — no human has listened yet; the picks live in
+> `assets/audio/lock.json` → `chosen` and flipping one costs $0 (both takes of
+> every line are already paid for). Details + how to change: V5 below.
 
 ## The three lines (byte-exact — never "fix" the spellings)
 
@@ -193,28 +195,33 @@ deliberate `--allow-rebuy` re-spend, i.e. real money again):
 3. **"wind" pronunciation:** generated as written ("wihnd", rhymes with "win" — the joke). Audition both win takes and confirm you hear the joke; a "wynd" respell would be a rebuy.
 4. **"DAG!" flavour:** generated mock-stern and comic with delivery context. Audition both takes.
 
-**V5 — take picks: RESOLVED by delegation (2026-11-14).** Brandon answered
-the open question with *"You can pick which takes to use"*, so the picks below
-were made from measured properties of the files (loudness, dynamic swing,
-spectral brightness, speech/dead-air split via ffmpeg — **not** from hearing
-them; they're cheap to overrule: both takes are already paid for, the game just
-points at one filename per line, and trimming the small silences is Step 9's
-job). If a real listen says otherwise, say the word and the default flips —
-zero extra credits.
+**V5 — take picks: recorded, PROVISIONAL — take 1 for all three lines.**
+On Brandon's delegation the project manager recorded **take 1 of every line**
+(2026-11-14): `LOOK AT BOBO!` t1 · `DAG!` t1 · `your did it! you wind` t1.
+**Provisional means no human has listened yet** — and note the mechanical
+audition below actually favored *take 2* for `DAG!` and the win line, so give
+take 2 a listen before the picks harden. The picks live in
+**`assets/audio/lock.json` → `chosen`**; both take files stay in the repo, so
+**flipping a pick costs $0 and needs no API call** — say e.g.
+**"yell 2, dag 1, win 2"** or edit that field. (An earlier agent made
+measured-mechanical picks of yell t1 / DAG t2 / win t2; the PM's take-1 set
+supersedes it as the shipped default.)
 
-| Line | **Shipped take** | Why (measured) | Fallback on disk |
-|---|---|---|---|
-| `LOOK AT BOBO!` | **take 1** (1.44 s) | Brighter delivery (mean centroid 2,991 Hz vs 2,563) and a longer, more drawn-out "looook" (1.14 s speech vs 1.00) = the delighted "look look LOOK" brief; lower peak (−6.8 vs −6.2 dB) keeps it away from harsh/scary | take 2 — snappier and darker if the game ever wants speed over glee |
-| `DAG!` | **take 2** (0.84 s) | The pettier, punchier dag: hottest level (RMS −21.6 vs −25.1), tightest package (0.38 s speech), less tail dead air (0.38 vs 0.51 s) — a quick comic correction under the gentle X | take 1 — bigger theatrical swing (crest 18.6 dB) if you want a deflating "Daaag…" |
-| `your did it! you wind` | **take 2** (1.86 s) | The giddier read: much brighter (centroid 4,018 vs 2,804 Hz) with more dynamic movement (crest 16.2 vs 14.8 dB) and room for the mangled-grin joke (1.51 s speech) | take 1 — calmer/cooler read if take 2 comes off too peaked |
-
-Mechanical audition numbers (ffmpeg, 2026-11-14):
+Mechanical audition numbers (ffmpeg, 2026-11-14 — reference for the human
+listen; `speech` excludes head/tail silence, `crest` = dynamic swing,
+`centroid` = brightness):
 
 | Take | dur | speech | mean dBFS | peak dBFS | crest | centroid | tail silence |
 |---|---|---|---|---|---|---|---|
-| yell take1 ✅ | 1.44 s | 1.14 s | −21.3 | −6.8 | 14.5 dB | 2,991 Hz | 0.30 s |
-| yell take2 | 1.25 s | 1.00 s | −20.6 | −6.2 | 14.4 dB | 2,563 Hz | 0.25 s |
-| dag take1 | 0.98 s | 0.40 s | −25.1 | −6.5 | 18.6 dB | 5,456 Hz | 0.51 s |
-| dag take2 ✅ | 0.84 s | 0.38 s | −21.6 | −4.7 | 16.9 dB | 5,026 Hz | 0.38 s |
-| win take1 | 1.67 s | 1.34 s | −23.2 | −8.4 | 14.8 dB | 2,804 Hz | 0.28 s |
-| win take2 ✅ | 1.86 s | 1.51 s | −23.0 | −6.8 | 16.2 dB | 4,018 Hz | 0.31 s |
+| yell t1 ✅ chosen | 1.44 s | 1.14 s | −21.3 | −6.8 | 14.5 dB | 2,991 Hz | 0.30 s |
+| yell t2 | 1.25 s | 1.00 s | −20.6 | −6.2 | 14.4 dB | 2,563 Hz | 0.25 s |
+| dag t1 ✅ chosen | 0.98 s | 0.40 s | −25.1 | −6.5 | **18.6 dB** | 5,456 Hz | 0.51 s |
+| dag t2 | 0.84 s | 0.38 s | −21.6 | −4.7 | 16.9 dB | 5,026 Hz | 0.38 s |
+| win t1 ✅ chosen | 1.67 s | 1.34 s | −23.2 | −8.4 | 14.8 dB | 2,804 Hz | 0.28 s |
+| win t2 | 1.86 s | 1.51 s | −23.0 | −6.8 | 16.2 dB | 4,018 Hz | 0.31 s |
+
+What the numbers suggest while you listen: chosen **yell t1** is the brighter,
+more drawn-out delighted read; **dag t1** has the biggest theatrical swing
+(crest 18.6 dB — a "DAG…!" that deflates; t2 is the punchier pettier one);
+**win t1** is the cooler read (t2 is brighter and more dynamic if the win needs
+more giddy). Trimming the small silences is Step 9's job whatever gets chosen.

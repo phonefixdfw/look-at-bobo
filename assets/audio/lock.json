@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "chosen": {
+    "$comment": "The take each line ships with. PROVISIONAL: recorded 2026-11-14 by the PM on Brandon’s delegation without a human listen. To change, say e.g. \"yell 2, dag 1, win 2\" or edit this field — both takes of every line are already bought, so flipping a pick costs $0 and needs no API call. gen-audio.mjs preserves this field when it updates the lock. Full audition data: docs/VOICES.md.",
+    "yell-look-at-bobo": "take1",
+    "dag-wrong-cat": "take1",
+    "win-line": "take1"
+  },
   "entries": {
     "yell-look-at-bobo#take1": {
       "hash": "471546d8b1f36d13",
