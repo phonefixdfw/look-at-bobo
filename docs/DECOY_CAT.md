@@ -1,6 +1,6 @@
 # Look at Bobo — The decoy cat (name TBD)
 
-> Decisions log and open questions for Brandon's 2026-11-14 design change: a second cat, a decoy. This file lives on its own (rather than in `docs/HANDOFF.md`) because PR #4 is currently editing HANDOFF.md; **HANDOFF.md should be updated to link here after PR #4 merges.**
+> Decisions log and open questions for Brandon's 2026-11-14 design change: a second cat, a decoy. This file lives on its own (rather than in `docs/HANDOFF.md`) because PR #4 was editing HANDOFF.md when it arrived. **Done:** PR #4 merged, and `docs/HANDOFF.md` §6 now links here (Step 3 housekeeping, 2026-11-14).
 
 ## What Brandon decided (2026-11-14 design change)
 | Date | Decision | Source |

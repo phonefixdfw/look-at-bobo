@@ -170,10 +170,16 @@ name of what caught it. A tool that only ever says PASS proves nothing.
 
 ## Notes for the next steps
 
-- **Step 3 (art style)** reuses this tool: three mockups, each exposing `window.LC`, are
-  captured into one comparison sheet. Palette lint, text contrast/size, a colour-blind
-  simulation and a photosensitivity probe (≤3 full-frame brightness swings over 20 % in
-  any second) get added to the tool there, when the design system defines them.
+- **Step 3 (art style) — done.** This tool now drives a second page: the style
+  test scene `design/style-test.html` (`npm run capture:style`, 72 frames:
+  6 moments × 4 views × 3 times), the reference implementation of
+  `docs/ART_STYLE.md` ("Sunny Room, Soft Fur"). It implements this contract
+  unchanged and adds selfTest checks that measure the art system back out of
+  the geometry (marking vertex counts, dash legibility in pixels, size ratio,
+  feet-on-support gaps, contrast, exact HUD strings) plus its own fault plants
+  (`?plant=dash|size|text|stats`). Palette lint, a colour-blind simulation and a
+  photosensitivity probe (≤3 full-frame brightness swings over 20 % in any
+  second) were **deferred to Step 6** with the rest of the tooling pass.
 - **Step 6 (slice)** adds `--url` / `--build` capture of the built game, `--scenario <beat>`,
   and `LC.goto(beat)` / `LC.camera()` on the game itself.
 - The test scene is **not** art direction: a floor, a box, a leaning stick, a capsule

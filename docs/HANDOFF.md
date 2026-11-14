@@ -1,10 +1,10 @@
 # Look at Bobo — Handoff (build-a-game)
 
-> **Step 2 built — awaiting Brandon's review.** Step 1 (story/characters/locations) stays **LOCKED**; its docs still carry a "Step 1 only … no Step 2 work started" header, which now reads as history: Step 2 (the visual debugging tool) was built on its own branch and PR as requested, and nothing later was started. No art style work, no apartment modelling beyond a trivial placeholder scene, no audio, no image generation, no paid services, nothing deployed. Real Bobo/apartment details not supplied by Brandon remain TBD and are never invented.
+> **Step 3 built — awaiting Brandon's review.** Step 1 (story/characters/locations) stays **LOCKED**; its docs still carry "Step N only" headers, which now read as history. Steps 2 and 3 were each built on their own branch and PR as requested; PRs #3/#4/#5 are merged. Nothing after Step 3 was started: no audio, no image generation, no paid services, nothing deployed. Real Bobo/apartment details not supplied by Brandon remain TBD and are never invented — the one Bobo photo supplied during Step 3 is on file (`docs/reference/bobo-01.png`) and the assumptions it forces (he's ~15 lb now, the photo shows ~10 lb) are flagged, not hidden.
 
 ## 0. Quick start
-1. Read `VISION.md` (root, approved by Brandon), this file, and `docs/CAPTURE.md` (the Step 2 tool + `window.LC` page contract).
-2. Current step: **Step 2 — Visual debugging tool — ✅ built, awaiting review** (branch `codeden/build-a-game-step-2-visual-debugging-4cab`, **PR #4** open to `main`, **not merged**: https://github.com/phonefixdfw/look-at-bobo/pull/4). Do not start Step 3 until explicitly asked.
+1. Read `VISION.md` (root, approved by Brandon), this file, `docs/CAPTURE.md` (the Step 2 tool + `window.LC` page contract) and `docs/ART_STYLE.md` (the Step 3 design system — every later scene copies from it).
+2. Current step: **Step 3 — Art style and design system, "Sunny Room, Soft Fur" — ✅ built, awaiting review** (branch `codeden/build-a-game-step-3-art-style-59a1`, PR open to `main`, **not merged**). Steps 1–2 and the decoy-cat docs are all merged to `main` (PRs #3, #4, #5; PR #5 landed while Step 3 was in progress — the branch merged it). Do not start Step 4 until explicitly asked — Step 4 (voices) is the only money step.
 3. Questions Q1–Q10 are resolved for Step 1: Q1/Q2 answered directly by Brandon; Q3–Q10 accepted as **provisional defaults**. Real Bobo/apartment details not supplied remain TBD and must never be invented.
 4. To use the tool: `npm install && npm run capture` (frames + contact sheet in `captures/`) and `npm run gate` (proves the tool catches planted mistakes). Needs Chrome or Edge already installed.
 
@@ -13,9 +13,9 @@
 | # | Step | Status | Notes |
 |---|---|---|---|
 | 1 | Story, characters and locations | ✅ **LOCKED** | `docs/STORY.md`, `docs/CHARACTERS.md`, `docs/LOCATIONS.md` are locked at the approved vision level. Q1/Q2 answered by Brandon; Q3–Q10 accepted as provisional defaults. Unknown real-Bobo/apartment details remain TBD. Step 2 not started. |
-| 2 | Visual debugging tool | ✅ **built — awaiting review** | Done per build-a-game step 2: `tools/capture.mjs` + the `window.LC` page contract + `tools/gate.mjs`. See `docs/CAPTURE.md`. Test scene captures cleanly (36-frame default run: PASS, console clean, budget PASS) and planted faults are caught (5 faults, each named by the check that caught it, exit code 1). No art-style work, trivial placeholder scene only. Not merged. |
-| 3 | Art style and design system | ⏳ | Not started. Next step when Brandon asks: three code-built mockups of the same trivial test arrangement in three different looks, captured with the Step 2 tool into one comparison sheet, then `docs/DESIGN_SYSTEM.md` after Brandon picks a style. Palette lint / contrast / colour-blind / photosensitivity checks get added to the tool there. |
-| 4 | Voices, sound and music | ⏳ | Not started. **Only step that costs money; requires Brandon's explicit approval before any spend.** |
+| 2 | Visual debugging tool | ✅ **merged (PR #4)** | Done per build-a-game step 2: `tools/capture.mjs` + the `window.LC` page contract + `tools/gate.mjs`. See `docs/CAPTURE.md`. Merged into `main` and used by every step since. |
+| 3 | Art style and design system | ✅ **built — awaiting review** | **One style built deeply instead of three mockups** (the brief pre-pinned the look from `VISION.md`; deviation recorded in `docs/ART_STYLE.md` §1). "Sunny Room, Soft Fur": `docs/ART_STYLE.md` + working reference scene `design/style-test.html` (`npm run capture:style`: 72 frames, 36/36 checks each, budget 89 draws / 101,636 tris). Includes Bobo + decoy from one parametric builder with measurable tells, and the exact-string HUD. Palette-lint / colour-blind / photosensitivity probes deferred to Step 6. Not merged. |
+| 4 | Voices, sound and music | ⏳ | Not started. **Only step that costs money; requires Brandon's explicit approval before any spend.** Next step when Brandon asks. |
 | 5 | Talking-character demo | ⏳ | Not started. |
 | 6 | Vertical slice | ⏳ | Not started. |
 | 7 | Play the slice | ⏳ | Not started. |
@@ -23,7 +23,7 @@
 | 9 | Polish | ⏳ | Not started. |
 | 10 | Deploy | ⏳ | Not started. Host chosen by Brandon. |
 
-**Current step:** 2 — **built, awaiting review; Step 1 remains LOCKED.** **What's happening right now:** the Step 2 tool, its test scene and its own self-check (`npm run gate`) are complete on branch `codeden/build-a-game-step-2-visual-debugging-4cab` with **PR #4** open to `main` (not merged, evidence attached: a clean 36-frame contact sheet and a caught planted fault). Step 3 (art style and design system) is **not started** and waits for an explicit request.
+**Current step:** 3 — **built, awaiting review; Step 1 remains LOCKED.** **What's happening right now:** the Step 3 style test scene, `docs/ART_STYLE.md` and the doc housekeeping are complete on branch `codeden/build-a-game-step-3-art-style-59a1` with a PR open to `main` (not merged, evidence attached: the 72-frame contact sheet and caught planted faults). Step 4 (voices/sound/music — the only money step) is **not started** and waits for Brandon's explicit go-ahead **with a cost shown first**.
 
 ## 2. Decisions log
 
@@ -47,6 +47,14 @@
 | 2026-11-14 | `captures/` gitignored as scratch; keepable images get attached to a PR or copied somewhere permanent | Agent (build-a-game rule) | Captures are reproducible output, not source |
 | 2026-11-14 | Moment ids in the test scene are kebab-case placeholders named after the ten generic moments in `docs/STORY.md` plus a `win` moment that carries the exact ending text `your did it! you wind` | Agent | Placeholders only — no claims about real Bobo habits; random-order compatibility is enforced by a `selfTest` check (shuffled visits vs declared order) |
 | 2026-11-14 | `playwright-core` drives the already-installed Chrome/Edge (no browser download); `LC_CHROME` overrides the path | Agent (autonomous) | Step 2 rule: no downloads, and it keeps installs small |
+| 2026-11-14 | Step 3 branch started from main **and merged the then-open decoy-cat docs branch (PR #5)** so the decoy design was available; PR #5 then merged to main during Step 3 and main was merged back in — content identical either way | Agent | Brief said don't assume decoy docs are on main; they became on main mid-work. Recorded so the history reads honestly |
+| 2026-11-14 | Step 3 built **one** style deeply ("Sunny Room, Soft Fur") instead of the skill's three-mockup comparison | Agent (autonomous, flagged) | The brief pre-pinned the look from `VISION.md` (realistically-lit apartment + softly stylized fur-shaded cats, in code); three shallow variants would have re-litigated a decided question. Deviation recorded in `docs/ART_STYLE.md` §1; veto is cheap (one `TOKENS` object + one lighting rig) |
+| 2026-11-14 | Markings are SDF **rules painted into vertex colours** (head rules in head space, body rules in cat-root space); both cats come from **one parametric builder** — the difference is which rules switch on and root scale | Agent (autonomous) | Lets selfTest *measure* the tells ("is the dash white and ≥20 px at 2.5 m?", "decoy dash = 0") instead of trusting painted geometry; a shared builder is how "reads similarly at a glance — tells on second look" stays true as both cats change |
+| 2026-11-14 | Bobo's forehead dash is **deliberately exaggerated** vs the photo (measured 71.9 mm; 26.9 px at 2.5 m, 11.2 px at 6 m at 1080p/fov-60) | Agent (autonomous) | The real thin dash disappears at search distance; the game's whole loop depends on the tell surviving across the room. Photo stays the record of the real marking (`docs/ART_STYLE.md` §5) |
+| 2026-11-14 | Brandon's photo shows Bobo at ~10 lb → **markings modelled from the photo, body scaled to the current ~15 lb; the 15 lb shape is an assumption**, flagged in `docs/ART_STYLE.md` §6 + `docs/CHARACTERS.md`; more angles + a recent photo + a decoy photo requested | Agent | Never-invent rule: the only photo and the only weight spec disagree; both kept, disagreement surfaced instead of averaged away |
+| 2026-11-14 | Decoy cat renders with Bobo's yellow-green eye token **as a flagged placeholder only** (his eye color was never supplied) | Agent (autonomous, flagged) | Scene can't run without an eye color; choice recorded as non-canonical in `docs/CHARACTERS.md` + `docs/ART_STYLE.md` §11 |
+| 2026-11-14 | `.codeden/VISION.md` re-synced **byte-identical to root `VISION.md`** (it was the stale pre-decoy copy PR #2 left on main) | Agent | Housekeeping task from the brief: two divergent vision files is a trap for the next session; redundancy noted here rather than deleting a file Brandon's PR created |
+| 2026-11-14 | The decoy's idle "breath" scales x/z only, never y | Agent | A belly that grew in y sank into the rug and the feet-on-surface checks (rightly) failed the frame — animation must not lie about contact |
 
 ## 3. Questions log (Q1–Q2 answered; Q3–Q10 accepted as provisional defaults)
 
@@ -68,7 +76,7 @@
 7. What **sounds** does Bobo make (meow/chirp/purr/silent) that we should plan for? (No audio will be made now; Step 4 needs approval.)
    - **Accepted provisional default:** Assume minimal/optional cute vocalizations TBD; keep "LOOK AT BOBO!" as the only required voiced line per vision.
 8. Can you share **reference photos/videos** of Bobo (markings, face/eyes, body, typical poses) for later art steps?
-   - **Accepted provisional default:** Proceed with the written description from vision (15 lb, mostly black, white feet/bib/muzzle/forehead dash, yellow-green eyes) until references are provided.
+   - **Partially answered in Step 3:** one photo supplied, on file at `docs/reference/bobo-01.png` (shows ~10 lb). **Still wanted:** a recent ~15 lb photo, more angles (side/back/tail/belly), and a decoy-cat photo if one exists. Everything else still proceeds from the written description; nothing invented.
 
 **D. Scope confirmations (accepted provisional defaults)**
 9. Confirm **length feel** (~10–15 minutes) and that the placeholder moment count (10) is right?
@@ -79,6 +87,8 @@
 ## 4. Demos (never delete; how to open each)
 | Demo | How to open | Files |
 |---|---|---|
+| **Style test scene (Step 3)** — the look, Bobo + the decoy, HUD, celebration | `npm install` then `npm run serve` → **http://127.0.0.1:8123/design/style-test.html**. Add `?plant=dash`, `?plant=size`, `?plant=text` or `?plant=stats` to see a deliberately planted mistake the checks must catch. `npm run capture:style` renders all 72 frames. | `design/style-test.html`, `design/style-test/styletest.js`, `vendor/three/` |
+| **Style contact sheet** | `npm run capture:style`, then open `captures/style-test/_contact-sheet.png` or serve it: **http://127.0.0.1:8123/captures/style-test/_contact-sheet.html** (72 frames labelled, failures in red). | `captures/style-test/` (scratch, gitignored) |
 | Capture test scene (Step 2) | `npm install` then `npm run serve` → **http://127.0.0.1:8123/tools/testscene.html**. Add `?plant=lift`, `?plant=sink`, `?plant=jam`, `?plant=text` or `?plant=stats` to see a deliberately planted mistake (the on-screen label shows which). | `tools/testscene.html`, `tools/testscene/testscene.js`, `vendor/three/` |
 | Contact sheet from a capture | `npm run capture`, then open `captures/testscene/_contact-sheet.png`, or serve it: **http://127.0.0.1:8123/captures/testscene/_contact-sheet.html** (36 frames, labelled, failures in red). | `captures/testscene/` (scratch, gitignored) |
 | Tool self-check | `npm run gate` — clean scene must PASS, five planted faults must FAIL with whatever caught them named. | `tools/gate.mjs`, `captures/gate/` |
@@ -86,17 +96,31 @@
 
 ## 5. Audio and credits
 - Credit ceiling: not set. Spent: 0. Real rate measured: n/a.
-- **Step 4 (voices, including "LOOK AT BOBO!") is the only step that costs money and will only happen after Brandon explicitly approves the cost/plan.** No paid services used in Step 1.
-- No paid services used in Step 2 either. Dev-only npm packages: `playwright-core` (drives the already-installed Chrome) and `three` (copied into `vendor/`). Nothing at runtime is fetched from a CDN.
+- **Step 4 (voices, including "LOOK AT BOBO!", "DAG!" and the ending line) is the only step that costs money and will only happen after Brandon explicitly approves the cost/plan.** No paid services used in Steps 1–3. Dev-only npm packages: `playwright-core` (drives the already-installed Chrome) and `three` (copied into `vendor/`). Nothing at runtime is fetched from a CDN; no image generation was used for any asset — everything visual is built in code, including the procedural textures.
 
-## 6. PR #2 / vision note
-- Root `VISION.md` (merged on main) was read first and treated as the approved source.
-- Open PR #2 (`Update the project vision`, branch `codeden/vision`, adds `.codeden/VISION.md`) was checked: its content is substantively the same as root `VISION.md` with minor formatting/wording differences (e.g. moment separators and a parenthetical note on length). **No substantive conflict identified; nothing overridden.** If PR #2 is intended to supersede/relocate the vision, reconcile after merge/review.
-- Step 2's own work is **PR #4** (this branch → `main`), open and unmerged, with the clean and planted contact sheets attached as evidence.
+## 6. Vision files and the decoy-cat docs — reconciliation note
+- Root `VISION.md` (on `main`) is the approved source and is decoy-aware (updated by PR #5, merged). `.codeden/VISION.md` (left by merged PR #2) was the stale **pre-decoy** copy; it is now re-synced **byte-identical to root `VISION.md`** so the next session can't read the wrong one. If the duplication ever bothers Brandon, deleting `.codeden/VISION.md` is safe — root is the source either way.
+- **Decoy-cat decisions and open questions live in [`docs/DECOY_CAT.md`](DECOY_CAT.md)** (Brandon's 2026-11-14 design change: the 22 lb mostly-black decoy with white feet + white neck and **no forehead dash**; wrong-cat = gentle X + **"DAG!"** + −1 point, score floors at 0). It arrived via PR #5, which merged mid-Step-3. This is the HANDOFF link that file asked for.
+- Step 2's tool work is merged as PR #4; Step 3's own work is this branch's PR (open, unmerged, evidence attached: the clean 72-frame contact sheet and caught planted faults).
 
-## 7. Step 2 result (measured) and next steps
+## 7. Step results (measured) and next steps
 
-### What Step 2 built
+### What Step 3 built (measured on this machine — Node 24.22, Chrome 157 headless, three r187)
+| File | Role |
+|---|---|
+| `docs/ART_STYLE.md` | **the design system**: the chosen look ("Sunny Room, Soft Fur"), tokens, materials, lighting rules, the marking-rule system, cat proportions, HUD rules, do/don't, and the measured acceptance checklist |
+| `design/style-test.html`, `design/style-test/styletest.js` | the reference implementation of the look — apartment slice + Bobo + decoy (one parametric builder) + HUD + win celebration; implements the `window.LC` contract; 36 selfTest checks measured back out of the geometry |
+| `docs/reference/bobo-01.png` | Brandon's Bobo photo, now on file (shows ~10 lb; markings are canonical, body shape assumption flagged) |
+| `package.json` `capture:style` script | `npm run capture:style` — the 72-frame style capture |
+
+- **Full run:** 6 moments × 4 views × 3 times = **72/72 frames PASS**, 36/36 selfTest checks on every frame, console clean, ~1 min.
+- **Budget:** worst frame **89 draw calls / 101,636 triangles** vs limits 150 / 150,000; 1 shadow light of 2 real lights; 1 pass (no post); 0.06–0.13 ms/frame.
+- **The tells, measured:** Bobo dash 37 white verts / bib 484; decoy collar 241 with dash 0 and bib 0; dash 71.9 mm → **26.9 px @2.5 m, 11.2 px @6 m**; decoy **1.32× wide, 1.68× bulk** in the same pose; feet-on-support within −1e-9..0 m in every moment.
+- **Contrast:** markings 14.1:1; worst HUD pair (coral/ink) 8.3:1 (AA 4.5:1).
+- **Planted faults caught** (each exits 1, check named): `?plant=dash` → `bobo-dash-white` +3 more; `?plant=size` → `size-tell-width/volume`; `?plant=text` → `ending-text-exact`; `?plant=stats` → tool's own `stats-understated`.
+- **Two design-system lessons the checks forced** (both now rules in `docs/ART_STYLE.md`): head-space vs root-space marking rules (the dash drifted with the head until the rules were evaluated per-space); the decoy's breath may only scale sideways (y-scaling sank the belly through the rug and the contact check correctly refused it).
+
+### What Step 2 built (history — all merged as PR #4)
 | File | Role |
 |---|---|
 | `tools/capture.mjs` | jump to any moment/time/view, render one frame, screenshot it, measure it; writes PNGs + `_contact-sheet.png` + `_contact-sheet.html` + `report.json`; exits non-zero on any failure |
@@ -115,15 +139,18 @@
   2. the first version read the budget numbers out of `renderer.info` on the page's say-so, and reported `passes: 0` forever — a number that could never fail. The counts now come from hooked WebGL calls (`drawArrays`/`drawElements`/instanced/`bindFramebuffer`) measured per frame, so the page can be checked against them and understating is a failure. `passes`, `shadowLights` and `realLights` stay declarations (they describe intent, not GPU work), but the measured render-target count now sits beside them in `report.json` so a wrong declaration is visible; it becomes a hard check when post-processing arrives in Step 3+.
 - Random-order compatibility is enforced, not assumed: `moment-order-independent` visits all 12 moments twice (declared order vs a seeded shuffle) and compares poses to ≤1e-9, and `seek-no-unseeded-random` counts any `Math.random`/`Date.now` inside the seek path.
 
-### Next step — Step 3: art style and design system (**not started, waits for Brandon**)
-Three code-built mockups of the same simple arrangement in three different looks, each exposing `window.LC`, captured with this tool into one comparison sheet; Brandon picks a style; then `docs/DESIGN_SYSTEM.md`, plus palette-lint / text-contrast / colour-blind / photosensitivity checks added to the tool. Bobo himself and the real apartment stay TBD until Brandon supplies references — Step 3 works from the written description in `VISION.md`/`docs/CHARACTERS.md` unless photos arrive.
+### Next step — Step 4: voices, sound and music (**not started; the money step; needs Brandon's explicit yes with a cost shown first**)
+Needed lines (fixed strings): the yell **"LOOK AT BOBO!"**, the wrong-cat line **"DAG!"**, and the ending `your did it! you wind` (read or sung, TBD) — per `docs/DECOY_CAT.md` and `VISION.md`. Nothing is bought, no account is created and no service is touched until Brandon approves the plan and cost. If he approves, casting/costs get logged in §5 (credit ceiling / spend / measured rate).
 
 ### Still standing from Step 1
 - **Step 1 is LOCKED.** Story, characters and locations stay as approved; real Bobo/apartment specifics are never invented and stay TBD until Brandon supplies them.
 - Step 4 (voices) is the only money step and needs an explicit yes with a cost shown first. Nothing is ever deployed without Brandon (Step 10).
 
-### Open items / questions for Brandon (nothing blocks Step 3)
-1. `AGENTS.md` was never created (Step 1 shipped `VISION.md` + the three docs only). It is the rulebook/index the build-a-game process loads every session — want a short one, drafted from `VISION.md` principles + this file, before Step 3?
-2. Does `lookatbobo.getluckysocial.com` serve plain static files (ES modules + import maps, `.wasm`/`.png` mime types)? The tool assumes yes, which is how everything here is built.
-3. The moment ids in the test scene are kebab-case placeholders (`lounging-couch`, `cardboard-box`, …). Fine as internal ids, or do you want different names?
-4. Anything you want the tool to check numerically that is not on the list in `docs/CAPTURE.md` yet — it is cheap to add now and useful in every later step.
+### Open items / questions for Brandon (nothing blocks Step 4)
+1. **Style verdict:** happy with "Sunny Room, Soft Fur" as the game's look (`docs/ART_STYLE.md`, screenshots on the Step 3 PR)? A veto is cheap — the scene reads one token object and one lighting rig.
+2. **Photos** (replaces assumptions, never adds inventions): a recent ~15 lb Bobo photo, more angles (side/back/tail/belly), and a decoy photo if he has one.
+3. **Decoy cat name** — still "the decoy cat" everywhere until you name him; and his **eye color** is currently Bobo's yellow-green as a flagged placeholder (`docs/DECOY_CAT.md` Q1).
+4. `AGENTS.md` was never created (Step 1 shipped `VISION.md` + the docs only). It is the rulebook/index the build-a-game process loads every session — want a short one, drafted from `VISION.md` principles + this file, before Step 4?
+5. Does `lookatbobo.getluckysocial.com` serve plain static files (ES modules + import maps, `.wasm`/`.png` mime types)? The tool assumes yes, which is how everything here is built.
+6. The moment ids in the test scenes are kebab-case placeholders (`lounging-couch`, `cardboard-box`, …). Fine as internal ids, or do you want different names?
+7. Anything you want the tool to check numerically that is not on the list in `docs/CAPTURE.md` yet — palette lint / colour-blind / photosensitivity probes are already slotted for Step 6.
