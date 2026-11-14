@@ -16,6 +16,8 @@ export const TOKENS = {
   nose: 0xd18b8b,
   earInner: 0x61494a,
   whisker: 0xf6f2ea,
+  // hand (the first-person player's, Step 5)
+  skin: 0xe8b58c, // provisional mid-warm tone — the one skin colour the game shows; Brandon's call
   // room
   oakFloor: 0xa87c52,
   plaster: 0xd9d3c7,
