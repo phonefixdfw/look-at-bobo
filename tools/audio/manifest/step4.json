@@ -1,0 +1,77 @@
+{
+  "$comment": [
+    "Step 4 voice manifest — the ONLY paid audio for Look at Bobo so far.",
+    "The game plays these as static files and never calls the API (build-a-game rule 5).",
+    "Every paid generation goes through tools/gen-audio.mjs. Nothing else touches ElevenLabs.",
+    "Texts are byte-exact game strings: 'DAG!' and 'your did it! you wind' are spelled",
+    "exactly this way ON PURPOSE (docs/DECOY_CAT.md, VISION.md). gen-audio.mjs refuses to",
+    "generate anything whose text drifted from the strings in docs/VOICES.md.",
+    "Casting + settings rationale: docs/VOICES.md. Ids verified against ElevenLabs' public",
+    "GET /v1/voices list on 2026-11-14; the tool resolves by NAME at buy time anyway."
+  ],
+  "group": "step4",
+  "limits": {
+    "$comment": "Brandon pre-approved spend for exactly these lines, max 2 takes each (issue #7, 2026-11-14).",
+    "maxTakesPerAsset": 2,
+    "maxPaidRequestsPerRun": 6,
+    "projectCreditsCeiling": 2000
+  },
+  "assets": [
+    {
+      "id": "yell-look-at-bobo",
+      "title": "The yell — played on every correct catch",
+      "speaker": "The player (first-person, unseen)",
+      "text": "LOOK AT BOBO!",
+      "delivery": "A joyful, silly shout at a friend across the room — the delight of 'look look LOOK, that's my cat!'. Loud and bright, never angry, never scary.",
+      "takes": 2,
+      "seedBase": 101,
+      "model": "eleven_multilingual_v2",
+      "outputFormat": "mp3_44100_128",
+      "voice": {
+        "name": "Liam",
+        "idHint": "TX3LPaxmHKxFdv7VOQHJ",
+        "alternatives": ["Charlie (IKne3meq5aSn9XLyUdCD)", "Jessica (cgSgspJ2msm6clMCkdW9)"]
+      },
+      "voiceSettings": { "stability": 0.3, "similarity_boost": 0.8, "style": 0.65, "use_speaker_boost": true }
+    },
+    {
+      "id": "dag-wrong-cat",
+      "title": "Wrong-cat penalty — played with the gentle X on the decoy cat",
+      "speaker": "The player (first-person, unseen)",
+      "text": "DAG!",
+      "delivery": "A playful, mock-stern 'no-no!' — comedic disappointment, the pettiest 'dag' in the world. Gentle and silly, never harsh, never a buzzer, never mean about the decoy.",
+      "takes": 2,
+      "seedBase": 202,
+      "model": "eleven_multilingual_v2",
+      "outputFormat": "mp3_44100_128",
+      "voice": {
+        "name": "Liam",
+        "idHint": "TX3LPaxmHKxFdv7VOQHJ",
+        "alternatives": ["Charlie (IKne3meq5aSn9XLyUdCD)", "Jessica (cgSgspJ2msm6clMCkdW9)"]
+      },
+      "voiceSettings": { "stability": 0.35, "similarity_boost": 0.8, "style": 0.5 },
+      "context": {
+        "$comment": "One-word lines come out flat without context (build-a-game step 4 tip). These shape the delivery only; the billed worst case counts them (docs/VOICES.md).",
+        "previous_text": "You found a cat!",
+        "next_text": "But that is not Bobo."
+      }
+    },
+    {
+      "id": "win-line",
+      "title": "Win line — played when the score reaches 10",
+      "speaker": "The player (first-person, unseen)",
+      "text": "your did it! you wind",
+      "delivery": "Disbelieving, giddy celebration, a bit breathless and proud — like reading your own trophy plaque out loud. The mangled spelling is the joke; read it exactly as written ('wind' rhymes with 'win').",
+      "takes": 2,
+      "seedBase": 303,
+      "model": "eleven_multilingual_v2",
+      "outputFormat": "mp3_44100_128",
+      "voice": {
+        "name": "Liam",
+        "idHint": "TX3LPaxmHKxFdv7VOQHJ",
+        "alternatives": ["Charlie (IKne3meq5aSn9XLyUdCD)", "Jessica (cgSgspJ2msm6clMCkdW9)"]
+      },
+      "voiceSettings": { "stability": 0.35, "similarity_boost": 0.8, "style": 0.55 }
+    }
+  ]
+}
