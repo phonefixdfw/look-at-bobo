@@ -105,6 +105,8 @@ if (isMain) {
     .then((srv) => {
       console.log(`Serving ${root}`);
       console.log(`  test scene:  ${srv.url}tools/testscene.html`);
+      console.log(`  style test:  ${srv.url}design/style-test.html`);
+      console.log(`  voice test:  ${srv.url}tools/audio/voice-test.html`);
       console.log(`  contact sheet (after a capture):  ${srv.url}captures/testscene/_contact-sheet.html`);
       console.log('Ctrl+C to stop.');
     })
