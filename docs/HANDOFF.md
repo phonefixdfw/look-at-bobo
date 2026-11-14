@@ -4,7 +4,7 @@
 
 ## 0. Quick start
 1. Read `VISION.md` (root, approved by Brandon), this file, and `docs/CAPTURE.md` (the Step 2 tool + `window.LC` page contract).
-2. Current step: **Step 2 — Visual debugging tool — ✅ built, awaiting review** (branch `codeden/build-a-game-step-2-visual-debugging-4cab`, PR open to `main`, **not merged**). Do not start Step 3 until explicitly asked.
+2. Current step: **Step 2 — Visual debugging tool — ✅ built, awaiting review** (branch `codeden/build-a-game-step-2-visual-debugging-4cab`, **PR #4** open to `main`, **not merged**: https://github.com/phonefixdfw/look-at-bobo/pull/4). Do not start Step 3 until explicitly asked.
 3. Questions Q1–Q10 are resolved for Step 1: Q1/Q2 answered directly by Brandon; Q3–Q10 accepted as **provisional defaults**. Real Bobo/apartment details not supplied remain TBD and must never be invented.
 4. To use the tool: `npm install && npm run capture` (frames + contact sheet in `captures/`) and `npm run gate` (proves the tool catches planted mistakes). Needs Chrome or Edge already installed.
 
@@ -23,7 +23,7 @@
 | 9 | Polish | ⏳ | Not started. |
 | 10 | Deploy | ⏳ | Not started. Host chosen by Brandon. |
 
-**Current step:** 2 — **built, awaiting review; Step 1 remains LOCKED.** **What's happening right now:** the Step 2 tool, its test scene and its own self-check (`npm run gate`) are complete on branch `codeden/build-a-game-step-2-visual-debugging-4cab` with a PR open to `main` (not merged). Step 3 (art style and design system) is **not started** and waits for an explicit request.
+**Current step:** 2 — **built, awaiting review; Step 1 remains LOCKED.** **What's happening right now:** the Step 2 tool, its test scene and its own self-check (`npm run gate`) are complete on branch `codeden/build-a-game-step-2-visual-debugging-4cab` with **PR #4** open to `main` (not merged, evidence attached: a clean 36-frame contact sheet and a caught planted fault). Step 3 (art style and design system) is **not started** and waits for an explicit request.
 
 ## 2. Decisions log
 
@@ -92,6 +92,7 @@
 ## 6. PR #2 / vision note
 - Root `VISION.md` (merged on main) was read first and treated as the approved source.
 - Open PR #2 (`Update the project vision`, branch `codeden/vision`, adds `.codeden/VISION.md`) was checked: its content is substantively the same as root `VISION.md` with minor formatting/wording differences (e.g. moment separators and a parenthetical note on length). **No substantive conflict identified; nothing overridden.** If PR #2 is intended to supersede/relocate the vision, reconcile after merge/review.
+- Step 2's own work is **PR #4** (this branch → `main`), open and unmerged, with the clean and planted contact sheets attached as evidence.
 
 ## 7. Step 2 result (measured) and next steps
 
