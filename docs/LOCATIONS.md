@@ -5,7 +5,7 @@
 ## Setting overview
 - **Type:** Modern one-bedroom apartment (realistic, believable lighting/materials/furniture as an art goal for later steps).
 - **Platform context:** Desktop web browser, keyboard/mouse, first-person traversal. Spaces must be readable and navigable for searching.
-- **Mood:** Bright/pleasant and cozy-silly (never scary or stressful). Lighting and layout should support spotting Bobo.
+- **Mood:** Bright/pleasant and cozy-silly (never scary or stressful; even the wrong-cat penalty is gentle — a silly X and "DAG!", no harsh buzzer, no game over). Lighting and layout should support spotting Bobo (and telling him apart from the decoy cat).
 
 ## Spaces implied by the vision and generic placeholder moments
 These areas are implied by the generic "normal cat stuff" placeholder moments (random order each playthrough, no repeats within a run) and the one-bedroom premise. Brandon accepted the suggested placeholder layout for Step 1; **exact real layout, connections, dimensions, and furnishings remain TBD if not supplied**. Because the order is random, layout/respawn logic must support any moment appearing from any valid placeholder location:
@@ -22,15 +22,22 @@ These areas are implied by the generic "normal cat stuff" placeholder moments (r
 | Laundry spot | Where basket lives | Napping in/near a laundry basket | Basket implied | Is it in bedroom, closet, bathroom, or elsewhere? |
 | Box/blanket spots | Props for moments | Resting near a cardboard box; curling up/making biscuits on a blanket | Props implied | Where do these usually appear in Bobo's real home? |
 
+## The decoy cat in the spaces (added 2026-11-14)
+- The decoy cat (name TBD — see [`docs/DECOY_CAT.md`](DECOY_CAT.md)) lies around the apartment as scenery, alongside Bobo's moment. He is scenery only: no cute moment belongs to him, and pointing at him triggers the gentle X + "DAG!" one-point penalty instead of a celebration.
+- **Hard constraint:** the decoy must **never be in the same spot as Bobo** at the same time — the two cats must stay distinguishable at a glance (forehead dash is Bobo's key tell; white neck vs white bib; 22 lb vs ~15 lb).
+- **Placement, number of lounge spots and relocation rules are TBD** — open questions with suggested defaults (he lounges in 3–5 fixed spots and relocates between rounds) are tracked in [`docs/DECOY_CAT.md`](DECOY_CAT.md). Nothing beyond "he lies around the apartment" is invented about his habits.
+
 ## Layout and navigation (accepted provisional defaults — real details TBD)
 - **Accepted provisional layout:** A compact, readable one-bedroom loop (entry/hallway connecting living area, kitchen nook, bedroom, bathroom, and a window/balcony door) so the player can search without getting lost. *This is an accepted provisional placeholder for planning only and must be replaced/validated by Brandon's real apartment layout if supplied.*
-- **Spawn/search flow:** After each catch, player respawns elsewhere in the apartment while Bobo moves to another cute moment. Moment order is **random each playthrough** (no repeats within a run, still exactly 10 points), so any moment may need to appear from any valid location. Exact spawn points and Bobo positions depend on the accepted provisional layout and any real layout supplied later.
+- **Spawn/search flow:** After each catch, player respawns elsewhere in the apartment while Bobo moves to another cute moment. Moment order is **random each playthrough** (no repeats within a run, still exactly 10 points), so any moment may need to appear from any valid location. Exact spawn points and Bobo positions depend on the accepted provisional layout and any real layout supplied later. Layout/respawn logic must place both cats in the apartment at the same time without ever sharing a spot, and keep the decoy readable enough that the player can tell him apart from Bobo.
+- **Decoy lounging (TBD, suggested default):** 3–5 fixed lounge spots distributed across the searchable areas, with the decoy relocating between rounds and never landing on Bobo's spot. Final count and placements pending Brandon (see [`docs/DECOY_CAT.md`](DECOY_CAT.md)).
 - **Interactable/important props (draft):** couch, bed, window/balcony glass, cardboard box, sink, desk, pen, keyboard, laundry basket, blanket. Exact models/placements TBD from real references.
 
 ## Location questions — accepted provisional defaults (never invent real specifics)
 - A rough floor plan or description of the real apartment (rooms, connections, approximate size/shape)?
 - Where are the key furniture pieces (couch, bed, desk, sinks, window/balcony)?
 - Which sink does Bobo sit in, if he does? Where do the box, laundry basket, and blanket usually live?
+- Where should the decoy cat lounge, and how many spots does he need? (TBD — see [`docs/DECOY_CAT.md`](DECOY_CAT.md); suggested default: 3–5 fixed spots, relocated between rounds, never Bobo's spot.)
 - Any areas that must be included/excluded?
 
 **Accepted provisional defaults:** Use a simple one-bedroom with living area + kitchenette, bedroom, bathroom, short hallway, and one large window (balcony optional) containing the generic placeholder props. Treat all placements as provisional until real layout/details are provided; do not invent real-Bobo/apartment specifics.

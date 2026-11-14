@@ -1,6 +1,6 @@
 # Look at Bobo — Characters (Step 1)
 
-> Step 1 output only — **LOCKED with accepted provisional defaults**. **Nothing about the real Bobo may be invented**; facts below come from `VISION.md` or Brandon-provided answers. Where real details are not supplied, they remain TBD/provisional placeholders only.
+> Step 1 output only — **LOCKED with accepted provisional defaults**. **Nothing about the real Bobo may be invented**; facts below come from `VISION.md` or Brandon-provided answers. Where real details are not supplied, they remain TBD/provisional placeholders only. Updated 2026-11-14 with Brandon's decoy-cat design change (his decisions log and open questions: [`docs/DECOY_CAT.md`](DECOY_CAT.md)); Bobo's description is unchanged.
 
 ## Bobo (the star)
 - **Identity:** A real cat. The star of the game — never a villain, never a prop, never in danger.
@@ -19,14 +19,29 @@
   - How he sounds (meows, chirps, purrs, silence?) — no audio invented.
   - **Accepted provisional default:** Generic "normal cat stuff" motion and minimal/optional cute vocalizations as placeholders only; **not claims about real Bobo**.
 
+## The decoy cat (name TBD)
+- **Identity:** A second cat — the decoy. He is scenery: he just lies around the apartment, like Bobo does. **Nothing else about his habits is known; do not invent any.**
+- **Name:** **TBD.** Do not invent one — call him "the decoy cat" everywhere until Brandon names him.
+- **Size/build:** Very fat — **22 lb** (vs Bobo's about 15 lb). (Brandon-supplied.)
+- **Color/markings (from Brandon):**
+  - Mostly black coat.
+  - White feet.
+  - White **neck** (Bobo's is a white **bib** — the neck-vs-bib pattern is one of the tells).
+  - **No white spot on his forehead.** Bobo's white vertical forehead dash is the **key tell** distinguishing the two cats.
+- **Eyes:** TBD (not supplied — do not invent).
+- **Role in gameplay:** If the player aims at him and shouts "LOOK AT BOBO!", they get a gentle, silly X, a voice says **"DAG!"** (spelled exactly that way, on purpose), and they lose 1 of their 10 points. The score floors at 0; there is no game over.
+- **Treatment rules:** He is never harmed, scared or mocked. He stays cute and oblivious, exactly like the scenery he is.
+- **In-game look:** Same build approach as Bobo (softly stylized, fur-shaded, built in code). He should read similarly to Bobo at a glance — that's the joke — while the forehead dash, the neck-vs-bib pattern and the size difference keep him clearly distinguishable on a second look.
+- **Placement/movement:** TBD — open questions with suggested defaults live in [`docs/DECOY_CAT.md`](DECOY_CAT.md) (e.g. he lounges in 3–5 fixed spots, relocates between rounds, and must never be in the same spot as Bobo).
+
 ## The Player
 - **Role:** First-person unseen player in the apartment (hands/arm may be shown when pointing — implementation detail for later steps).
-- **Goal:** Find Bobo, aim, and press the button to point and shout "LOOK AT BOBO!"
-- **Voicing:** The yell "LOOK AT BOBO!" is the key voiced moment (voice/casting/cost is Step 4 and requires Brandon's approval). Player character otherwise silent unless Brandon requests otherwise.
-- **Abilities/limits:** Walk, look, aim/interact. No combat, no inventory, no failure, no timers.
+- **Goal:** Find Bobo — and only Bobo — aim, and press the button to point and shout "LOOK AT BOBO!" Shouting at the decoy cat instead costs 1 point.
+- **Voicing:** Step 4 voice lines are: the yell **"LOOK AT BOBO!"**, the wrong-cat line **"DAG!"** (spelled exactly that way, on purpose), and the ending text `your did it! you wind` (voice/casting/cost is Step 4 and requires Brandon's approval). Player character otherwise silent unless Brandon requests otherwise.
+- **Abilities/limits:** Walk, look, aim/interact. No combat, no inventory. No timers and no game over; the only setback is the gentle one-point wrong-cat penalty (score floors at 0).
 
 ## Other characters
-- **None specified / accepted default none.** No other humans or animals in scope for now (aligns with "not goals": no multiplayer; vision describes a solo apartment search). If Brandon later wants another presence (e.g. offscreen owner voice), that remains an optional future change.
+- **The decoy cat (above)**, added by Brandon's design change, is the only other character in scope. No other humans or animals (aligns with "not goals": no multiplayer; vision describes a solo apartment search). If Brandon later wants another presence (e.g. offscreen owner voice), that remains an optional future change.
 
 ## Casting / reference needs (provisional defaults accepted; real references still TBD if not supplied)
 - Reference photos/videos of Bobo (multiple angles, markings, eyes, typical poses) would guide Step 3+ art and Step 5 character work; if not supplied, proceed from the written description only and do not invent specifics.
