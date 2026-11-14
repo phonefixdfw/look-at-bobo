@@ -1,0 +1,20 @@
+{
+  "name": "look-at-bobo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Look at Bobo - a first-person game about finding a cat doing cute things. Built in code, deployed as plain static files.",
+  "scripts": {
+    "vendor": "node tools/sync-vendor.mjs",
+    "serve": "node tools/serve.mjs",
+    "capture": "node tools/capture.mjs tools/testscene.html --times 0,2.4,5 --views overview,contact,first-person --moments default,cardboard-box,keyboard,win --out captures/testscene --selftest",
+    "capture:all": "node tools/capture.mjs tools/testscene.html --out captures/testscene-all --selftest --determinism",
+    "capture:weak": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview --moments default --out captures/testscene-weaklaptop --gpu swiftshader --selftest",
+    "capture:planted": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview,contact --moments default,cardboard-box --out captures/testscene-planted --param plant=lift --selftest",
+    "gate": "node tools/gate.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1",
+    "three": "^0.187.0"
+  }
+}
