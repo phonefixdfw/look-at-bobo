@@ -1,0 +1,23 @@
+
+> look-at-bobo@0.0.0 audio:dry
+> node tools/gen-audio.mjs
+
+
+Look at Bobo — step 4 voice manifest: /home/brandon/.codeden/wt/look-at-bobo/f6463d83/tools/audio/manifest/step4.json
+
+requests: 6 total, 0 already paid for (lock), 6 to buy
+  [buy ] yell-look-at-bobo#take1   13 chars  eleven_multilingual_v2  seed 1876062199
+  [buy ] yell-look-at-bobo#take2   13 chars  eleven_multilingual_v2  seed 1892839818
+  [buy ] dag-wrong-cat#take1       41 chars  eleven_multilingual_v2  seed 633787340
+  [buy ] dag-wrong-cat#take2       41 chars  eleven_multilingual_v2  seed 684120197
+  [buy ] win-line#take1            21 chars  eleven_multilingual_v2  seed 2452163117
+  [buy ] win-line#take2            21 chars  eleven_multilingual_v2  seed 2401830260
+
+estimate for the 6 to buy (published rates, 2026-11-14):
+  150 characters billed (worst case, incl. delivery context)
+  ≈ $0.0120 at $0.08/1k chars  ·  ≈ 150 credits (≤1/char worst case)
+  (offline estimate — the first run with a key shows the account prices and measures the real rate)
+
+DRY RUN — nothing was bought. Buy with: node tools/gen-audio.mjs --buy --max-credits 200
+
+total if all 6 were bought: 150 credits ≈ $0.0120 — within the 2000 credit ceiling and Brandon's "2 takes per line" approval.

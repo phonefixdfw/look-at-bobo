@@ -1,0 +1,40 @@
+
+> look-at-bobo@0.0.0 audio:selftest
+> node tools/audio/tool-selftest.mjs
+
+  PASS  dry-run-exits-0 — exit 0
+  PASS  dry-run-zero-spend — stub POSTs=0
+  PASS  dry-run-shows-estimate
+  PASS  buy-exits-0 — exit 0
+chars …
+     ✓ 5.8 KB → dag-wrong-cat.take2.mp3
+  → win-line#take1  voice "Liam - Stub Voice"  21 chars …
+     ✓ 5.8 KB → win-line.take1.mp3
+  → win-line#take2  voice "Liam - Stub Voice"  21 chars …
+     ✓ 5.8 KB → win-line.take2.mp3
+
+done. est 150 credits · actually billed 150 credits (5000 → 5150).
+If the actual number disagrees with docs/VOICES.md's published-rate estimate, fix the doc — the ledger is ground truth.
+Ledger: /tmp/lc-audio-selftest-rajYfQ/r2/ledger/2026-11-14T21-59-01-114Z.json
+
+  PASS  buy-posted-exactly-6 — stub POSTs=6 (expected 6: 3 lines × 2 takes)
+  PASS  buy-wrote-6-mp3s — dag-wrong-cat.take1.mp3, dag-wrong-cat.take2.mp3, win-line.take1.mp3, win-line.take2.mp3, yell-look-at-bobo.take1.mp3, yell-look-at-bobo.take2.mp3
+  PASS  lock-has-6-entries
+  PASS  lock-resolved-voice-name
+  PASS  lock-kept-exact-text
+  PASS  ledger-six-ok
+  PASS  ledger-measured-real-rate — actual=150 credits vs estimate 150
+  PASS  no-key-never-reached-disk — ledger is key-free
+  PASS  cache-never-rebuys — stub POSTs=0
+  PASS  stale-entry-refused — stub POSTs=0
+  PASS  allow-rebuy-rebuys-only-that — stub POSTs=2 (expected 2 takes of dag only)
+  PASS  max-credits-refused
+  PASS  buy-needs-max-credits
+  PASS  takes-cap-refused
+  PASS  request-cap-refused-too — 7 requests > per-run cap of 6, both guards fire
+  PASS  exact-string-guard
+  PASS  no-key-refuses-buy
+  PASS  key-redacted-in-output — stub POSTs=1
+  PASS  key-redacted-in-ledger
+
+23/23 checks passed
