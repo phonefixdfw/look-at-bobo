@@ -5,10 +5,14 @@
 > files and **never** calls the API; every paid generation goes through this one
 > cost-guarded tool). Test page: `tools/audio/voice-test.html` (`npm run serve`).
 >
-> **Status (2026-11-14): prepared, nothing bought — blocked on a missing
-> `ELEVENLABS_API_KEY`.** Everything that can be built without the key is built
-> and self-tested (`npm run audio:selftest`, 23/23). Spend so far: **$0**.
-> See "Getting unblocked" at the bottom.
+> **Status (2026-11-14): ✅ GENERATED — all 6 takes bought in ONE run**
+> (3 lines × 2 takes, zero failures, zero retries; ledger
+> `tools/audio/ledger/2026-11-14T22-17-51-472Z.json`). Files are on disk in
+> `assets/audio/` (committed, 131 KB total) and play on the audition page
+> (`npm run serve` → voice-test page). Real cost: **60 credits posted ≈ $0.005**
+> (measured, was 250 of 10,000 before → 310 after) against a 150-credit /
+> $0.012 worst-case estimate — see "What it actually cost".
+> **Open: Brandon picks one take per line (V5 below).**
 
 ## The three lines (byte-exact — never "fix" the spellings)
 
@@ -30,6 +34,11 @@ one voice covers the game — cheaper and more coherent.
 | Role | Recommended (default) | Alternatives | Why |
 |---|---|---|---|
 | The player (all 3 lines) | **Liam** — "Energetic, Social Media Creator" (`TX3LPaxmHKxFdv7VOQHJ`) | **Charlie** — "Deep, Confident, Energetic" (`IKne3meq5aSn9XLyUdCD`); **Jessica** — "Playful, Bright, Warm" (`cgSgspJ2msm6clMCkdW9`) | Liam is exactly the "watch my cat do a thing!" energy the game is built on. Charlie = deeper, more theatrical; Jessica = the player as a different person. Voice ids were read live from ElevenLabs' public default list (`GET /v1/voices`, 2026-11-14). |
+
+The voice **was resolved by name at buy time and it worked**: the account's own
+`GET /v1/voices` returned `Liam - Energetic, Social Media Creator`
+(`TX3LPaxmHKxFdv7VOQHJ`) and all 6 takes were bought with it (verified in
+`assets/audio/lock.json`). The idHint path was never needed.
 
 The tool resolves the voice **by name against whatever account the key belongs
 to** at buy time (falls back to the id hint), so casting survives a different
@@ -81,6 +90,28 @@ reports the actually-billed credits; if that number disagrees with the table
 above, this doc gets corrected (build-a-game lesson: real rates have come out
 different from published estimates).
 
+### What it actually cost (measured 2026-11-14, run `2026-11-14T22-17-51-472Z`)
+
+The one and only buy run bought all 6 requests; every request returned audio on
+the first try — **no failures, no retries, no `--allow-rebuy`**.
+
+| Measurement | Value |
+|---|---|
+| In-run balance delta (ledger, ground truth) | **0 credits** (250 → 250) — ElevenLabs' counter lags the API by minutes, so the in-run delta could not measure it |
+| Account counter ~4 min after the run | **310 used** (was 250 before) → **≈60 credits actually billed** for all 6 takes |
+| Cost at the published $0.08/1k | **≈ $0.005** (worst case per the table above was $0.012) |
+| Plan | Free tier, 10,000 credits/period — ~0.6 % of one period used by the whole cast |
+
+Why 60 and not 150: the estimate charges the worst case (every character of the
+`DAG!` delivery context billed at 1 credit/char). Actual billing was cheaper —
+the context lines and/or punctuation clearly don't bill at the worst-case rate.
+The estimate stays as written above: it is the **cap**, not the expectation.
+`GET /v1/models` on this account returns a bare array whose
+`eleven_multilingual_v2` entry carries no `prices` field, so the per-run live
+price printout can only confirm model availability — the balance delta remains
+the only real-rate instrument, and its reading must be taken minutes after the
+run, not inside it.
+
 ### Spend guardrails (all enforced in code, all proven by `npm run audio:selftest`)
 
 - Default command is a **dry run**; buying needs `--buy` **and** `--max-credits N`.
@@ -97,7 +128,7 @@ different from published estimates).
 - The API key never enters the browser, the repo, the chat, the tool's output,
   or the ledger (output is redacted even if a server echoed the key back).
 
-## Files produced (on a successful buy)
+## Files produced (bought 2026-11-14 — all present, committed)
 
 ```
 assets/audio/
@@ -105,13 +136,23 @@ assets/audio/
   dag-wrong-cat.take1.mp3       take2.mp3
   win-line.take1.mp3            take2.mp3
   lock.json                     # hash, voice, seed, bytes, date per take (committed)
-tools/audio/ledger/<run>.json   # one file per paid run: estimate, per-request
-                                # results, balance before/after (committed)
+tools/audio/ledger/2026-11-14T22-17-51-472Z.json  # the one paid run (committed)
 ```
 
-Format is `mp3_44100_128` — small enough for the web (each take is a short one
-or two second clip, a few tens of KB) and the standard default; no 192k/44.1
-formats that need higher tiers. **No post-processing in step 4** (loudness and
+Actual takes (durations measured by ffprobe and re-measured by Chrome's decoder
+in the audition page — identical):
+
+| File | Text | Duration | Size | Seed |
+|---|---|---|---|---|
+| `yell-look-at-bobo.take1.mp3` | `LOOK AT BOBO!` | 1.44 s | 23.7 KB | 1876062199 |
+| `yell-look-at-bobo.take2.mp3` | `LOOK AT BOBO!` | 1.25 s | 20.5 KB | 1892839818 |
+| `dag-wrong-cat.take1.mp3` | `DAG!` | 0.98 s | 16.4 KB | 633787340 |
+| `dag-wrong-cat.take2.mp3` | `DAG!` | 0.84 s | 13.9 KB | 684120197 |
+| `win-line.take1.mp3` | `your did it! you wind` | 1.67 s | 27.0 KB | 2452163117 |
+| `win-line.take2.mp3` | `your did it! you wind` | 1.86 s | 30.2 KB | 2401830260 |
+
+**131 KB total for the whole cast** — plain static files, small enough for the
+web with no build step. **No post-processing in step 4** (loudness and
 mix are step 9's job). Step 5 will add character-level timestamps for lip-sync
 (a different endpoint) — deliberately not paid for now.
 
@@ -124,37 +165,34 @@ mix are step 9's job). Step 5 will add character-level timestamps for lip-sync
 | `npm run audio:list` | the account's voices (free call, needs key) |
 | `npm run audio:buy` | **SPENDS**: buys exactly what's missing, capped (`--max-credits 200`) |
 | `npm run audio:selftest` | 23 checks against a local stub server — proves every guard and the "never pay twice" cache **without any spend** |
+| `npm run audio:pagecheck` | (`npm run serve` must be up) 24 headless-Chrome checks that the audition page really plays all six takes: 6/6 ready, every mp3 decodes, byte-exact strings, clean console — free, local, no key |
 | `npm run serve` → `tools/audio/voice-test.html` | play page for every take (pending/ready states; add `?dir=../../captures/voice-selftest/` to see a demo with placeholder tones) |
 
-## Getting unblocked (blocked on: the API key is not visible where Brandon put it)
+## Where the key lives (unblocked 2026-11-14)
 
-Checked 2026-11-14, presence only, never printed:
+Brandon put the key in a gitignored **`.env.local` at the project repo root**
+(`/home/brandon/codeden-projects/look-at-bobo/.env.local`, line
+`ELEVENLABS_API_KEY=…`) and approved the paid generation. The tool finds it
+from any worktree via `git --git-common-dir` (presence checked only — the key
+was never printed, logged, or committed; `.env*` are in `.gitignore`).
 
-1. Process environment of this session and its parents (`ELEVENLABS_API_KEY`) — **not set**.
-2. Gitignored `.env` / `.env.local` at the worktree root and at the project repo root (`~/codeden-projects/look-at-bobo`) — **neither file exists**.
+The buy has since been made (one run, 6/6 takes, see "What it actually
+cost"). The lock in `assets/audio/lock.json` means a re-run of
+`npm run audio:buy` finds nothing to buy and spends $0 — safe to run by
+accident. Any future generation needs an explicit `--allow-rebuy <line>`,
+which is a deliberate, visible re-spend.
 
-To unblock, either put the key where the previous Step-4 attempt was also told
-to look — **`.env` in the project repo root** (already gitignored, and the tool
-finds it from any worktree via `git --git-common-dir`):
+## Questions for Brandon (what's decided, what's still yours)
 
-```
-# /home/brandon/codeden-projects/look-at-bobo/.env
-ELEVENLABS_API_KEY=...
-```
+**Decided by the takes now on disk** (changing any of them after the buy is a
+deliberate `--allow-rebuy` re-spend, i.e. real money again):
 
-— or export `ELEVENLABS_API_KEY` in the environment the agent runs in (a `.env`
-in a worktree root also works, but worktrees are ephemeral — the repo root is
-the durable spot).
+1. **Voice:** bought with **Liam for all three lines** (the suggested default; alternatives Charlie / Jessica were priced the same and remain a one-field manifest edit + rebuy).
+2. **Win line voiced vs text-only:** bought **voiced** (the exact text shows on screen either way).
+3. **"wind" pronunciation:** generated as written ("wihnd", rhymes with "win" — the joke). Audition both win takes and confirm you hear the joke; a "wynd" respell would be a rebuy.
+4. **"DAG!" flavour:** generated mock-stern and comic with delivery context. Audition both takes.
 
-Then: `npm run audio:dry` (read the estimate + live account prices),
-`npm run audio:buy`, `npm run audio:status`, and play all six takes on the
-voice-test page. Nothing here needs Brandon's further approval — the spend was
-pre-approved for exactly these lines — but the dry-run estimate stays above the
-buy command in the transcript on purpose.
-
-## Questions for Brandon (suggested defaults in bold)
-
-1. **Voice:** happy with **Liam for all three lines**, or prefer Charlie / Jessica (or a voice from your own ElevenLabs account — `npm run audio:list` shows them)?
-2. **Win line voiced vs text-only:** default **voiced** (plus the exact text on screen either way).
-3. **"wind" pronunciation:** default lets the model read it as written ("wihnd", rhymes with "win" — the joke). Want "wynd" (like the wind) instead? That needs a respell-for-audio variant, tell me before the buy.
-4. **"DAG!" flavour:** default is mock-stern and comic with delivery context. Too soft / too mean? Cheapest to fix before the buy (the first two takes are the approval).
+**V5 — the one open decision: pick one take per line.** Press play on each
+pair at `npm run serve` → voice-test page and reply with three numbers, e.g.
+"yell 2, dag 1, win 2". The loser files stay on disk (zero extra cost) until
+Step 9's mix decides otherwise; the game ships only the chosen take per line.
