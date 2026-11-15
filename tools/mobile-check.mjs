@@ -741,7 +741,7 @@ try {
         knob: getComputedStyle(document.getElementById('stick-knob')).transform,
       };
     });
-    check('#38 under the thumb: instant recentre, full brightness', pressed.active === true && pressed.opacity > 0.95 && Math.abs(pressed.cx - 140) < 6 && Math.abs(pressed.cy - 258) < 6, JSON.stringify(pressed));
+    check('#38 under the thumb: instant recentre at the press point, full brightness', pressed.active === true && pressed.opacity > 0.95 && Math.abs(pressed.cx - 140) < 6 && Math.abs(pressed.cy - 330) < 6, JSON.stringify(pressed));
     check('#38 the knob tracks the finger', /matrix\(1, 0, 0, 1, 0, -5[12]/.test(pressed.knob), pressed.knob);
     const retired = await page
       .waitForFunction(() => document.getElementById('touch-intro').classList.contains('gone'), null, { timeout: 3000 })
