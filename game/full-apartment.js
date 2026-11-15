@@ -430,7 +430,7 @@ export function buildFullApartment(scene) {
   mergedMesh(flat, frameBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
   mergedMesh(flat, sillBoards, { cast: false });
   mergedMesh(flat, leafBoards.map((e) => ({ ...e, mat: walnut })));
-  mergedMesh(flat, hardware);
+  mergedMesh(flat, hardware.map((e) => ({ ...e, mat: e.mat ?? metal })));
   mergedMesh(flat, panes.map((e) => ({ ...e, mat: glass })), { cast: false, receive: false });
 
   // ── baseboards: 10 cm tall, 1.8 cm off the plaster, every interior room ──
