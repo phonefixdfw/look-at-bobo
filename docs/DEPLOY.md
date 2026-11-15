@@ -156,6 +156,18 @@ and landscape lock: **Android Chrome grants both; iOS Safari has neither API
 for a page** and just plays inside the browser chrome — that is expected, not
 a bug. Upright, the game waits behind a "turn your phone sideways" card.
 
+**The controls announce themselves (issue #38).** The move stick no longer waits
+to be discovered: its ring rests at the lower-left from the first frame of play
+(semi-transparent, notch/home-bar aware, bright ring on a dark edge so it reads
+on any wall), recentres under the thumb when you press anywhere in that corner,
+and glides back when you let go. The first seconds of a session show three
+short chips — **move · look · shout** — plus a dashed "drag to look" circle on
+the right side; they fade after ~6 s or the moment you first move, and calm
+motion (the comfort setting, or your phone's reduce-motion) skips the ring's
+gentle first-run pulse. None of this appears on desktop or in a `?gate=off`
+capture — if a phone report says "the controls are invisible", first check the
+stamp line says `mode touch`.
+
 Useful parameters while phone-testing (append to the URL with `?`/`&`):
 
 | Parameter | What it does |
