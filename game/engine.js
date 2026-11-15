@@ -415,6 +415,37 @@ export function bootGame(cfg) {
   // ---------------------------------------------------------------------------
   let seekTime = 0;
 
+  /** Step 9 idle life: blink and an ear flick, both a pure function of the
+   *  phase-relative t (never wall clock, never random), written EVERY frame
+   *  so a seeked or staged pose depends only on (moment, t). The eye "groups"
+   *  squash in Y — the flattened iris reads as a closed lid at this scale. */
+  function faceLife(bp, t, off) {
+    const eyes = bp.head.userData.eyes;
+    if (eyes && eyes.length) {
+      const P = 4.6;
+      const p = (t + off) % P;
+      const cyc = Math.floor((t + off) / P);
+      const lid = (u) => (u >= 0 && u < 0.13 ? Math.sin((u / 0.13) * Math.PI) : 0);
+      let b = lid(p);
+      if (cyc % 3 === 2) b = Math.max(b, lid(p - 0.46)); // occasional double-blink
+      const k = 1 - 0.88 * b;
+      for (const e of eyes) e.scale.y = k;
+    }
+    const P2 = 5.7;
+    const q = (t + off * 1.6) % P2;
+    const u = q < 0.2 ? Math.sin((q / 0.2) * Math.PI) : 0;
+    const side = Math.floor((t + off * 1.6) / P2) % 2 === 0 ? 1 : -1; // alternates ears
+    for (const c of bp.head.children) {
+      if (!c.userData || c.userData.tag !== 'ear') continue;
+      const bx = c.userData.baseRotX ?? (c.userData.baseRotX = c.rotation.x);
+      const bz = c.userData.baseRotZ ?? (c.userData.baseRotZ = c.rotation.z);
+      const s = Math.sign(c.position.x) || 1;
+      const on = s === side ? u : 0;
+      c.rotation.z = bz + s * on * 0.2;
+      c.rotation.x = bx - on * 0.12;
+    }
+  }
+
   function applyTime(t) {
     seekTime = t;
     // Bobo: the moment's own life — all procedural, all pure in t.
@@ -422,9 +453,14 @@ export function bootGame(cfg) {
     if (bp) {
       const base = bp.body.userData.baseScale ?? (bp.body.userData.baseScale = bp.body.scale.clone());
       bp.tailPivot.rotation.y = Math.sin(t * 1.7) * 0.14;
+      bp.tailPivot.rotation.x = Math.sin(t * 0.71 + 1.2) * 0.045; // slow secondary drift
       bp.head.rotation.y = Math.sin(t * 0.85 + 0.4) * 0.09;
       bp.head.rotation.x = bp.baseHeadX + Math.sin(t * 0.6) * 0.025;
-      bp.body.scale.copy(base);
+      bp.head.rotation.z = Math.sin(t * 0.47 + 2.1) * 0.02; // a cat never holds still
+      const breathe = Math.sin(t * 1.9); // Step 9: the whole cat breathes
+      bp.body.scale.set(base.x * (1 + 0.016 * breathe), base.y * (1 + 0.009 * breathe), base.z * (1 + 0.012 * breathe));
+      bp.shells[0].scale.copy(bp.body.scale).multiplyScalar(1.045); // the fuzz rides along
+      faceLife(bp, t, 0);
       // The moment's own set piece (the slice's if-chain lives in the boot
       // file now; the full game's ten + the pen ride the same slot).
       if (game.phase === 'find') {
@@ -438,6 +474,9 @@ export function bootGame(cfg) {
       const s = Math.sin(t * 1.1);
       dp.body.scale.set(base.x * (1 + 0.03 * s), base.y, base.z * (1 + 0.022 * s));
       dp.shells[0].scale.copy(dp.body.scale).multiplyScalar(1.045);
+      dp.tailPivot.rotation.y = Math.sin(t * 0.9 + 2) * 0.07; // a lazy heavy sway
+      dp.tailPivot.rotation.x = Math.sin(t * 0.41) * 0.03;
+      faceLife(dp, t, 1.7); // out of sync with Bobo — two animals, one clock
     }
     // "DAG!" eases in and stays: the penalty is a joke, not a punishment
     if (HUD_SPEC[game.phase].dag) {

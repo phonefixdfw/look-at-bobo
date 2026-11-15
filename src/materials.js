@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { TOKENS } from './tokens.js';
+import { furMap } from './polish.js'; // Step 9: canvas fur grain over the vertex-colour markings
 
 // ---------------------------------------------------------------------------
 // 4. The materials library (docs/ART_STYLE.md §3). One place, reused everywhere.
@@ -16,10 +17,12 @@ function std(color, opts = {}) {
 function furMaterial({ sheen = false, white = false } = {}) {
   return new THREE.MeshStandardMaterial({
     vertexColors: true,
+    map: furMap, // white-based grain: multiplies the vertex colours, so the
+                 // markings still say who this cat is and the coat has a nap
     roughness: white ? 0.62 : 0.48, // black fur is glossier than white
     metalness: 0,
-    sheen: sheen ? 0.6 : 0.25,
-    sheenRoughness: 0.35,
+    sheen: sheen ? 0.72 : 0.25,
+    sheenRoughness: 0.3,
     sheenColor: new THREE.Color(TOKENS.furSheen),
   });
 }
