@@ -44,6 +44,10 @@ import {
 const EXACT_ENDING = 'your did it! you wind';
 const EXACT_DAG = 'DAG!';
 const DURATION = 6; // seconds per phase loop (the demo's clock contract)
+/** The live play view (not in VIEWS: it has no fixed pose — it follows the
+ *  player). Fixed in step 7: boot used to set game.view to this without
+ *  ever setting viewName, so only captures ever saw the player's own eyes. */
+const LIVE_VIEW = 'player-camera';
 
 const params = new URLSearchParams(location.search);
 /** Fault injection (docs/TECH_PLAN.md "Capture contract"): the fault only
@@ -123,6 +127,10 @@ const input = createInput({ canvas });
 const voices = createVoiceEngine({ resolve: (f) => `../${f}` });
 const planFor = (phase) => audioPlanFor(phase === 'find' ? 'idle' : phase, PLAN_OVERRIDES);
 let firedCues = new Set();
+/** Live aim-tell bookkeeping (step 7, ART_STYLE §8): a shout at nothing
+ *  pulses the reticle (mustard) until this find-phase time. */
+const RETICLE_NUDGE = 0.6; // seconds
+let nudgeUntil = 0;
 
 function markCuesUpTo(t) {
   // epsilon: cue times like 0.25 must not slip through a float gap between
@@ -190,6 +198,7 @@ function updateHud() {
   setText(el.scoreMax, `/ ${pad2(TARGET)}`);
   el.reticle.classList.toggle('show', spec.reticle);
   el.reticle.classList.toggle('soft', spec.soft);
+  el.reticle.classList.remove('nudge'); // live aim-tells are per-phase; never bleed across
   if (el.dag.style.display !== (spec.dag ? 'block' : 'none')) el.dag.style.display = spec.dag ? 'block' : 'none';
   el.ending.classList.toggle('show', spec.ending);
   el.veil.classList.toggle('show', spec.ending);
@@ -224,6 +233,7 @@ const game = {
   decoySupport: 'rug',
   spawnIdx: 0,
   prevSpawnRoom: SPAWNS[0].room,
+  winElapsed: 0, // seconds since the win landed (survives the celebration loop)
 };
 let started = GATE_OFF;
 let gateOpen = GATE_OFF;
@@ -319,24 +329,52 @@ function triggerEvent(event) {
       game.score = PLANT === 'score' ? game.score - 1 : Math.max(0, game.score - 1);
       game.phase = 'wrong';
     }
+    if (game.phase === 'win') game.winElapsed = 0; // the restart cooldown starts here
     game.time = 0;
     firedCues = new Set();
+    nudgeUntil = 0;
     applyStage();
   });
 }
 
+/** Circles for the player's push-out resolve, in the shape
+ *  `world.resolve` wants (absolute clearance = MOVE.boboPush / decoyPush). */
+function catPushes() {
+  return [
+    { x: bobo.root.position.x, z: bobo.root.position.z, r: MOVE.boboPush - MOVE.playerRadius },
+    { x: decoy.root.position.x, z: decoy.root.position.z, r: MOVE.decoyPush - MOVE.playerRadius },
+  ];
+}
+
+/** The last line of defence at a respawn: never stand inside a cat. */
+function standClearOfCats() {
+  const pos = { x: player.x, z: player.z };
+  world.resolve(pos, catPushes());
+  player.x = pos.x;
+  player.z = pos.z;
+}
+
 /** After a catch: next moment, new decoy spot, respawn in a different room
- *  from Bobo's new spot AND from where we just were (issue #11). */
+ *  from Bobo's new spot AND from where we just were (issue #11). Step 7
+ *  (issue #13): the spawn pick also avoids the living cats — pickSpawn
+ *  won't choose a spawn standing in the 22 lb decoy (the hall spawn sat
+ *  0.07 m from d-hall), and standClearOfCats is the backstop either way. */
 function afterCatch() {
   startLiveRound();
   const boboRoom = momentById(game.momentId).room;
-  const { spawn, idx } = pickSpawn(boboRoom, game.prevSpawnRoom, game.spawnIdx);
+  const avoid = [
+    { x: bobo.root.position.x, z: bobo.root.position.z },
+    { x: decoy.root.position.x, z: decoy.root.position.z },
+  ];
+  const { spawn, idx } = pickSpawn(boboRoom, game.prevSpawnRoom, game.spawnIdx, avoid);
   game.spawnIdx = idx;
   game.prevSpawnRoom = spawn.room;
   spawnPlayerAt(spawn);
+  standClearOfCats();
   game.phase = 'find';
   game.time = 0;
   firedCues = new Set();
+  nudgeUntil = 0;
   applyStage();
 }
 
@@ -347,11 +385,15 @@ function restartRun() {
   game.score = 0;
   game.phase = 'find';
   game.time = 0;
+  game.winElapsed = 0;
   game.spawnIdx = 0;
   game.prevSpawnRoom = SPAWNS[0].room;
   firedCues = new Set();
+  nudgeUntil = 0;
   startLiveRound();
   spawnPlayerAt(SPAWNS[0]);
+  standClearOfCats();
+  input.reset(); // no key or queued shout crosses a restart (Space-mashing included)
   applyStage();
 }
 
@@ -437,6 +479,13 @@ function applyTime(t) {
 
 function applyView(name) {
   viewName = name;
+  if (name === LIVE_VIEW) {
+    // The live view has no fixed pose — it IS the player (step 7). Capture
+    // views never take this branch, so captured frames stay pose-pure.
+    applyCameraFromPlayer();
+    updateHandVisibility();
+    return;
+  }
   const v = VIEWS[name];
   camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
   camera.rotation.set(v.pitch, v.yaw, 0);
@@ -491,10 +540,7 @@ function stepPlayer(dt, scripted = null) {
     } else {
       const pos = { x: player.x, z: player.z };
       world.move(pos, vx * step, vz * step);
-      world.resolve(pos, [
-        { x: bobo.root.position.x, z: bobo.root.position.z, r: MOVE.boboPush - MOVE.playerRadius },
-        { x: decoy.root.position.x, z: decoy.root.position.z, r: MOVE.decoyPush - MOVE.playerRadius },
-      ]);
+      world.resolve(pos, catPushes());
       player.x = pos.x;
       player.z = pos.z;
       player.bob += step * 26; // footfall cadence rides the actual ground speed
@@ -507,18 +553,41 @@ function stepPlayer(dt, scripted = null) {
 // ---------------------------------------------------------------------------
 const raycaster = new THREE.Raycaster();
 const CENTER = new THREE.Vector2(0, 0);
-function aimShout() {
-  if (!started || game.paused || game.phase !== 'find') return;
+
+/** What the centre ray is really on: 'cat-bobo' | 'cat-decoy' | null.
+ *  One helper for the shout AND the live aim-tell, so what the reticle
+ *  promises is exactly what the shout does. */
+function catUnderCrosshair() {
+  camera.updateMatrixWorld();
   raycaster.setFromCamera(CENTER, camera);
   for (const hit of raycaster.intersectObjects([bobo.root, decoy.root], true)) {
     if (!hit.object.isMesh) continue;
     let o = hit.object;
     while (o && !(o.name ?? '').startsWith('cat-')) o = o.parent;
-    if (o) {
-      triggerEvent(o.name === 'cat-bobo' ? 'catch' : 'wrong');
-      return;
-    }
+    if (o) return o.name;
   }
+  return null;
+}
+
+function aimShout() {
+  if (!started || game.paused || game.phase !== 'find') return;
+  const cat = catUnderCrosshair();
+  if (cat) {
+    triggerEvent(cat === 'cat-bobo' ? 'catch' : 'wrong');
+    return;
+  }
+  // Input is never silent (issue #13): a shout at nothing shrugs back with a
+  // mustard nudge on the reticle instead of doing nothing at all.
+  nudgeUntil = game.time + RETICLE_NUDGE;
+}
+
+/** ART_STYLE §8 live: the calm dot softens to coral while aimed at the
+ *  decoy — "is that…?" — and carries the nudge pulse after a shout at
+ *  nothing. Live view only: captured frames stage the HUD from HUD_SPEC,
+ *  untouched (the wrong-phase soft stay the spec's own). */
+function updateAimTell() {
+  el.reticle.classList.toggle('soft', catUnderCrosshair() === 'cat-decoy');
+  el.reticle.classList.toggle('nudge', game.time < nudgeUntil);
 }
 
 // ---------------------------------------------------------------------------
@@ -533,6 +602,7 @@ function stepGame(dt) {
   if (game.paused) return;
 
   if (game.phase === 'find') stepPlayer(dt);
+  if (game.phase === 'win') game.winElapsed += dt;
   game.time += dt;
 
   if (game.phase === 'catch' && game.time >= CATCH_END) afterCatch();
@@ -540,20 +610,66 @@ function stepGame(dt) {
     game.phase = 'find'; // the moment is NOT consumed by a DAG! (Q6)
     game.time = 0;
     firedCues = new Set();
+    nudgeUntil = 0;
     applyStage();
   } else if (game.phase === 'win' && game.time >= DURATION) {
     game.time -= DURATION; // the celebration loops; the score stays frozen
-    firedCues = new Set();
+    // The win LINE does not loop with it (issue #13): firedCues used to
+    // reset here, so the voice line replayed every 6 s. Once per win.
   }
 
   const prev = game.time - dt;
   advanceCues(prev, game.time);
 }
 
-function frame() {
-  stepGame(1 / 60);
+/** Fixed-step simulation from real frame deltas (issue #13 — the loop must
+ *  survive frame-time spikes and background-tab throttling). Each rendered
+ *  frame drains as many 1/60 steps as the elapsed wall time earned, capped
+ *  so a tab returning after 30 s cannot fast-forward through events: the
+ *  clamped step keeps physics sane and simply drops lost time, the way the
+ *  render path drops frames. */
+const FIXED_DT = 1 / 60; // the simulation step — every rule above is written in it
+const MAX_FRAME_DT = 0.25; // seconds of catch-up per frame (15 sim steps)
+const MAX_STEPS = 16; // hard cap on sim steps per rendered frame
+let accumulator = 0;
+let lastStamp = null;
+const loopStats = { frames: 0, clamped: 0, maxSteps: 0, lastSteps: 0, maxDelta: 0, simSteps: 0 };
+
+/** Run one frame's worth of simulation for a delta (seconds). Exported
+ *  through LC.loopTick so a headless test can drive the loop at any
+ *  simulated frame rate without a real rAF clock. */
+function tickLoop(deltaSeconds) {
+  let delta = Number(deltaSeconds);
+  if (!Number.isFinite(delta) || delta < 0) delta = 0;
+  if (delta > loopStats.maxDelta) loopStats.maxDelta = delta;
+  if (delta > MAX_FRAME_DT) {
+    delta = MAX_FRAME_DT;
+    loopStats.clamped++;
+  }
+  accumulator += delta;
+  let steps = 0;
+  while (accumulator >= FIXED_DT && steps < MAX_STEPS) {
+    stepGame(FIXED_DT);
+    accumulator -= FIXED_DT;
+    steps++;
+  }
+  if (steps === MAX_STEPS) accumulator = Math.min(accumulator, FIXED_DT); // drop the rest, never spiral
+  loopStats.frames++;
+  loopStats.lastSteps = steps;
+  loopStats.simSteps += steps;
+  if (steps > loopStats.maxSteps) loopStats.maxSteps = steps;
+  return steps;
+}
+
+function frame(stampMs) {
+  const dt = lastStamp === null ? FIXED_DT : (stampMs - lastStamp) / 1000;
+  lastStamp = stampMs;
+  tickLoop(dt);
   applyTime(game.time);
-  if (started && !game.paused && viewName === 'player-camera') applyCameraFromPlayer();
+  if (started && !game.paused && viewName === 'player-camera') {
+    applyCameraFromPlayer();
+    if (game.phase === 'find') updateAimTell();
+  }
   updateLabel();
   window.LC.renderNow();
 }
@@ -763,6 +879,71 @@ function selfTest() {
   }
   add('respawn-changes-room', respawnOk ? 'different room, every case' : 'same room as Bobo', 'spawn room ≠ Bobo\'s new room', respawnOk, '"respawn elsewhere" after each catch (issue #11)');
 
+  // --- step 7 (issue #13): never wake up inside a cat, never inside furniture.
+  // Every legal (moment × decoy × prev-room × cycle) respawn combination,
+  // through the REAL pickSpawn (cat-avoiding) and the REAL world.resolve the
+  // game runs at spawn — measuring where the player ACTUALLY ends up standing.
+  let wakeOk = true;
+  let wakeWorst = Infinity;
+  let wakeCase = null;
+  for (const m of MOMENTS) {
+    for (const d of DECOY_SPOTS) {
+      if (Math.hypot(d.pos[0] - m.spot[0], d.pos[2] - m.spot[2]) < DECOY_MIN_DIST) continue; // that pair never coexists
+      for (const prev of ['living', 'hall', 'bedroom']) {
+        for (let fromIdx = 0; fromIdx < SPAWNS.length; fromIdx++) {
+          const { spawn } = pickSpawn(m.room, prev, fromIdx, [
+            { x: m.spot[0], z: m.spot[2] },
+            { x: d.pos[0], z: d.pos[2] },
+          ]);
+          const pos = { x: spawn.pos[0], z: spawn.pos[1] };
+          world.resolve(pos, [
+            { x: m.spot[0], z: m.spot[2], r: MOVE.boboPush - MOVE.playerRadius },
+            { x: d.pos[0], z: d.pos[2], r: MOVE.decoyPush - MOVE.playerRadius },
+          ]);
+          const margin = Math.min(
+            Math.hypot(pos.x - m.spot[0], pos.z - m.spot[2]) - MOVE.boboPush,
+            Math.hypot(pos.x - d.pos[0], pos.z - d.pos[2]) - MOVE.decoyPush,
+          );
+          if (margin < wakeWorst) {
+            wakeWorst = margin;
+            wakeCase = `${m.id}+${d.id} from ${prev}, cycle ${fromIdx} → ${spawn.room}`;
+          }
+          if (margin < -1e-9 || !world.inside(pos.x, pos.z)) wakeOk = false;
+        }
+      }
+    }
+  }
+  add(
+    'respawn-clear-of-cats',
+    wakeOk ? `every respawn lands outside both cats (tightest ${wakeWorst.toFixed(2)} m past the push edge: ${wakeCase})` : `lands inside a cat: ${wakeCase}`,
+    '≥ push radius (0.46/0.50 m) and on the floor after resolve',
+    wakeOk,
+    'pickSpawn avoids cat-side spawns, world.resolve is the backstop (issue #13: the hall spawn sat 0.07 m from d-hall)',
+  );
+
+  let padOk = true;
+  let padWorst = Infinity;
+  let padCase = null;
+  for (const s of SPAWNS) {
+    for (const box of COLLIDERS) {
+      const dx = Math.max(box.x0 - s.pos[0], 0, s.pos[0] - box.x1);
+      const dz = Math.max(box.z0 - s.pos[1], 0, s.pos[1] - box.z1);
+      const dist = Math.hypot(dx, dz);
+      if (dist < padWorst) {
+        padWorst = dist;
+        padCase = `${s.room}@(${s.pos[0]},${s.pos[1]}) ↔ ${box.id}`;
+      }
+      if (dist < MOVE.playerRadius) padOk = false;
+    }
+  }
+  add(
+    'spawn-clearance',
+    padOk ? `every spawn ≥ player radius clear of furniture (tightest ${padWorst.toFixed(2)} m: ${padCase})` : `overlaps furniture: ${padCase}`,
+    `≥ ${MOVE.playerRadius} m from every collider`,
+    padOk,
+    'you never materialise standing in the lamp (issue #13: the living spawn moved off floor-lamp)',
+  );
+
   // --- the cast reads right (Step 3 tells hold here) ------------------------
   const bb = scanMarkings(bobo, bobo.current);
   const dd = scanMarkings(decoy, decoy.current);
@@ -947,7 +1128,7 @@ function installContract() {
     duration: DURATION,
     views: Object.keys(VIEWS),
     setView(name) {
-      if (!VIEWS[name]) throw new Error(`Unknown view "${name}". Declared: ${Object.keys(VIEWS).join(', ')}`);
+      if (name !== LIVE_VIEW && !VIEWS[name]) throw new Error(`Unknown view "${name}". Declared: ${Object.keys(VIEWS).join(', ')}`);
       game.view = name;
       applyView(name);
       updateLabel();
@@ -958,6 +1139,8 @@ function installContract() {
     play() {
       if (game.playing) return;
       game.playing = true;
+      lastStamp = null; // time spent paused is never game time
+      accumulator = 0;
       renderer.setAnimationLoop(frame);
     },
     pause() {
@@ -1138,6 +1321,22 @@ function installContract() {
     audioPlan(phase = game.phase) {
       return planFor(phase);
     },
+    /** Step 7 stress hooks: where the cast and the player actually stand
+     *  (legality proofs run against the live scene, not a re-derivation),
+     *  and what the centre ray is currently on. */
+    catsDebug() {
+      return {
+        bobo: bobo.root.position.toArray().map(round),
+        decoy: decoy.root.position.toArray().map(round),
+        boboPush: MOVE.boboPush,
+        decoyPush: MOVE.decoyPush,
+        px: round(player.x),
+        pz: round(player.z),
+      };
+    },
+    aimProbe() {
+      return catUnderCrosshair() ?? 'nothing';
+    },
     /** Cue bookkeeping for the audio check / step 7 bot: which planned cues
      *  are already consumed for the current phase, and the phase clock. */
     cuesDebug() {
@@ -1154,6 +1353,38 @@ function installContract() {
     },
     restart() {
       restartRun();
+    },
+    /** Step 7 stress hooks (issue #13; docs/CAPTURE.md extensions). One
+     *  loopTick(dt) = one rendered frame that took `dt` seconds: the same
+     *  clamped, fixed-step pipeline the rAF clock drives, minus the draw.
+     *  Rate-independence proof: 1 s of wall time at any frame rate earns
+     *  +1.000 s of game time; a spike earns at most MAX_FRAME_DT. */
+    loopTick(dt = FIXED_DT) {
+      return tickLoop(dt);
+    },
+    /** The loop's own telemetry, including where the REAL camera sits —
+     *  `camera('player-camera')` reports the player's state; this reports
+     *  the object the frame actually rendered from (camera-follow proof). */
+    loopDebug() {
+      return {
+        ...loopStats,
+        fixedDt: FIXED_DT,
+        maxFrameDt: MAX_FRAME_DT,
+        stepCap: MAX_STEPS,
+        accumulator: round(accumulator),
+        playing: game.playing,
+        paused: game.paused,
+        phase: game.phase,
+        time: round(game.time),
+        winElapsed: round(game.winElapsed),
+        camPos: camera.position.toArray().map(round),
+        camYaw: round(camera.rotation.y),
+        camPitch: round(camera.rotation.x),
+      };
+    },
+    loopDebugReset() {
+      for (const k of Object.keys(loopStats)) loopStats[k] = 0;
+      accumulator = 0;
     },
   };
 }
@@ -1188,27 +1419,54 @@ function startGame() {
   queue = [];
   startLiveRound();
   spawnPlayerAt(SPAWNS[0]);
-  game.view = 'player-camera'; // the live camera follows the player now
+  standClearOfCats();
   applyStage();
+  game.view = LIVE_VIEW; // the live camera follows the player now —
+  applyView(LIVE_VIEW); // step 7: this used to skip viewName, so the camera never actually moved
+  input.reset(); // nothing held (or queued before the start) steers the new run
   input.lock();
   window.LC?.play();
+}
+
+/** Seconds of celebration that must be seen before Space/click may skip
+ *  the win (issue #13: a Space-mashing player used to clear the whole
+ *  screen mid-keydown before the win line ever landed). */
+const WIN_RESTART_AFTER = 0.6;
+
+function tryRestartFromWin() {
+  if (game.winElapsed >= WIN_RESTART_AFTER) restartRun();
+}
+
+function resumePlay() {
+  game.paused = false;
+  el.pause.classList.remove('show');
 }
 
 function wireInput() {
   el.gate.addEventListener('click', unlockGate);
   el.pause.addEventListener('click', () => {
     if (game.phase === 'win') return;
-    input.lock(); // resuming IS the click-to-resume
+    // Resume paths by situation: still holding the pointer (a blur paused
+    // us — Alt-Tab keeps the lock) or no lock semantics at all (headless
+    // ?gate=off) → resume directly; otherwise resuming IS re-grabbing
+    // the pointer, and the lock-change event clears the pause.
+    if (GATE_OFF || input.isLocked()) resumePlay();
+    else input.lock();
   });
   input.onLockChange((locked) => {
-    if (locked) game.paused = false;
+    if (locked) resumePlay();
     else if (started && game.phase !== 'win' && !GATE_OFF) game.paused = true;
     el.pause.classList.toggle('show', game.paused);
+  });
+  input.onLockError(() => {
+    // Chrome refuses an instant re-lock after Esc (and headless never
+    // grants one): never silently eat the click, keep the card up.
+    el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
   });
   canvas.addEventListener('click', () => {
     if (!gateOpen) return;
     if (game.phase === 'win') {
-      restartRun();
+      tryRestartFromWin();
       return;
     }
     if (input.isLocked()) input.queueAction('point');
@@ -1217,7 +1475,7 @@ function wireInput() {
   window.addEventListener('keydown', (ev) => {
     if (ev.code === 'Space' && gateOpen && !ev.repeat) {
       ev.preventDefault();
-      if (game.phase === 'win') restartRun();
+      if (game.phase === 'win') tryRestartFromWin();
       else input.queueAction('point');
     }
   });
@@ -1241,6 +1499,10 @@ if (PLANT === 'text') {
 
 function boot() {
   if (GATE_OFF) el.gate.classList.add('hidden');
+  // The moment-label chip is tooling (capture frames, phase/moment/view/t/score
+  // readout). Step 7: hidden for a real player — it was spoilers-on-screen —
+  // but keepable with ?label=on; tool pages (?gate=off) always show it.
+  if (!GATE_OFF && params.get('label') !== 'on') el.label.classList.add('off');
   stageFindMoment(MOMENTS[0].id);
   applyStage();
   applyView('first-person');

@@ -30,6 +30,8 @@
                  ?win=N     points to win (default 5)
                  ?seed=N    the moment-order seed (default 11)
                  ?score=N   start at N points
+                 ?label=on  show the tool's moment-label chip live
+                            (it is hidden for players; ?gate=off always shows it)
     Faults to prove the checks bite (selfTest / budget must FAIL):
       ?plant=text          the joke ending gets "fixed"
       ?plant=audio         the yell plays the wrong take
@@ -83,6 +85,11 @@
         color: #f2f5f8;
         white-space: pre;
         z-index: 30;
+      }
+      /* The chip is tooling, not story: hidden for players (step 7),
+         shown on tool pages (?gate=off) and on demand (?label=on). */
+      #moment-label.off {
+        display: none;
       }
 
       /* ---------- HUD (design system §8): everything below the canvas ---------- */
@@ -154,6 +161,24 @@
       }
       #reticle.soft::after {
         background: var(--ui-coral);
+      }
+      /* A shout at nothing is never silent (step 7): one gentle mustard
+         nudge on the dot — the design system's "yes, heard you" colour. */
+      #reticle.nudge {
+        animation: reticle-nudge 0.6s ease-out;
+      }
+      @keyframes reticle-nudge {
+        0% {
+          border-color: var(--ui-mustard);
+          transform: scale(1);
+        }
+        35% {
+          border-color: var(--ui-mustard);
+          transform: scale(1.65);
+        }
+        100% {
+          transform: scale(1);
+        }
       }
 
       /* The find-phase prompt: the whole instruction, in the game's voice. */

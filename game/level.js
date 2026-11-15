@@ -64,7 +64,9 @@ export const SPAWNS = [
   { room: 'bedroom', pos: [-2.6, 6.4], yaw: -0.79 },
   { room: 'hall', pos: [-0.55, 3.5], yaw: 0 },
   { room: 'bedroom', pos: [-2.2, 4.8], yaw: -1.2 },
-  { room: 'living', pos: [-2.0, -1.8], yaw: 2.6 },
+  // Step 7: was (-2.0, -1.8) — 0.12 m from the floor-lamp collider, so the
+  // player materialised standing inside it (spawn-clearance proves ≥0.30 m).
+  { room: 'living', pos: [-1.5, -1.8], yaw: 2.6 },
   { room: 'living', pos: [2.6, 1.8], yaw: 0.85 },
 ];
 
@@ -110,11 +112,28 @@ export function pickDecoySpot(boboSpot, rng) {
   return valid[Math.min(valid.length - 1, Math.floor(rng() * valid.length))];
 }
 
+/** How far a respawn prefers to stand from living cats (m). The room rules
+ *  are law; this is a strong preference — the game's collision resolve is
+ *  the hard backstop either way (issue #13: the hall spawn used to land
+ *  0.07 m from the d-hall decoy, i.e. inside a 22 lb cat). */
+export const SPAWN_AVOID_DIST = 1.2;
+
 /** The next spawn after a catch: first cycle entry whose room differs from
- *  Bobo's new room and from the previous spawn room. `fromIdx` advances the
- *  cycle; `prevRoom` is the room of the spawn the player used last. */
-export function pickSpawn(boboRoom, prevRoom, fromIdx) {
+ *  Bobo's new room and from the previous spawn room, and that stands
+ *  `SPAWN_AVOID_DIST` clear of every point in `avoid` (the living cats —
+ *  pass their positions; empty array keeps the old behaviour). The room
+ *  rules outrank the distance rule, so the last two fallbacks relax it
+ *  before they relax room separation; `world.resolve` covers the rest.
+ *  `fromIdx` advances the cycle; `prevRoom` is the room of the spawn the
+ *  player used last. */
+export function pickSpawn(boboRoom, prevRoom, fromIdx, avoid = [], minDist = SPAWN_AVOID_DIST) {
+  const clear = (s) => avoid.every((a) => Math.hypot(s.pos[0] - a.x, s.pos[1] - a.z) >= minDist);
   const n = SPAWNS.length;
+  for (let k = 1; k <= n; k++) {
+    const idx = (fromIdx + k) % n;
+    const s = SPAWNS[idx];
+    if (s.room !== boboRoom && s.room !== prevRoom && clear(s)) return { spawn: s, idx };
+  }
   for (let k = 1; k <= n; k++) {
     const idx = (fromIdx + k) % n;
     const s = SPAWNS[idx];
