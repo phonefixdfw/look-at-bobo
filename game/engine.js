@@ -38,6 +38,7 @@ import { buildHand } from '../src/hand.js';
 import { VOICE_LINES, audioPlanFor, createVoiceEngine } from '../src/audio.js';
 import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
+import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
 
 export function bootGame(cfg) {
   const {
@@ -79,6 +80,12 @@ export function bootGame(cfg) {
   // both ways (?motion=off forces calm, ?motion=full forces the juice back).
   const OS_REDUCE = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const motionParam = params.get('motion');
+  // Issue #25 (phones): TOUCH decides the CONTROL mode (?touch=on|off wins);
+  // AUTO_LOW is a device fact (touch or tiny screen) that only picks the
+  // quality DEFAULT — ?quality=low/high always beat it, both ways.
+  const TOUCH = touchOverride(location.search) ?? isTouchDevice();
+  const AUTO_LOW = autoLowQuality();
+  const qualityParam = params.get('quality');
   const SETTINGS = {
     sens: Number.isFinite(sensRaw) ? clamp(sensRaw, 0.2, 3) : 1,
     invertY: params.get('invertY') === '1',
@@ -86,7 +93,8 @@ export function bootGame(cfg) {
     highContrast: params.get('contrast') === 'high',
     volume: Number.isFinite(volRaw) ? clamp(volRaw, 0, 1) : 1,
     muted: params.get('mute') === '1',
-    quality: params.get('quality') === 'low' ? 'low' : 'full', // weak-GPU path (?quality=low)
+    // Weak-GPU path: ?quality=low|high, else auto-low on phones (?quality=low).
+    quality: qualityParam === 'low' || (qualityParam !== 'high' && AUTO_LOW) ? 'low' : 'full',
   };
 
   /** Small, seeded, reproducible — the run's only randomness (docs/DECOY_CAT.md). */
@@ -110,6 +118,13 @@ export function bootGame(cfg) {
   const canvas = document.getElementById('view');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(1); // pixel-exact captures on any display (docs/CAPTURE.md)
+  if (TOUCH) {
+    // Phones keep a crisp-but-honest backing store: device pixels, capped hard
+    // (SwiftShader-less phones are the market here). Desktop stays ratio 1 —
+    // the capture contract's guarantee is untouched because captures never run
+    // as a touch device.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, SETTINGS.quality === 'low' ? 1.5 : 2));
+  }
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -160,6 +175,11 @@ export function bootGame(cfg) {
 
   const world = createWorld({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
   const input = createInput({ canvas });
+  // Issue #25 touch state (all inert on desktop: TOUCH is false there, so
+  // touchCtl stays null and the listeners below are never installed).
+  let touchCtl = null;
+  let portraitMQ = null;
+  let rotatePaused = false; // paused BY the portrait rotation (landscape resumes it)
 
   // ---------------------------------------------------------------------------
   // 3. The voice engine — the ONLY place audio fires is the play loop below.
@@ -1203,7 +1223,10 @@ export function bootGame(cfg) {
           SETTINGS.highContrast === wantHc &&
           document.body.classList.contains('hc') === wantHc &&
           SETTINGS.muted === (p.get('mute') === '1') &&
-          SETTINGS.quality === (p.get('quality') === 'low' ? 'low' : 'full'),
+          // Issue #25: quality resolves low|high over the phone default — the
+          // check re-derives the same rule, so it holds on ANY device.
+          SETTINGS.quality === (p.get('quality') === 'low' ? 'low' : p.get('quality') === 'high' ? 'full' : AUTO_LOW ? 'low' : 'full') &&
+          document.documentElement.classList.contains('touch') === TOUCH,
         'comfort settings parse from the url (calm follows prefers-reduced-motion unless overridden) and drive the page',
       );
     }
@@ -1520,6 +1543,30 @@ export function bootGame(cfg) {
         for (const k of Object.keys(loopStats)) loopStats[k] = 0;
         accumulator = 0;
       },
+      /** Issue #25 (docs/CAPTURE.md extensions): what touch mode the page
+       *  booted in and what the controller is doing right now. Pure reads —
+       *  never affects a normal game. */
+      touchDebug() {
+        return {
+          active: TOUCH,
+          autoLow: AUTO_LOW,
+          controls: touchCtl ? touchCtl.debug() : null,
+          virtual: input.virtualState(),
+        };
+      },
+      /** The GPU posture actually in force: quality + the real backing store. */
+      gpuDebug() {
+        return {
+          quality: SETTINGS.quality,
+          pixelRatio: renderer.getPixelRatio(),
+          devicePixelRatio: window.devicePixelRatio || 1,
+          shadows: renderer.shadowMap.enabled,
+          confetti: confetti.enabled,
+          canvasW: renderer.domElement.width,
+          canvasH: renderer.domElement.height,
+          touch: TOUCH,
+        };
+      },
     };
   }
 
@@ -1538,10 +1585,33 @@ export function bootGame(cfg) {
   // ---------------------------------------------------------------------------
   // 13. The gate (click unlocks audio + pointer lock), pause, restart
   // ---------------------------------------------------------------------------
+  /** Issue #25: on a phone, the same tap that unlocks audio also asks for
+   *  fullscreen and landscape — both best-effort: Android Chrome grants
+   *  them, iOS Safari has no Fullscreen API for pages (its element call is
+   *  video-only), so there the game plays perfectly well inside the browser
+   *  chrome (docs/DEPLOY.md "Testing on a phone"). */
+  function requestTouchFullscreen() {
+    try {
+      const root = document.documentElement;
+      if (typeof root.requestFullscreen === 'function') {
+        const p = root.requestFullscreen({ navigationUI: 'hide' });
+        p?.catch?.(() => {});
+      }
+    } catch {
+      /* denied / no gesture / iOS: play windowed */
+    }
+    try {
+      screen.orientation?.lock?.('landscape')?.catch?.(() => {});
+    } catch {
+      /* iOS again: no orientation lock — the rotate hint carries the message */
+    }
+  }
+
   function unlockGate() {
     if (gateOpen) return;
     gateOpen = true;
-    voices.unlock();
+    voices.unlock(); // inside the user gesture (autoplay rules)
+    if (TOUCH) requestTouchFullscreen(); // also inside the gesture (issue #25)
     el.gate.classList.add('hidden');
     if (!started) startGame();
   }
@@ -1558,7 +1628,14 @@ export function bootGame(cfg) {
     game.view = LIVE_VIEW; // the live camera follows the player now —
     applyView(LIVE_VIEW); // step 7: this used to skip viewName, so the camera never actually moved
     input.reset(); // nothing held (or queued before the start) steers the new run
-    input.lock();
+    if (TOUCH) {
+      // No pointer lock on touch (issue #25): the drag zones ARE the pointer.
+      // A phone that started upright waits behind the rotate hint instead.
+      if (portraitMQ?.matches) {
+        game.paused = true;
+        rotatePaused = true;
+      }
+    } else input.lock();
     window.LC?.play();
   }
 
@@ -1573,6 +1650,7 @@ export function bootGame(cfg) {
 
   function resumePlay() {
     game.paused = false;
+    rotatePaused = false; // a deliberate resume outranks the rotate-pause too
     el.pause.classList.remove('show');
   }
 
@@ -1582,9 +1660,10 @@ export function bootGame(cfg) {
       if (game.phase === 'win') return;
       // Resume paths by situation: still holding the pointer (a blur paused
       // us — Alt-Tab keeps the lock) or no lock semantics at all (headless
-      // ?gate=off) → resume directly; otherwise resuming IS re-grabbing
-      // the pointer, and the lock-change event clears the pause.
-      if (GATE_OFF || input.isLocked()) resumePlay();
+      // ?gate=off, or touch — issue #25: nothing to grab, tapping IS asking)
+      // → resume directly; otherwise resuming IS re-grabbing the pointer,
+      // and the lock-change event clears the pause.
+      if (GATE_OFF || input.isLocked() || TOUCH) resumePlay();
       else input.lock();
     });
     // Step 8 (full game): the pause card also carries a restart button.
@@ -1592,7 +1671,7 @@ export function bootGame(cfg) {
       el.pauseRestart.addEventListener('click', (ev) => {
         ev.stopPropagation();
         restartRun();
-        if (GATE_OFF || input.isLocked()) resumePlay();
+        if (GATE_OFF || input.isLocked() || TOUCH) resumePlay();
         else input.lock(); // the lock-change event clears the pause
       });
     }
@@ -1608,6 +1687,8 @@ export function bootGame(cfg) {
     });
     canvas.addEventListener('click', () => {
       if (!gateOpen) return;
+      if (TOUCH) return; // issue #25: no pointer lock to grab — the drag zones
+      // and the shout button own the screen on touch devices
       if (game.phase === 'win') {
         tryRestartFromWin();
         return;
@@ -1672,6 +1753,73 @@ export function bootGame(cfg) {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 13b. Touch mode (issue #25) — installed ONLY on a touch device (or
+  // ?touch=on). On every desktop and every capture run this function returns
+  // at once and the page is behaviourally byte-identical to before.
+  // ---------------------------------------------------------------------------
+  function initTouchUI() {
+    if (!TOUCH) return;
+    document.documentElement.classList.add('touch');
+    document.body.classList.add('touch');
+    touchCtl = createTouchControls({
+      baseEl: document.getElementById('stick-base'),
+      knobEl: document.getElementById('stick-knob'),
+      shoutEl: document.getElementById('shout-btn'),
+      onStick: (a) => {
+        input.setVirtual('forward', a.fwd > 0);
+        input.setVirtual('back', a.fwd < 0);
+        input.setVirtual('left', a.strafe < 0);
+        input.setVirtual('right', a.strafe > 0);
+        input.setVirtual('run', a.run);
+      },
+      // Drag deltas land in the same accumulator mouse moves use, so
+      // ?sens and ?invertY steer the finger exactly like the mouse.
+      onLook: (dx, dy) => input.look(dx, dy),
+      onShout: () => {
+        if (!gateOpen) voices.unlock(); // ?gate=off phone page: a tap is a gesture too
+        if (!started) return;
+        if (game.phase === 'win') {
+          tryRestartFromWin(); // the shout button doubles as "play again"
+          return;
+        }
+        if (!game.paused) input.queueAction('point');
+      },
+    });
+    // Touch wording, JS-swapped so the captured desktop DOM never sees it
+    // (#hint, #ending-again and the pause card live inside captured frames).
+    if (el.gateBtn) el.gateBtn.textContent = 'tap to start';
+    if (el.hint) el.hint.textContent = 'left thumb: stick · right side: drag to look · big button: shout at the dot';
+    const psub = el.pause?.querySelector?.('.pause-sub');
+    if (psub) psub.textContent = 'tap anywhere to keep looking';
+    if (el.endingAgain) {
+      el.endingAgain.textContent = 'tap the shout button to look at them again';
+      el.endingAgain.style.pointerEvents = 'auto'; // a tap target, not a caption
+      el.endingAgain.addEventListener('click', tryRestartFromWin);
+    }
+    // Portrait: the game waits behind the rotate hint (its .show is pure CSS,
+    // see full.html) — pausing here keeps the sim honest while upright.
+    portraitMQ = typeof matchMedia === 'function' ? matchMedia('(orientation: portrait)') : null;
+    const applyOrientation = () => {
+      touchCtl?.releaseAll(); // a finger mid-drag must not bank across the turn
+      if (portraitMQ?.matches) {
+        if (started && !game.paused && game.phase !== 'win') {
+          game.paused = true;
+          rotatePaused = true;
+        }
+      } else if (rotatePaused) resumePlay(); // back landscape: straight back in
+      el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
+    };
+    portraitMQ?.addEventListener?.('change', applyOrientation);
+    // Tab hidden: pause (the phone user returns to a waiting card, not a
+    // run that walked off while the screen was off).
+    document.addEventListener('visibilitychange', () => {
+      touchCtl?.releaseAll();
+      if (document.hidden && started && !game.paused && game.phase !== 'win') game.paused = true;
+      el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
+    });
+  }
+
   // Fault injection, applied after everything is built so selfTest can catch it.
   if (PLANT === 'text') {
     ENDING_TEXT = 'you did it! you win'; // the joke "fixed": ending-text-exact must fail
@@ -1703,6 +1851,7 @@ export function bootGame(cfg) {
     resize();
     renderer.render(scene, camera);
     installContract();
+    initTouchUI(); // issue #25: no-op on desktop
     wireInput();
     // `LC.ready` is the tool's one signal that the page may be captured, and a
     // capture is a screenshot of the WHOLE page — so ready means "the game is

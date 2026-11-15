@@ -16,6 +16,11 @@ const KEY_MAP = {
 
 export function createInput({ dom = document, canvas = null } = {}) {
   const keys = Object.create(null);
+  // Issue #25: roles held by the touch controller (virtual stick). Separate
+  // from `keys` so a blur/unlock that drops real keys never drops the stick
+  // mid-step (the controller releases it explicitly), and so the desktop
+  // keyboard path below stays byte-for-byte what it always was.
+  const virtual = Object.create(null);
   let lookDx = 0;
   let lookDy = 0;
   const actions = []; // "point" | "pause" | "resume"
@@ -87,7 +92,23 @@ export function createInput({ dom = document, canvas = null } = {}) {
   target?.addEventListener?.("contextmenu", onContextMenu);
 
   return {
-    isDown: (role) => keys[role] === true,
+    isDown: (role) => keys[role] === true || virtual[role] === true,
+    /** Issue #25: the touch stick presses "keys" without a keyboard. Same
+     *  roles the keyboard map uses (forward/back/left/right/run). */
+    setVirtual(role, on) {
+      if (on) virtual[role] = true;
+      else delete virtual[role];
+    },
+    /** Issue #25: accumulate look from a finger drag, in pixels (the same
+     *  unit mouse deltas are in — stepPlayer applies sensitivity + invertY
+     *  to touch look exactly as it does to mouse look). */
+    look(dx, dy) {
+      lookDx += dx;
+      lookDy += dy;
+    },
+    virtualState() {
+      return { ...virtual };
+    },
     // Consume accumulated look once per step (drift-free under capture).
     takeLook() {
       const l = { dx: lookDx, dy: lookDy };
@@ -116,6 +137,7 @@ export function createInput({ dom = document, canvas = null } = {}) {
     },
     reset() {
       for (const k of Object.keys(keys)) delete keys[k];
+      for (const k of Object.keys(virtual)) delete virtual[k];
       lookDx = 0;
       lookDy = 0;
       actions.length = 0;
