@@ -308,12 +308,12 @@ export const DECOY_SPOTS = [
   { id: 'd-living', room: 'living', pos: [-1.45, 'floor', 1.8], faceYaw: 0.06 },
   { id: 'd-tv', room: 'living', pos: [0.9, 'floor', -2.0], faceYaw: 0.21 },
   { id: 'd-dining', room: 'living', pos: [0.0, 'floor', 1.6], faceYaw: 1.67, pose: 'side' },
-  { id: 'd-kitchen', room: 'kitchen', pos: [3.6, 'floor', -1.55], faceYaw: -3.14 },
+  { id: 'd-kitchen', room: 'kitchen', pos: [3.5, 'floor', -1.5], faceYaw: -3.14 }, // 1.28 m off the sink spot (was 1.185 — illegal pair)
   { id: 'd-bar', room: 'kitchen', pos: [4.05, 'floor', -0.62], faceYaw: 1.36, pose: 'side' },
   { id: 'd-hall', room: 'hall', pos: [0.35, 'floor', 3.0], faceYaw: 1.23 },
   { id: 'd-entry', room: 'entry', pos: [2.0, 'floor', 2.5], faceYaw: 1.9 },
   { id: 'd-bath', room: 'bathroom', pos: [-2.75, 'floor', 3.55], faceYaw: -0.81, pose: 'side' },
-  { id: 'd-bedroom', room: 'bedroom', pos: [-1.35, 'floor', 6.75], faceYaw: 1.65 },
+  { id: 'd-bedroom', room: 'bedroom', pos: [-1.35, 'floor', 6.95], faceYaw: 1.65 }, // 20 cm south: the desk/keyboard pair sat under DECOY_MIN_DIST
   { id: 'd-balcony', room: 'balcony', pos: [1.4, 'floor', -3.35], faceYaw: 2.82, pose: 'side' },
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
