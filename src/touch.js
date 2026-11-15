@@ -6,9 +6,17 @@
 // `isTouchDevice()` is false, the engine never builds a controller, and every
 // captured desktop pixel stays exactly what it was.
 //
+// Issue #38: the ring is not invisible until you find it any more. On touch
+// devices it rests at its spot in the lower-left from the first frame (the CSS
+// positions the idle ring; pressing still recentres it under the thumb, and
+// releasing glides it back instead of vanishing), and a small first-run layer —
+// three move/look/shout chips plus a swipe cue for the look side — teaches the
+// controls once and retires itself. Both are plain DOM the CSS already owns;
+// this file only flips the classes, so capture and desktop pixels are unchanged.
+//
 // Routing model (Pointer Events, one listener set on window):
 //   * a finger that lands in the lower-left pad becomes the move stick
-//     (dynamic origin — the base appears under the thumb, quantised to 8
+//     (dynamic origin — the base recentres under the thumb, quantised to 8
 //     directions, pressed far enough = run);
 //   * any other finger drags the camera, in pixels, through the same
 //     accumulator the mouse uses, so ?sens and ?invertY apply for free;
@@ -109,6 +117,64 @@ export function createTouchControls({
   let stickCy = 0;
   const lastAxis = { fwd: 0, strafe: 0, run: false };
 
+  // Issue #38 first-run layer. Optional DOM like everything else here: pages
+  // without it (the slice, the demo) skip the whole teaching flow.
+  const gateEl = doc.getElementById?.('gate') ?? null;
+  const introEl = doc.getElementById?.('touch-intro') ?? null;
+  const lookHintEl = doc.getElementById?.('look-hint') ?? null;
+  const INTRO_SHOW_MS = 6500; // long enough to read all three chips
+  let introState = 'idle'; // idle -> show -> gone
+  let introTimer = 0;
+  let gateWatcher = null;
+  const isCapture = () => doc.body?.classList.contains('capture') === true;
+  // Calm mode is the settings checkbox (which already follows the OS
+  // "reduce motion" at boot); engine.js keeps it in sync with SETTINGS.
+  const isCalm = () => doc.getElementById?.('set-motion')?.checked === true;
+
+  function startIntro() {
+    if (introState !== 'idle') return;
+    if (isCapture()) {
+      introState = 'gone'; // ?gate=off: a capture frame never carries teaching chrome
+      return;
+    }
+    introState = 'show';
+    introEl?.classList.add('show');
+    lookHintEl?.classList.add('show');
+    if (!isCalm()) baseEl?.classList.add('pulse'); // three slow breathes, no flashing
+    introTimer = win.setTimeout(dismissIntro, INTRO_SHOW_MS);
+  }
+
+  function dismissIntro() {
+    win.clearTimeout(introTimer);
+    gateWatcher?.disconnect();
+    gateWatcher = null;
+    if (introState === 'show') {
+      introState = 'gone';
+      for (const el of [introEl, lookHintEl]) {
+        el?.classList.remove('show');
+        el?.classList.add('gone');
+      }
+      baseEl?.classList.remove('pulse');
+    }
+  }
+
+  // The chips are for the FIRST moments of play, not of the page: they come up
+  // when the gate lifts (or at once, if there is no gate, or the live switch
+  // turned a running page touch mid-find).
+  if (introEl || lookHintEl || baseEl) {
+    if (!gateEl || gateEl.classList.contains('hidden')) startIntro();
+    else if (typeof win.MutationObserver === 'function') {
+      gateWatcher = new win.MutationObserver(() => {
+        if (gateEl.classList.contains('hidden')) {
+          gateWatcher?.disconnect();
+          gateWatcher = null;
+          startIntro();
+        }
+      });
+      gateWatcher.observe(gateEl, { attributes: true, attributeFilter: ['class'] });
+    }
+  }
+
   const own = (el) => (el ? `#${el.id}` : null);
   const interactiveSel = [INTERACTIVE, own(baseEl), own(shoutEl)].filter(Boolean).join(',');
 
@@ -146,25 +212,37 @@ export function createTouchControls({
     setAxis(fwd, strafe, norm >= cfg.stickRunBand);
   }
 
-  function showBase(x, y) {
+  // Issue #38: the idle ring lives at its CSS rest position (lower-left, safe-
+  // area aware) and is never hidden by JS. Pressing moves it under the thumb —
+  // the #26 dynamic origin — with .active for the brighter "in use" look; the
+  // inline position is a style, so clearing the styles is all it takes for the
+  // CSS transition to glide the ring home on release.
+  function pressBase(x, y) {
     if (!baseEl) return;
+    baseEl.classList.add('active');
     baseEl.style.left = `${x}px`;
     baseEl.style.top = `${y}px`;
-    baseEl.style.opacity = '1';
     if (knobEl) knobEl.style.transform = 'translate(0px, 0px)';
   }
-  function hideBase() {
-    if (baseEl) baseEl.style.opacity = '0';
+  function restBase() {
+    if (!baseEl) return;
+    baseEl.classList.remove('active');
+    baseEl.style.left = '';
+    baseEl.style.top = '';
+    if (knobEl) knobEl.style.transform = '';
   }
 
   function releaseAll() {
     stickId = null;
     lookers.clear();
-    hideBase();
+    restBase();
     setAxis(0, 0, false);
   }
 
   function onPointerDown(e) {
+    // The teaching layer retires on the first real game touch (not on the
+    // gate, the gear or any other control — those are their own story).
+    if (introState === 'show' && !interactiveTouch(e.target)) dismissIntro();
     if (e.pointerType === 'mouse') return; // real mice keep the desktop path
     if (interactiveTouch(e.target)) return;
     const id = e.pointerId;
@@ -172,7 +250,7 @@ export function createTouchControls({
       stickId = id;
       stickCx = e.clientX;
       stickCy = e.clientY;
-      showBase(e.clientX, e.clientY);
+      pressBase(e.clientX, e.clientY);
       setAxis(0, 0, false);
     } else {
       lookers.set(id, { x: e.clientX, y: e.clientY });
@@ -205,7 +283,7 @@ export function createTouchControls({
     const id = e.pointerId;
     if (id === stickId) {
       stickId = null;
-      hideBase();
+      restBase(); // glide home, stay visible (issue #38)
       setAxis(0, 0, false);
     }
     lookers.delete(id);
@@ -220,6 +298,7 @@ export function createTouchControls({
     const press = (e) => {
       e.preventDefault();
       e.stopPropagation(); // never also a look-drag
+      if (introState === 'show') dismissIntro(); // a shout is an interaction too
       try {
         shoutEl.setPointerCapture(e.pointerId); // pointerup comes back here even off-target
       } catch {
@@ -240,6 +319,7 @@ export function createTouchControls({
       return {
         stick: stickId !== null,
         lookPointers: lookers.size,
+        intro: introState, // #38: 'idle' | 'show' | 'gone'
         ...lastAxis,
       };
     },
@@ -248,6 +328,8 @@ export function createTouchControls({
       win.removeEventListener('pointermove', onPointerMove);
       win.removeEventListener('pointerup', onPointerEnd);
       win.removeEventListener('pointercancel', onPointerEnd);
+      dismissIntro();
+      restBase();
       releaseAll();
     },
   };
