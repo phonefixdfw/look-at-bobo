@@ -746,4 +746,11 @@ lands, reporting `winElapsed` at that instant: from the harness a win is only ob
 a poll late, so no harness-side tap can be *provably* inside a 0.6 s cooldown.
 Thresholds unchanged; the multi-touch walk also respawns to the spot the single-finger
 walk proved clear, so it measures two live fingers rather than which way the previous
-test happened to face.
+test happened to face. Measured green afterwards (`/tmp/opencode/mobile5.log`: **68
+checks, 0 failed**): the two walks now land at 2.08 m and 2.34 m instead of 0.02–0.18 m,
+and the cooldown check reports `winElapsed 0.150` at the instant of the early tap — inside
+the 0.6 s rule by measurement, not by luck. One caveat for whoever re-runs this: the whole
+suite is ~5 min of software-GL Chrome, so run it alone — on a loaded machine a page boot
+once outlasted the harness's 45 s wait for `LC.ready` and aborted the run before check 1
+with a Playwright `TimeoutError`. That wait is now `BOOT_TIMEOUT_MS` (120 s): a page that
+never boots still fails, it just fails at two minutes instead of 45 seconds.

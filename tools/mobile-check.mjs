@@ -76,6 +76,15 @@ function check(name, pass, detail = '') {
 // permission denials (headless grants neither), favicon, autoplay policy.
 const IGNORE = /fullscreen|orientation|favicon|autoplay|AudioContext/i;
 
+/** How long a page gets to reach `LC.ready`. Every page here boots under
+ *  SwiftShader on a shared machine: 4–20 s alone, but one run on a box already
+ *  at 107 GB of 125 GB spent more than 45 s on its FIRST page and died with a
+ *  Playwright `TimeoutError` before check 1 ever ran (measured: the same code
+ *  passed 68/68 minutes later on an idle machine). A page that never boots still
+ *  fails — it just fails at two minutes rather than 45 seconds, so the suite
+ *  keeps reporting the checks instead of the machine's memory pressure. */
+const BOOT_TIMEOUT_MS = 120000;
+
 const contexts = [];
 /** Counts requestPointerLock() calls for the whole page (issue #29: after a
  *  finger takes over, the number must never move again). Wrapping the prototype
@@ -98,7 +107,7 @@ async function phonePage(params, opts = {}) {
   page.on('pageerror', (e) => errs.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
   await page.goto(`${server.url}${PAGE}${params}`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+  await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: BOOT_TIMEOUT_MS });
   page.__errs = errs;
   return page;
 }
@@ -111,7 +120,7 @@ async function desktopPage(params) {
   page.on('pageerror', (e) => errs.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
   await page.goto(`${server.url}${PAGE}${params}`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+  await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: BOOT_TIMEOUT_MS });
   page.__errs = errs;
   return page;
 }
@@ -614,7 +623,7 @@ try {
       page.on('pageerror', (e) => errs.push(String(e)));
       page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
       await page.goto(`${distServer.url}game/full.html`, { waitUntil: 'load' });
-      await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+      await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: BOOT_TIMEOUT_MS });
       const info = await page.evaluate(() => window.LC.buildInfo());
       // Every module URL in the shipped page has to carry the same stamp, or a
       // phone can still be handed last build's engine.js.
