@@ -47,6 +47,7 @@ export const COLLIDERS = [
   { id: 'kitchen-table', x0: 2.1, z0: 1.25, x1: 3.15, z1: 2.0 },
   { id: 'hall-console', x0: 0.06, z0: 3.14, x1: 0.34, z1: 3.86 },
   { id: 'big-plant', x0: -1.87, z0: -2.53, x1: -1.44, z1: -2.11 },
+  { id: 'bedroom-plant', x0: 1.52, z0: 4.32, x1: 1.88, z1: 4.68 }, // Step 9 plant by the bed head
 ];
 
 /** Surfaces the cats stand on that buildRoom does not measure itself. All of
