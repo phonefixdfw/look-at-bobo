@@ -565,7 +565,7 @@
           left 0.25s ease-out,
           top 0.25s ease-out;
       }
-      #stick-base.active {
+      body.touch:not(.capture) #stick-base.active {
         opacity: 1;
         transition: none; /* the jump under the thumb is instant; home is a glide */
       }
