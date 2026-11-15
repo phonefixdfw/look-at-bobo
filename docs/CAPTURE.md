@@ -208,3 +208,11 @@ name of what caught it. A tool that only ever says PASS proves nothing.
   confetti, canvasW, canvasH, touch}` — the phone posture actually in force. Captures never
   run as a touch device, so pixel ratio stays 1 on every captured frame; `npm run
   check:mobile` is the consumer of both hooks (`docs/PLAYTEST_NOTES.md` §14).
+- **Issue #29 (stale cache / mis-detected phone) added two more, same shape:**
+  `LC.buildStamp()` returns the build id this JS was served as (`npm run build` puts
+  `?v=<id>` on every shipped URL; `dev` in the source tree), and `LC.buildInfo()`
+  returns `{js, html, match, touch, touchOverride, autoLow, quality, stampDebug, text}`
+  — what the visible stamp line is made of, including `window.LC_BUILD_HTML`, the
+  page's own inline stamp, so a headless check can prove HTML and JS came from the same
+  build. Both are pure reads; the stamp DOM itself is hidden and empty under
+  `?gate=off`, so no captured frame contains it (`docs/PLAYTEST_NOTES.md` §15).

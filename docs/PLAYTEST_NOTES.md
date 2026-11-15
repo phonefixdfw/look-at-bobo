@@ -631,3 +631,119 @@ game cannot tell this from a phone, and neither can the checks. **36/36 PASS.**
 Safari's missing Fullscreen/orientation-lock APIs, real thumb feel, and SwiftShader-vs-real-GPU
 framerate are not verifiable headlessly; see `docs/DEPLOY.md` "Testing on a phone". Mic
 shouting stays out of scope.
+
+## 15. Issue #29 — the phone that stayed on the desktop path (headless forensics, `npm run check:mobile` scenarios 8–11)
+
+Brandon opened the deployed game on an Android Chrome phone in landscape and got
+the **desktop** game: the room rendered, the score read 00/10, there was no stick
+and no shout button, and Chrome showed its pointer-lock notice. #26 was live on
+the server (its `/src/touch.js` returns 200 and the served `engine.js` calls
+`isTouchDevice()`), so the detection itself had to be reading false — and once the
+page has grabbed the pointer, **nothing in the UI lets a finger take it back**.
+
+### Cause found (three, and the measurements that separate them)
+
+Headless Chrome with a signal probe (`requestPointerLock` wrapped and counted, one
+row per device shape) — every realistic phone answers "touch" and never asks for
+the pointer:
+
+| Emulated device | mtp / ontouchstart / `(pointer:coarse)` / `(hover:none)` / UA-CH mobile | boot | after the gate tap |
+|---|---|---|---|
+| Android phone, normal UA | 1 / true / true / true / true | touch | **0 lock calls**, shout button shown |
+| Android "Desktop site" (desktop UA, touch hardware) | 1 / true / true / true / false | touch | **0 lock calls** |
+| iPad-style UA | 1 / true / true / true / true | touch | **0 lock calls** |
+| Phone with **every JS signal blind** (0 / false / false / false) | all false | **mouse** | **1 lock call, pointer locked, no button** |
+| Phone with `?touch=off` in the URL | all true | **mouse** | **1 lock call, pointer locked, no button** |
+
+1. **`?touch=off` was sticky.** On a phone it grants pointer lock and the touch UI
+   never appears — and there is no control to undo it, only the address bar. It is
+   also self-perpetuating: the comfort panel saves settings by rewriting
+   `location.search` from the parameters it was handed (`engine.js`'s `apply()`), so
+   once the parameter is in the URL it survives every tap and every link shared
+   from that page.
+2. **A device can be blind in JavaScript and still have fingers.** In a
+   `hasTouch: false` browser context — what a "Desktop site" tab, a locked-down
+   webview or a stale cached module looks like to the page — every signal reads
+   false (`maxTouchPoints 0`, no `ontouchstart`, neither media query matches), yet
+   `Input.dispatchTouchEvent` still delivers a **trusted** `pointerdown` with
+   `pointerType: 'touch'` plus a `touchstart`. Detection is a guess; an arriving
+   finger is a fact. #26 had no path from the second back to the first.
+   (Rejected: `(any-pointer: coarse)`, which would flip a non-touch kiosk with a
+   touchscreen attached into touch. A touchscreen laptop already reports touch via
+   `maxTouchPoints`, which #26 shipped and this keeps.)
+3. **A stale per-module cache explains the report even when detection is right.**
+   A browser caches each file under **its own URL**: `?touch=on&v=2` on the page
+   address changes one entry out of ~30, so `game/engine.js` can still be last
+   week's. Low detail is no evidence either way — `?quality=low` in a URL and
+   #26's auto-low both make the desktop look cheap too.
+
+### The fix
+
+- **A finger outranks detection (live switch).** `TOUCH` is a `let`, and unless the
+   URL chose the mode, a capture-phase `pointerdown`/`touchstart` watcher on the
+   window hands the controls to touch the moment a real finger lands — *before* the
+   gate's own click handler, so a mis-detected phone never gets as far as requesting
+   pointer lock. One-way: a mouse appearing on a hybrid machine must not take the
+   controls off someone's hands. `?touch=off` still wins at boot (QA on a real
+   phone), and then nothing watches at all. `initTouchUI()` now ends with
+   `applyOrientation()` so it is safe to call late.
+- **Two hidden pause paths had to learn about it.** Dropping the pointer after the
+   switch paused the game from *two* directions: the engine's `onLockChange`, and
+   `src/input.js` pushing a `'pause'` action into its queue on unlock/blur, which
+   `stepGame` consumes. Both guards now carry `&& !TOUCH`; a phone keeps its real
+   pauses (portrait rotate, hidden tab). Found by wrapping `addEventListener` on
+   every target and printing which listeners ran: only `pointerlockchange` showed
+   up, so the pause came from the action queue.
+- **Detection hardened, positive-only.** `isTouchDevice()` gains `(hover: none)` and
+   `navigator.userAgentData.mobile` beside `maxTouchPoints` / `ontouchstart` /
+   `(pointer: coarse)`. Every signal can only switch touch **on**, so a plain
+   desktop — and every captured frame — is untouched.
+- **Every URL versioned, and a visible stamp.** `npm run build` stamps every
+   relative URL in `dist/` with `?v=<commit>-<UTC time>` (imports, the entry script
+   tag, the `three` importmap target, the vendor bundle's own import, the audio
+   literals, the root redirect), then re-crawls `dist/` and **fails** if any shipped
+   URL is left un-stamped. The start card and the gear panel show
+   `build … · mode touch|mouse · quality …`, written first by a 6-line **inline**
+   script (so a stale module cannot hide it) and then by the engine with the stamp
+   on its *own* module URL — a half-updated page reads
+   `html X / js Y · MISMATCH: html and js are different builds`. `?stamp=on` puts it
+   in the tab title and the top of the screen; `LC.buildStamp()` / `LC.buildInfo()`
+   expose it; `docs/DEPLOY.md` has the `Cache-Control: no-cache` snippet. Under
+   `?gate=off` the stamp is hidden **and** empty, so no capture baseline moved.
+
+### What #29 added to the checks (scenarios 8–11, all through real handlers)
+
+- **8 the rescue:** a touch-blind desktop context boots the mouse path, the gate
+  click grabs the pointer (`locked: true`), **one** CDP finger switches the page to
+  touch — stick built, shout button shown, pointer dropped, **no pause**, the lock
+  count never moves again, the mode line flips to `mode touch` — the stick then walks
+  and the shout button scores a real find. Mouse moves and a click afterwards change
+  nothing (`touch` stays true, 0 further lock requests).
+- **9** `?touch=off` on a phone: a finger on the gate and a finger on the screen keep
+  the mouse path, and the card says `mode mouse (?touch=off)`.
+- **10 the stamp:** card + gear panel agree with `LC.buildInfo()`; no debug chrome
+  without `?stamp=on`; with it, the corner text and the `[html dev] [js dev]` title;
+  `?gate=off&stamp=on` leaves both divs empty, no corner, no title change,
+  `body.capture` set. When a `dist/` exists it is served too: the stamp must equal
+  `dist/build.json`, the card must show a real id, and **every fetched module URL
+  must carry that `?v=`** (24 modules, 0 un-versioned).
+- **11 the detector,** in-page against `src/touch.js` with fake windows: phone →
+  touch; `(hover:none)` alone → touch; UA-CH mobile alone → touch; touchscreen laptop
+  → touch; desktop → mouse; a phone blind in every signal → mouse, *and scenario 8 is
+  what saves that one*.
+
+**Also fixed here (harness, not game): three of #26's checks were timing traps.**
+`stick + look simultaneously`, `look: drag turns the camera` and `shout restarts only
+after the cooldown` measured motion or a rule over fixed **wall-clock** windows, and a
+phone page under SwiftShader renders at single-digit frame rates — so the window can
+contain one or two sim steps, which turns a camera (one step applies the whole
+accumulated drag) but walks 0.02–0.18 m instead of ~2 m. **All three fail identically
+at `e952358`, before any #29 code** (`/tmp/opencode/base-mobile.log`: 2 failed, 34
+passed, on the same machine), so they were failing for the machine, not the game. They
+now wait on the simulation — `simSteps(page, n)` waits for n `stepGame` calls — and the
+early play-again tap is fired by an in-page watcher (`shoutAtWin`) on the frame the win
+lands, reporting `winElapsed` at that instant: from the harness a win is only observable
+a poll late, so no harness-side tap can be *provably* inside a 0.6 s cooldown.
+Thresholds unchanged; the multi-touch walk also respawns to the spot the single-finger
+walk proved clear, so it measures two live fingers rather than which way the previous
+test happened to face.
