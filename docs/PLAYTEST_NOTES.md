@@ -534,16 +534,17 @@ advancing between the two screenshots the determinism check takes. Probed on
 
 | | overlay at `ready` | frame #01, first shot | frame #01, second shot | identical |
 |---|---|---|---|---|
-| `e965bb1` (before) | present, opacity **0.969** | `f4490a4f94cf` 337,865 B | `75bd1e1ff099` 494,598 B | **no** |
+| `e965bb1` (before) | **present**, mid-fade (sampled 0.969 / 1.0 on two runs) | `f4490a4f94cf` 337,865 B | `75bd1e1ff099` 494,598 B | **no** |
 | this branch (after) | **gone from the DOM** | `75bd1e1ff099` 494,598 B | `75bd1e1ff099` 494,598 B | **yes** |
 
 Same moment, same view, same time, two different pictures — the first is a
 crossfade of "Getting your flat ready…" and the flat, so it is never the same
 twice. The byte sizes tell the same story (338 KB of dark card vs 495 KB of
-game), and only frame #01 could ever fail because the fade finishes inside the
-first round trip. Note the clean-frame hash is **the same on both trees**:
-`75bd1e1ff099` — the game's own pixels never changed, so the fix cannot have
-moved the look.
+game; a second probe run caught the overlay at opacity 1.0 and the first shot
+at 287 KB, `e81a2f8f784e` — same verdict). Only frame #01 could ever fail,
+because the fade finishes inside the first round trip. Note the clean-frame
+hash is **the same on both trees**: `75bd1e1ff099` — the game's own pixels never
+changed, so the fix cannot have moved the look.
 
 **What a player could see (checked, nothing to fix).** No flash and no visual
 glitch: with no URL params (the title gate up), sampled through the fade before
