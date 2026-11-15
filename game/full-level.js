@@ -124,7 +124,7 @@ export const SPAWNS = [
   { room: 'bathroom', pos: [-2.3, 3.3], yaw: 1.9 },
   { room: 'bedroom', pos: [-2.6, 6.55], yaw: -0.79 },
   { room: 'bedroom', pos: [-1.2, 4.7], yaw: -1.4 },
-  { room: 'bedroom', pos: [-0.2, 6.75], yaw: 0.85 },
+  { room: 'bedroom', pos: [-1.35, 6.6], yaw: 0.85 }, // was [-0.2,6.75]: on the laundry basket's push pad (issue #27)
 ];
 
 /** Capture views (docs/LEVEL_LAYOUT.md). pos + yaw/pitch + fov; `hand` says

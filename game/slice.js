@@ -12,7 +12,7 @@
  */
 import * as LEVEL from './level.js'
 import { buildApartment } from './apartment.js'
-import { bootGame, catRootYaw } from './engine.js'
+import { bootGame } from './engine.js'
 
 /* ---- the slice's five moments, pose by pose ----
  * Moved verbatim out of the old applyTime (behaviour frozen): the engine
@@ -32,7 +32,7 @@ function sliceMomentAnim({ bp, base, t, bobo, game, momentById }) {
     bp.head.rotation.y = Math.sin(t * 0.9) * 0.62; // peeking out of the box
     bp.tailPivot.rotation.y = Math.sin(t * 1.3) * 0.18;
   } else if (m === 'tail-chase') {
-    bobo.root.rotation.y = catRootYaw(momentById(m).faceYaw) + t * Math.PI * 2 * 0.55; // chasing it
+    bobo.root.rotation.y = momentById(m).faceYaw + t * Math.PI * 2 * 0.55; // chasing it
     bp.tailPivot.rotation.y = Math.sin(t * 6.0) * 0.24; // the tail fights back
   } else if (m === 'bed-sprawl') {
     const s = Math.sin(t * 0.8);
