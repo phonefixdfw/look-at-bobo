@@ -36,7 +36,8 @@ Application" step should now succeed and produce `dist/index.html`.
 
 ```bash
 curl -s -o /dev/null -w 'root      %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/
-curl -s -o /dev/null -w 'game      %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/game/slice.html
+curl -s -o /dev/null -w 'game      %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/game/full.html
+curl -s -o /dev/null -w 'slice     %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/game/slice.html
 curl -s -o /dev/null -w 'module    %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/src/cat.js
 curl -s -o /dev/null -w 'three     %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/vendor/three/three.module.js
 curl -s -o /dev/null -w 'audio     %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/assets/audio/yell-look-at-bobo.take1.mp3
@@ -45,15 +46,18 @@ curl -s -o /dev/null -w 'audio     %{http_code} %{content_type}\n' https://looka
 Expect — every line **200**, and the types exactly:
 
 - `root` → `text/html` (the page; it redirects to the game immediately)
-- `game` → `text/html`, `module`/`three` → **`text/javascript`**, `audio` → **`audio/mpeg`**
+- `game`/`slice` → `text/html`, `module`/`three` → **`text/javascript`**, `audio` → **`audio/mpeg`**
 
-Then open `https://lookatbobo.getluckysocial.com/` — it should land on the slice
-instantly; click start and the real voice takes play. **If any `.js` answers with
-a `content-type` other than `text/javascript`, the game will not boot** (browsers
-refuse ES modules with the wrong MIME and the console says so) — fix the server's
-MIME config for `.js`/`.mjs` first; that is the usual suspect when a static-deploy
-game is a black screen. Any `404` on these five lines means the build didn't ship
-that file — run `npm run build` locally and compare against the printed manifest.
+Then open `https://lookatbobo.getluckysocial.com/` — it should land on the
+**full game** instantly (Step 8: `ENTRY` in the build script is now
+`game/full.html`; the slice still ships and stays reachable at
+`/game/slice.html`); click start and the real voice takes play. **If any `.js`
+answers with a `content-type` other than `text/javascript`, the game will not
+boot** (browsers refuse ES modules with the wrong MIME and the console says so)
+— fix the server's MIME config for `.js`/`.mjs` first; that is the usual
+suspect when a static-deploy game is a black screen. Any `404` on these six
+lines means the build didn't ship that file — run `npm run build` locally and
+compare against the printed manifest.
 
 ## Checking the build locally before pushing
 
@@ -62,11 +66,13 @@ npm run build                                  # prints every file it ships + to
 node tools/serve.mjs --root dist               # http://127.0.0.1:8123/  (root page -> game)
 ```
 
-## If Step 8 changes the game
+## If a later step changes the game
 
-- **Entry renamed/replaced** (e.g. `game/slice.html` → `game/index.html`): update
-  the single `ENTRY` constant at the top of `tools/build-dist.mjs`. A missing
-  entry fails the build loudly rather than deploying an empty site.
+- **Entry renamed/replaced** — already happened once: Step 8 switched the
+  entry from `game/slice.html` to `game/full.html`, which was just the one
+  `ENTRY` constant at the top of `tools/build-dist.mjs`. A missing entry fails
+  the build loudly rather than deploying an empty site; the slice keeps
+  shipping at its own path because `game/` is copied wholesale.
 - **New files inside `game/`, `src/`, `vendor/three/`**: shipped automatically —
   those directories are copied wholesale.
 - **A new import from a new top-level directory**: the build fails, naming the
