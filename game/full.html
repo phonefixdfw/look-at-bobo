@@ -527,26 +527,47 @@
         display: none;
       }
 
-      /* Virtual move stick: the base appears wherever the thumb lands in the
-         lower-left pad (src/touch.js). Decorative — the window pointer
-         listeners do the work, so this layer must never eat a touch. */
+      /* Virtual move stick (issue #25; always visible since #38): idle, the
+         ring RESTS at its spot in the lower-left so a first-timer sees the
+         control before touching anything. Press in the pad zone and it
+         recentres under the thumb (the #26 dynamic origin, src/touch.js);
+         releasing glides it home instead of vanishing. Contrast comes from a
+         light ring AND a dark outline, so it holds on a bright wall and in a
+         dark corner alike. Decorative — the window pointer listeners do the
+         work, so this layer must never eat a touch. Hidden on desktop (no
+         .touch) and in capture mode, so no baseline or determinism frame ever
+         carried it. */
       #stick-base {
         position: fixed;
         left: 0;
         top: 0;
         width: 118px;
         height: 118px;
-        margin: -59px 0 0 -59px;
+        transform: translate(-50%, -50%);
         border-radius: 999px;
-        border: 2px solid rgba(247, 244, 238, 0.38);
-        background: rgba(16, 21, 28, 0.30);
+        border: 2px solid rgba(247, 244, 238, 0.85);
+        background: rgba(16, 21, 28, 0.38);
+        box-shadow:
+          0 0 0 2px rgba(10, 13, 18, 0.55),
+          0 6px 18px rgba(10, 13, 18, 0.35);
         display: none;
-        opacity: 0;
         z-index: 15;
         pointer-events: none;
       }
-      body.touch #stick-base {
+      body.touch:not(.capture) #stick-base {
         display: block;
+        opacity: 0.72;
+        /* rest centre: comfortably thumb-reachable, clear of the shout button */
+        left: calc(80px + env(safe-area-inset-left, 0px));
+        top: calc(100dvh - 80px - env(safe-area-inset-bottom, 0px));
+        transition:
+          opacity 0.3s ease,
+          left 0.25s ease-out,
+          top 0.25s ease-out;
+      }
+      body.touch:not(.capture) #stick-base.active {
+        opacity: 1;
+        transition: none; /* the jump under the thumb is instant; home is a glide */
       }
       #stick-knob {
         position: absolute;
@@ -556,7 +577,71 @@
         height: 52px;
         margin: -26px 0 0 -26px;
         border-radius: 999px;
-        background: rgba(247, 244, 238, 0.5);
+        background: rgba(247, 244, 238, 0.82);
+        box-shadow: 0 0 0 1.5px rgba(10, 13, 18, 0.45);
+        transition: transform 0.18s ease-out;
+      }
+      #stick-base.active #stick-knob {
+        transition: none; /* while held, the knob tracks the thumb exactly */
+      }
+      /* Which-way-is-up at a glance: four little chevrons on the ring. */
+      .sb-chev {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 13px;
+        height: 13px;
+        margin: -6.5px 0 0 -6.5px;
+        color: rgba(247, 244, 238, 0.92);
+        filter: drop-shadow(0 1px 1.5px rgba(10, 13, 18, 0.9));
+      }
+      .sb-chev svg {
+        display: block;
+        width: 13px;
+        height: 13px;
+      }
+      .sb-chev.n {
+        transform: translateY(-45px);
+      }
+      .sb-chev.s {
+        transform: translateY(45px);
+      }
+      .sb-chev.w {
+        transform: translateX(-45px);
+      }
+      .sb-chev.e {
+        transform: translateX(45px);
+      }
+      /* The very first seconds of a first run: three slow breathes so the eye
+         finds the stick — never a flash. src/touch.js adds .pulse only when
+         calm mode is off, and the media query below covers the OS "reduce
+         motion" setting too. */
+      #stick-base::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 999px;
+        border: 2px solid rgba(247, 244, 238, 0);
+        opacity: 0;
+      }
+      #stick-base.pulse::after {
+        animation: stick-pulse 1.9s ease-in-out 3;
+      }
+      @keyframes stick-pulse {
+        0% {
+          opacity: 0;
+          transform: scale(0.94);
+          border-color: rgba(247, 244, 238, 0);
+        }
+        35% {
+          opacity: 1;
+          border-color: rgba(247, 244, 238, 0.6);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.1);
+          border-color: rgba(247, 244, 238, 0);
+        }
       }
 
       /* The shout button: click/Space in thumb-sized, honest form. Same
@@ -592,6 +677,128 @@
       #shout-btn.press {
         transform: scale(0.94);
         filter: brightness(1.12);
+      }
+
+      /* First-run teaching layer (issue #38): replaces the old faint line of
+         text with three short, high-contrast chips — icon + one word — that
+         come up when the gate lifts and retire themselves seconds later or on
+         the first game touch (src/touch.js flips .show/.gone). Click-through
+         and clear of every thumb zone, so it never blocks the view or a
+         target. Same on desktop as before: no .touch, nothing rendered. */
+      #touch-intro {
+        position: fixed;
+        z-index: 20;
+        left: 50%;
+        bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+        transform: translateX(-50%);
+        display: none;
+        align-items: center;
+        gap: 9px;
+        opacity: 0;
+        transition: opacity 0.6s ease;
+        pointer-events: none;
+      }
+      body.touch:not(.capture) #touch-intro {
+        display: flex;
+      }
+      #touch-intro.show {
+        opacity: 1;
+      }
+      #touch-intro.gone {
+        opacity: 0;
+      }
+      .ti-chip {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        background: rgba(10, 13, 18, 0.82);
+        border: 1px solid rgba(247, 244, 238, 0.42);
+        box-shadow: 0 4px 16px rgba(10, 13, 18, 0.45);
+        color: var(--ui-paper);
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+      .ti-chip svg {
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      /* A swipe cue for the look side, top-right — above the shout button,
+         clear of the score, where nothing else lives. */
+      #look-hint {
+        position: fixed;
+        z-index: 20;
+        top: calc(13% + env(safe-area-inset-top, 0px));
+        right: calc(11% + env(safe-area-inset-right, 0px));
+        width: 84px;
+        display: none;
+        text-align: center;
+        opacity: 0;
+        transition: opacity 0.8s ease;
+        pointer-events: none;
+        color: var(--ui-paper);
+      }
+      body.touch:not(.capture) #look-hint {
+        display: block;
+      }
+      #look-hint.show {
+        opacity: 0.95;
+      }
+      #look-hint.gone {
+        opacity: 0;
+      }
+      .lh-ring {
+        position: relative;
+        width: 74px;
+        height: 74px;
+        margin: 0 auto;
+        border-radius: 999px;
+        border: 2px dashed rgba(247, 244, 238, 0.78);
+        box-shadow: 0 0 0 2px rgba(10, 13, 18, 0.4);
+      }
+      .lh-hand {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 22px;
+        height: 22px;
+        margin: -11px 0 0 -11px;
+        color: var(--ui-paper);
+        filter: drop-shadow(0 1px 2px rgba(10, 13, 18, 0.9));
+        animation: lh-swipe 2.6s ease-in-out infinite;
+      }
+      .lh-hand svg {
+        display: block;
+        width: 22px;
+        height: 22px;
+      }
+      @keyframes lh-swipe {
+        0%,
+        100% {
+          transform: translateX(-15px);
+        }
+        45%,
+        55% {
+          transform: translateX(15px);
+        }
+      }
+      #look-hint span {
+        display: block;
+        margin-top: 6px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-shadow: 0 1px 3px rgba(10, 13, 18, 0.9);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #stick-base.pulse::after,
+        .lh-hand {
+          animation: none;
+        }
       }
 
       /* Landscape-first: upright, the game waits behind this card (its own
@@ -661,8 +868,9 @@
         bottom: calc(44px + env(safe-area-inset-bottom, 0px));
       }
       body.touch #hint {
-        left: calc(10px + env(safe-area-inset-left, 0px));
-        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        display: none; /* #38: the low faint text line is retired on phones —
+                          the chips, the resting stick and the swipe cue teach
+                          it now. Desktop keeps its one-liner. */
       }
       body.touch .pause-card {
         padding: 32px 44px;
@@ -780,9 +988,16 @@
     <canvas id="view"></canvas>
 
     <!-- Phone controls (issue #25): invisible unless the engine adds .touch.
-         The stick base appears under the thumb; the shout button is click/
+         The stick ring rests in view from the first frame of play (#38) and
+         recentres under the thumb when pressed; the shout button is click/
          Space in thumb-sized form. Both are wired in src/touch.js. -->
-    <div id="stick-base" aria-hidden="true"><div id="stick-knob"></div></div>
+    <div id="stick-base" aria-hidden="true">
+      <span class="sb-chev n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7" /></svg></span>
+      <span class="sb-chev s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7" /></svg></span>
+      <span class="sb-chev w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg></span>
+      <span class="sb-chev e"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg></span>
+      <div id="stick-knob"></div>
+    </div>
     <button id="shout-btn" type="button" aria-label="Shout: look at Bobo!">LOOK AT BOBO!</button>
 
     <div id="hud">
@@ -850,6 +1065,32 @@
         <div class="rotate-phone"></div>
         turn your phone sideways<br />to look at bobo
       </div>
+    </div>
+
+    <!-- Issue #38: first-run teaching layer, shown by src/touch.js when the
+         gate lifts and gone seconds later (or on the first game touch).
+         Click-through, phone-only, and never in a capture frame. -->
+    <div id="touch-intro" aria-hidden="true">
+      <div class="ti-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" /><path d="M12 4.4V2.8M12 21.2v-1.6M19.6 12h1.6M2.8 12h1.6" /></svg>
+        <b>move</b>
+      </div>
+      <div class="ti-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16" /><path d="M15.5 8l4 4-4 4" /><path d="M8.5 8l-4 4 4 4" /></svg>
+        <b>look</b>
+      </div>
+      <div class="ti-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l4 3.5v-11L7 10H4z" /><path d="M14.5 9.5a4 4 0 0 1 0 5" /><path d="M17 7.5a7.5 7.5 0 0 1 0 9" /></svg>
+        <b>shout</b>
+      </div>
+    </div>
+    <div id="look-hint" aria-hidden="true">
+      <div class="lh-ring">
+        <div class="lh-hand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16" /><path d="M15.5 8l4 4-4 4" /><path d="M8.5 8l-4 4 4 4" /></svg>
+        </div>
+      </div>
+      <span>drag to look</span>
     </div>
 
     <div id="hint">WASD + mouse · Shift run · click/Space = shout at the dot · Esc pause</div>
