@@ -1242,14 +1242,18 @@ export function bootGame(cfg) {
     }
 
     // scripted dash north: 400 walking steps must stop AT the north wall,
-    // inside the walk union (?plant=no-collision sails through it)
+    // inside the walk union (?plant=no-collision sails through it). The level
+    // can state its own lane and band (WALK_BLOCK, game/full-level.js); the
+    // slice's literals are the fallback, unchanged.
     {
+      const WB = cfg.level.WALK_BLOCK || { pos: [0.4, 0], yaw: 0, lo: -2.53, hi: -2.4, wall: '−2.52' };
       const saved = { ...player };
-      spawnPlayerAt({ pos: [0.4, 0], yaw: 0 });
+      spawnPlayerAt({ pos: WB.pos.slice(), yaw: WB.yaw });
       for (let i = 0; i < 400; i++) stepPlayer(1 / 60, { fwd: 1 });
       const z = player.z;
       Object.assign(player, saved);
-      add('walk-blocked', `z=${z.toFixed(2)}`, 'stops at the north wall (−2.52), never through it', z >= -2.53 && z <= -2.4 && inUnion(player.x, z), 'walls are not a rumour (the walk rect is the wall, inset)');
+      const wallLabel = WB.wall ?? WALK_RECTS[0].z0;
+      add('walk-blocked', `z=${z.toFixed(2)}`, `stops at the north wall (${wallLabel}), never through it`, z >= WB.lo && z <= WB.hi && inUnion(player.x, z), 'walls are not a rumour (the walk rect is the wall, inset)');
     }
 
     let respawnOk = true;

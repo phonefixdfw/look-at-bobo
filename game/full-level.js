@@ -78,7 +78,7 @@ export const COLLIDERS = [
   { id: 'coffee-table', x0: -1.9, z0: -1.0, x1: -1.3, z1: 0.2 },
   { id: 'tv-stand', x0: 1.98, z0: -2.4, x1: 2.4, z1: -0.85 },
   { id: 'bookshelf', x0: -3.3, z0: -2.9, x1: -2.95, z1: -2.0 },
-  { id: 'big-plant', x0: -0.2, z0: -2.82, x1: 0.4, z1: -2.22 },
+  { id: 'big-plant', x0: -0.95, z0: -2.82, x1: -0.35, z1: -2.22 }, // clear of the WALK_BLOCK lane (x 0.4)
   { id: 'box', x0: -2.35, z0: 1.35, x1: -1.8, z1: 1.8 },
   { id: 'dining-table', x0: 0.75, z0: 1.1, x1: 2.35, z1: 1.9 }, // the long bench side towards the east wall
   { id: 'chair-a', x0: 0.22, z0: 1.42, x1: 0.69, z1: 1.89 },
@@ -137,7 +137,7 @@ export const COLLIDERS = [
 export const MOMENTS = [
   { id: 'couch-loaf', label: 'loafing on the couch', canonical: 'couch-loaf.couch', canonicalDecoy: 'd-living' },
   { id: 'window-bird', label: 'watching the window', canonical: 'window-bird.n-window', canonicalDecoy: 'd-tv' },
-  { id: 'box-sit', label: 'sitting in the box', canonical: 'box-sit.box', canonicalDecoy: 'd-living' },
+  { id: 'box-sit', label: 'sitting in the box', canonical: 'box-sit.box', canonicalDecoy: 'd-dining' }, // d-living sat 0.66 m off the box — illegal pair
   { id: 'sink-sit', label: 'sitting in the sink', canonical: 'sink-sit.sink', canonicalDecoy: 'd-kitchen' },
   { id: 'desk-pen', label: 'on the desk by the pens', canonical: 'desk-pen.desk', canonicalDecoy: 'd-bedroom' },
   { id: 'keyboard-sit', label: 'on the keyboard', canonical: 'keyboard-sit.keyboard', canonicalDecoy: 'd-bedroom' },
