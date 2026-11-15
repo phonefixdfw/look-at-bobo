@@ -1073,39 +1073,67 @@ function installContract() {
      *  Returns where it ended up and which cat the centre ray now hits. */
     aimAt(which = 'bobo') {
       const root = which === 'decoy' ? decoy.root : bobo.root;
+      const want = root.name; // 'cat-bobo' | 'cat-decoy'
       const cx = root.position.x;
       const cz = root.position.z;
       const headY = root.position.y + (which === 'decoy' ? 0.36 : 0.34);
       const px0 = player.x;
       const pz0 = player.z;
-      for (let dist = 3.4; dist >= 1.3; dist -= 0.25) {
-        const dx = px0 - cx;
-        const dz = pz0 - cz;
-        const len = Math.hypot(dx, dz) || 1;
-        const probe = { x: cx + (dx / len) * dist, z: cz + (dz / len) * dist };
-        if (!world.inside(probe.x, probe.z)) continue;
-        world.resolve(probe, []);
-        if (!world.inside(probe.x, probe.z)) continue;
+      const dx0 = px0 - cx;
+      const dz0 = pz0 - cz;
+      const len0 = Math.hypot(dx0, dz0) || 1;
+      const centreHit = () => {
+        raycaster.setFromCamera(CENTER, camera);
+        for (const hit of raycaster.intersectObjects(scene.children, true)) {
+          if (!hit.object.isMesh || !hit.object.visible) continue;
+          let o = hit.object;
+          while (o && !(o.name ?? '').startsWith('cat-')) o = o.parent;
+          return o ? o.name : 'wall/prop';
+        }
+        return null;
+      };
+      // Nearest vantage whose CENTRE RAY actually reaches the cat wins (a
+      // box flap or chair back at 3.4 m would otherwise "aim" through it).
+      const aimFrom = (probe) => {
         player.x = probe.x;
         player.z = probe.z;
-        break;
+        const dx = cx - player.x;
+        const dz = cz - player.z;
+        player.yaw = Math.atan2(-dx, -dz);
+        player.pitch = clamp(Math.atan2(headY - MOVE.eye, Math.hypot(dx, dz)), -MOVE.pitchLimit, MOVE.pitchLimit);
+        applyCameraFromPlayer();
+        camera.updateMatrixWorld();
+        return centreHit();
+      };
+      const walkable = (p) => {
+        if (!world.inside(p.x, p.z)) return false;
+        world.resolve(p, []);
+        return world.inside(p.x, p.z);
+      };
+      let last = null;
+      for (let dist = 1.3; dist <= 3.4; dist += 0.25) {
+        const probe = { x: cx + (dx0 / len0) * dist, z: cz + (dz0 / len0) * dist };
+        if (!walkable(probe)) continue;
+        last = last ?? aimFrom(probe);
+        if (last === want) break;
       }
-      const dx = cx - player.x;
-      const dz = cz - player.z;
-      player.yaw = Math.atan2(-dx, -dz);
-      player.pitch = clamp(Math.atan2(headY - MOVE.eye, Math.hypot(dx, dz)), -MOVE.pitchLimit, MOVE.pitchLimit);
-      applyCameraFromPlayer();
-      camera.updateMatrixWorld();
-      raycaster.setFromCamera(CENTER, camera);
-      let hits = null;
-      for (const hit of raycaster.intersectObjects(scene.children, true)) {
-        if (!hit.object.isMesh || !hit.object.visible) continue;
-        let o = hit.object;
-        while (o && !(o.name ?? '').startsWith('cat-')) o = o.parent;
-        hits = o ? o.name : 'wall/prop';
-        break;
+      // The line back to where the player was may cross a wall (cross-room
+      // respawn): walk a ring around the cat and take the first angle from
+      // which the ray reaches it — every spot in this game is open floor.
+      if (last !== want) {
+        for (const dist of [1.6, 2.2, 2.8]) {
+          for (let k = 0; k < 8; k++) {
+            const a = (k / 8) * Math.PI * 2 + 0.3;
+            const probe = { x: cx + Math.sin(a) * dist, z: cz + Math.cos(a) * dist };
+            if (!walkable(probe)) continue;
+            last = aimFrom(probe);
+            if (last === want) break;
+          }
+          if (last === want) break;
+        }
       }
-      return { x: round(player.x), z: round(player.z), yaw: round(player.yaw), pitch: round(player.pitch), hits };
+      const hits = centreHit();
+      return { x: round(player.x), z: round(player.z), yaw: round(player.yaw), pitch: round(player.pitch), hits: hits ?? last };
     },
     audioPlan(phase = game.phase) {
       return planFor(phase);
