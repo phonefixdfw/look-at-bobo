@@ -747,3 +747,80 @@ a poll late, so no harness-side tap can be *provably* inside a 0.6 s cooldown.
 Thresholds unchanged; the multi-touch walk also respawns to the spot the single-finger
 walk proved clear, so it measures two live fingers rather than which way the previous
 test happened to face.
+
+## 16. Issue #27 — playtest round 1 (Brandon's hands on the deployed game)
+
+Brandon hand-playtested `main` on desktop and found three classes of bug: the
+bedroom headboard floating 0.69 m off the wall, a bathroom you could walk into
+and never walk out of — while being able to see through walls "some" — and
+cats facing away from him (plus no lying-on-side/back poses). Part 1 of the fix
+(this section) covers the layout/walls; the cats part ships in the follow-up
+PR that closes the issue.
+
+### Bug 1 — the floating headboard (cause + fix)
+The full flat's bed, headboard, nightstand and lamp were authored at z≈5.0–5.15
+while the bedroom's hall-side wall inner face is z=4.26: a 0.69 m gap you could
+walk behind, which read as furniture floating. All of it moved flush (small
+realism gap only): bed frame/bedding/duvet/pillow to z centres 5.11/5.11/5.37/
+4.59, headboard to 4.31, nightstand+lamp to 4.48; the bed rug moved from the
+dead gap behind the headboard to the side you step out onto (0.19, 5.4); the
+bedroom plant moved to the SE corner (it used to stand in the headboard's new
+footprint); `bedLight` now sits over the bed's centre; colliders followed
+(`bed` z∈[4.26,5.96], `nightstand` z∈[4.26,4.7]); and the two bed-top moments
+followed the mattress (`bed-stretch` 5.9→5.21, `blanket-biscuits` 6.3→5.61) so
+Bobo never sits on the floor behind a moved bed.
+
+### Bug 2 — the bathroom trap (cause + fix)
+The bathroom door was never closed — the toilet was the locked door. Step 8
+placed the toilet beside the bathroom's only doorway (`toilet` x∈[−1.86,−1.49],
+door3 x∈[−1.48,−1.30]), and collision pushes every collider out by the player
+radius (0.30 m) *on all sides*, so the toilet's push pad covered door3's whole
+width: a 0.30 m body could enter the bathroom (its centre could pass — barely,
+through the vanity gap) but no cell in the room connected back out. The old
+connectivity proof (`walk-rects-connected`) walks rect-corner-to-rect-corner as
+a *point* and subtracts nothing, so it said PASS while the room was a trap —
+that is the root cause, not the geometry alone: the check could not represent
+the bug.
+- **Fix:** toilet moved to the far (west) end of the same wall (x∈[−3.14,−2.77]
+  in collider terms), leaving a ~0.9 m clear strip door→bowl. Vanity untouched.
+- **Root-cause fix:** new `src/reach.js` builds a 0.10 m grid of *body-sized*
+  standable cells (walk-rect union minus every collider's push pad) and floods
+  it. The new selfTest check `walk-reachable` runs the flood from every spawn
+  and demands: every room, every other spawn, and a cell 0.9–3.4 m away with a
+  clear eye-high line to **every cat spot** (`bestApproach`, used again by the
+  cats PR). Point walks can no longer prove reachability anywhere in this repo.
+- The same check then caught a *second* trap of the same class: the bedroom
+  respawn (−0.2,6.75) had no standable cell centre (laundry basket pad); moved
+  to (−1.35,6.6).
+
+### Bug 3 — seeing through walls (cause + fix)
+Plaster is opaque and single-sided; the only way to look through it from inside
+is to get the camera within `camera.near` (0.05 m) of a face: the near plane
+cuts that face away and, because slabs are 0.12 m thick, both faces fall inside
+the near plane — a hole straight into the next room. Furniture can't do that
+(every piece is a collider, kept 0.30 m out by the push pad). Walls are NOT
+colliders — the walk rects ARE the wall limits — and they sat **0.02 m** off
+the plaster faces. Every wall you could hug was a peep-hole. (Brandon saw the
+bathroom variant: hugging the hall-side wall, the bathroom/bedroom beyond was
+visible.)
+- **Fix:** every walk rect edge (slice + full, doorway rects only off their
+  jambs) now sits ≥0.08 m off the plaster: 0.05 near + 0.02 margin + 0.01
+  grid. Normal-looking views are unchanged (the player simply stops 6 cm
+  earlier); the look-from-normal-positions requirement is unchanged.
+- **Check:** `wall-camera-clearance` sweeps every rect box against every slab
+  face using `wallFaceFailures` (src/reach.js) and fails on any gap < near+2 cm
+  or any rect that reaches INTO plaster. The slabs come from the builders
+  themselves (`wallBoxes` is now returned by `buildRoom`/`buildApartment`/
+  `buildFullApartment`, derived from the very defs that got merged), so the
+  check measures the walls you can actually see — a wall can't be "fixed" in
+  one place only. A geometric check (radius/pad vs near plane) was chosen over
+  per-frame pixel sampling because it covers every allowed camera position, not
+  three of them.
+
+### What changed in the counts
+selfTest is now **49/49** (full) and **45/45** (slice) — +2 checks in part 1,
++1 (`cats-face-the-room`) lands with the cats PR, making 50/46; stress
+`--checks` bumped to match (49 full / 45→46 slice). Expected pixel changes:
+bedroom scenes (flush furniture, moved rug/plant/lamp, moments), bathroom
+(toilet relocation), first-person frames hugging walls (6 cm clamp). All other
+rooms are untouched geometry.

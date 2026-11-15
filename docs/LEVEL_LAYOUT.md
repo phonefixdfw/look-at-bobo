@@ -33,13 +33,26 @@ Kitchen and bathroom moments are step 7.
   union; doorways are the small rects that connect the rooms:
   | rect | x | z |
   |---|---|---|
-  | living | [−3.12, 3.12] | [−2.52, 2.52] |
-  | door 1 (living→hall) | [−1.11, −0.09] | [2.50, 2.72] |
-  | hall | [−1.32, 0.32] | [2.66, 4.14] |
-  | door 2 (hall→bedroom) | [−1.11, −0.09] | [4.08, 4.30] |
-  | bedroom | [−3.12, 1.98] | [4.28, 6.92] |
+  | living | [−3.04, 3.04] | [−2.44, 2.44] |
+  | door 1 (living→hall) | [−1.05, −0.15] | [2.36, 2.86] |
+  | hall | [−1.24, 0.32] | [2.76, 4.04] |
+  | door 2 (hall→bedroom) | [−1.05, −0.15] | [3.96, 4.46] |
+  | bedroom | [−3.04, 1.9] | [4.36, 6.84] |
   Doorways are 1.06 m wide (0.23 m clearance either side of the player
   radius); doors stay open all game (docs/LOCATIONS.md).
+- **Rect inset vs plaster (issue #27):** rect edges sit **0.08 m off the
+  wall's inner face**, not 0.02 m. Walls are not colliders — the rect edge is
+  the only thing keeping the camera out of the plaster — and with the 0.05 m
+  near plane, a 0.02 m inset let the near plane clip 3 cm of every wall face
+  away and you could see the next room through the hole (furniture never did
+  this: its collider pad keeps a body 0.30 m out). Doorway rects still cross
+  their own wall band — that is the opening — but keep ≥0.08 m off each jamb.
+  The selfTest check `wall-camera-clearance` measures every rect↔slab gap off
+  the slabs that were actually built (`apt.wallBoxes`, src/reach.js), so these
+  numbers can never drift from the plaster again. `walk-reachable` floods a
+  body-sized grid (0.30 m radius, collider pads subtracted) from every spawn
+  and demands every room, spawn and cat — the point-walk `walk-rects-connected`
+  could not see the bathroom trap.
 
 ## Extension geometry (apartment.js, merged plaster)
 
@@ -192,8 +205,8 @@ this file; every number below is what `game/full-level.js` uses.
 | `desk-pen` | bedroom | sit | (−2.84, deskTop, 5.55) | 0.76 | d-bed | bats the pen off the desk (pen reset per frame — order-safe) |
 | `keyboard-sit` | bedroom | sit | (−2.84, kbTop, 5.87) | 0.79 | d-bed | walks paws on the keys |
 | `laundry-nap` | bedroom | loaf | (−0.45, laundryTop, 6.2) | 0.18 | d-hall | deep loaf, fabric-rise breathing |
-| `bed-stretch` | bedroom | sit | (1.2, bedTop, 5.9) | 0.5 | d-bed | front-paw stretch + quivering hindquarters |
-| `blanket-biscuits` | bedroom | sit | (1.2, blanketTop, 6.3) | 0.58 | d-bed | alternating kneading, purr bounce |
+| `bed-stretch` | bedroom | sit | (1.2, bedTop, 5.21) | 0.5 | d-bed | front-paw stretch + quivering hindquarters |
+| `blanket-biscuits` | bedroom | sit | (1.2, blanketTop, 5.61) | 0.58 | d-bed | alternating kneading, purr bounce |
 | `hall-chase` | hall | loaf | (−0.5, floor, 3.42) | 0 | d-rug | chatter-teeth, tail lash, haunch wiggle |
 
 Extra supports come from `EXTRA_SUPPORTS`; `cushion`/`rug` are the slice's.
@@ -205,7 +218,8 @@ from the slice, `winAt: 10`.
 
 Spawns: living (0.98,−1.5)+0.6 · living (−1.5,−1.8)+2.6 · living
 (−2.2,1.7)−2.2 · hall (−0.55,3.5)0 · bathroom (−2.3,3.3)+1.9 · bedroom
-(−2.6,6.55)−0.79 · bedroom (−1.2,4.7)−1.4 · bedroom (−0.2,6.75)+0.85.
+(−2.6,6.55)−0.79 · bedroom (−1.2,4.7)−1.4 · bedroom (−1.35,6.6)+0.85
+(was (−0.2,6.75), which sat on the basket's pad — issue #27).
 Decoys: d-rug (0.15,0.55) · d-plant (2.55,−1.6) · d-hall (−0.5,3.45) ·
 d-bath (−2.4,3.4) · d-bed (−1.7,6.8) — one per room so the wrong cat can
 ambush anywhere.
@@ -220,12 +234,12 @@ ambush anywhere.
 | plant-pot | (2.45, −2.22) → (2.79, −1.88) |
 | box | (1.44, 0.53) → (2.06, 0.97) |
 | counter (kitchenette) | (0.6, 1.94) → (2.4, 2.54) |
-| bed | (0.45, 4.95) → (1.95, 6.65) |
-| nightstand | (0.03, 4.93) → (0.47, 5.37) |
+| bed | (0.45, 4.26) → (1.95, 5.96) | ← flush to the hall-side wall (issue #27)
+| nightstand | (0.03, 4.26) → (0.47, 4.7) | ← flush with the bed (issue #27)
 | basket (laundry) | (−0.76, 5.97) → (−0.14, 6.43) |
 | desk (bedroom) | (−3.14, 5.2) → (−2.54, 6.2) |
 | vanity (bath) | (−3.09, 2.66) → (−2.36, 2.98) |
-| toilet | (−1.86, 3.61) → (−1.49, 4.12) |
+| toilet | (−3.14, 3.61) → (−2.77, 4.12) | ← was at the door; its pad sealed the room (issue #27)
 | tv-stand | (1.19, −2.55) → (2.43, −2.09) |
 | bookshelf | (−3.14, −2.55) → (−2.84, −1.85) |
 | coffee-table | (−1.6, 0.27) → (−0.7, 0.83) |

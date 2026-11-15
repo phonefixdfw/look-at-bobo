@@ -86,8 +86,8 @@ export const MOMENTS = [
   { id: 'desk-pen', room: 'bedroom', pose: 'sit', spot: [-2.84, 'deskTop', 5.55], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-bed' },
   { id: 'keyboard-sit', room: 'bedroom', pose: 'sit', spot: [-2.84, 'kbTop', 5.87], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-bed' },
   { id: 'laundry-nap', room: 'bedroom', pose: 'loaf', spot: [-0.45, 'laundryTop', 6.2], faceYaw: 2.6, canonicalDecoy: 'd-hall' },
-  { id: 'bed-stretch', room: 'bedroom', pose: 'sit', spot: [1.2, 'bedTop', 5.9], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' },
-  { id: 'blanket-biscuits', room: 'bedroom', pose: 'sit', spot: [1.2, 'blanketTop', 6.3], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' },
+  { id: 'bed-stretch', room: 'bedroom', pose: 'sit', spot: [1.2, 'bedTop', 5.21], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' }, // follows the flush bed (issue #27): was 5.9, off the moved mattress
+  { id: 'blanket-biscuits', room: 'bedroom', pose: 'sit', spot: [1.2, 'blanketTop', 5.61], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' }, // on the moved blanket (issue #27)
   { id: 'hall-chase', room: 'hall', pose: 'loaf', spot: [-0.5, 'floor', 3.42], faceYaw: 0.6, canonicalDecoy: 'd-rug' },
 ];
 

@@ -623,7 +623,7 @@ export function buildFullApartment(scene) {
   // ---- fill light for the rooms the style-test rig never lit ----
   // Budget: sun stays the only shadow light; 3 more real lights, 5 total.
   const bedLight = new THREE.PointLight(0xffd9b0, 3.2, 6, 2);
-  bedLight.position.set(0.9, 2.35, 5.7);
+  bedLight.position.set(0.9, 2.35, 5.11); // over the flush bed's centre (issue #27)
   bedLight.castShadow = false;
   const bathLight = new THREE.PointLight(0xdfeaf2, 2.2, 4.5, 2);
   bathLight.position.set(-2.3, 2.3, 3.4);
