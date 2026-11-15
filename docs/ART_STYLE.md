@@ -150,10 +150,16 @@ naming its check.
   body shape is an assumption** — markings modelled from the photo, body scaled
   up. A recent ~15 lb photo (plus side/back/tail-belly angles) would replace
   the assumption; asked for in §11.
-- **Bobo** (root scale 1.0): sit and loaf poses; sits ~0.45 m to head top at
-  root scale. Marking rules per §5.
+- **Bobo** (root scale 1.0): sit, loaf, `side` and `back` poses (`side`/`back`
+  added for issue #27 — the loaf egg rolled onto a flank, resp. belly-up; every
+  lying pose's lowest contact still lands on the support, and the bib/belly
+  zones exist per pose); sits ~0.45 m to head top at root scale. Marking rules
+  per §5.
 - **Decoy cat** (root scale `(1.30, 1.13, 1.12)` — wide and heavy, not tall):
-  sit and sprawl poses (belly-down, hips out, the 22 lb signature). Measured in
+  sit, sprawl and `side` poses (sprawl is belly-down, hips out, the 22 lb
+  signature; `side` from issue #27, with the collar band across the TOP of the
+  neck — the one neck region Bobo's lying bib never reaches, so the scan can't
+  trade tells). Measured in
   the same sit pose: **1.32× Bobo's width, 1.68× his bulk** (limits ≥1.25 /
   ≥1.35). Slow "breath" animation is sideways-only — scaling the belly in y
   would sink it into the rug and (rightly) fail the contact checks.

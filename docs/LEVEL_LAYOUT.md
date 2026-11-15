@@ -3,7 +3,9 @@
 Metres, right-handed, floor y=0, the same space as `src/room.js`.
 **Forward is −z.** Angle convention (camera and cats, identical formula): a
 yaw `a` faces `(−sin a, −cos a)`; 0 = facing −z; −π/2 = +x; +π/2 = −x;
-π = +z. Every number here is the number `game/level.js` uses, chosen against
+π = +z. Cat rigs face local +z, so every cat-root writer converts through
+`catRootYaw(a) = a + π` — the authored number below IS the facing (the
+selfTest check `cats-face-the-room` measures real rigs and proves it). Every number here is the number `game/level.js` uses, chosen against
 the geometry `buildRoom()` actually builds (its couch cushions top out at
 0.44, its box interior is x∈[1.46,2.04] × z∈[0.54,0.96] with the floor of the
 box at 0.02, its window opening is x∈[−1.15,1.15] y 0.5–2.0 at z=−2.6).
@@ -79,10 +81,10 @@ no-shadow warm point each in the bedroom (0.9, 2.35, 5.7) and hall
 | moment | room | x, z | support / y | pose | faceYaw | why there |
 |---|---|---|---|---|---|---|
 | `loaf-couch` | living | (−2.55, 0.46) | cushion 0.44 | loaf | −π/2 | loafed on the couch cushion, facing into the room |
-| `window-bird` | living | (−0.6, −2.2) | floor 0 | sit | −0.98 | haunches at the window, head sweeping the glass |
+| `window-bird` | living | (−0.6, −2.2) | floor 0 | sit | 2.36 | haunches at the window, half-turned to the room (was −0.98, 124° off its approach — issue #27) |
 | `cardboard-box` | living | (1.75, 0.75) | box floor 0.02 | sit | +π/2 | sits **in** the style-test box; walls hide the lower body; faces the room |
 | `tail-chase` | hall | (−0.5, 3.42) | floor 0 | loaf | 0.6 | the only room you can spin in (1.66 m clear) |
-| `bed-sprawl` | bedroom | (1.2, 5.9) | duvet 0.5 | sprawl | +π/2 | sprawled on the duvet, head toward the doorway side |
+| `bed-sprawl` | bedroom | (1.2, 5.9) | duvet 0.5 | sprawl | 0.785 | sprawled on the duvet, NW to the doorway approach (was +π/2 — exactly 90° off, knife-edge; issue #27) |
 
 ## Decoy spots (fixed 4; seeded pick per round, never Bobo's, ≥ 1.2 m)
 
@@ -91,7 +93,7 @@ no-shadow warm point each in the bedroom (0.9, 2.35, 5.7) and hall
 | `d-rug` | living | (0.15, 0.55) | +0.9 | window-bird, cardboard-box, tail-chase |
 | `d-plant` | living | (2.55, −1.6) | +2.4 | loaf-couch |
 | `d-hall` | hall | (−0.5, 3.45) | 0 | bed-sprawl |
-| `d-bed` | bedroom | (−1.8, 5.7) | −1.2 | (valid fallback) |
+| `d-bed` | bedroom | (−1.8, 5.7) | +π/2 | (valid fallback; was −1.2 — 159° off, stared at the corner; issue #27) |
 
 Every spot has ≥ 2 valid candidates ≥ 1.2 m away (the tail-chase spot
 excludes only `d-hall` at 0.03 m), so "always findable, never the same spot"
@@ -198,18 +200,23 @@ this file; every number below is what `game/full-level.js` uses.
 
 | id | room | pose | Bobo's spot | support y | decoy for the staged frame | rig write (game/full.js) |
 |---|---|---|---|---|---|---|
-| `couch-loaf` | living | loaf | (−2.55, cushion, 0.46) | 0.44 | d-plant | loaf breathe + slow blink |
+| `couch-loaf` | living | side | (−2.55, cushion, 0.46) | 0.44 | d-plant | side-sleeper: flank breathes in the horizontal plane, dreaming tail flick (was loaf — issue #27) |
 | `window-bird` | living | sit | (−0.6, floor, −2.2) | 0 | d-rug | head tracks an arc (the bird), ear twitches |
 | `box-sit` | living | sit | (1.75, boxFloor, 0.75) | 0.02 | d-rug | canonical event tableau (unchanged) |
 | `sink-sit` | living | sit | (2.05, counterTop, 2.2) | 0.9 | d-rug | taps head to the faucet, drips |
 | `desk-pen` | bedroom | sit | (−2.84, deskTop, 5.55) | 0.76 | d-bed | bats the pen off the desk (pen reset per frame — order-safe) |
 | `keyboard-sit` | bedroom | sit | (−2.84, kbTop, 5.87) | 0.79 | d-bed | walks paws on the keys |
-| `laundry-nap` | bedroom | loaf | (−0.45, laundryTop, 6.2) | 0.18 | d-hall | deep loaf, fabric-rise breathing |
-| `bed-stretch` | bedroom | sit | (1.2, bedTop, 5.21) | 0.5 | d-bed | front-paw stretch + quivering hindquarters |
+| `laundry-nap` | bedroom | side | (−0.45, laundryTop, 6.2) | 0.18 | d-hall | deep sleep curled on its side in the laundry, slow horizontal breathing (was loaf — issue #27) |
+| `bed-stretch` | bedroom | back | (1.2, bedTop, 5.21) | 0.5 | d-bed | belly-up roll-stretch: spine extends, belly flattens, chin to the ceiling (was sit — issue #27) |
 | `blanket-biscuits` | bedroom | sit | (1.2, blanketTop, 5.61) | 0.58 | d-bed | alternating kneading, purr bounce |
 | `hall-chase` | hall | loaf | (−0.5, floor, 3.42) | 0 | d-rug | chatter-teeth, tail lash, haunch wiggle |
 
 Extra supports come from `EXTRA_SUPPORTS`; `cushion`/`rug` are the slice's.
+Issue #27 re-authored the yaws the `cats-face-the-room` check failed or found
+knife-edge: window-bird 2.36 (was −0.98), desk-pen −0.7 and keyboard-sit −2.36
+(both were ±π/2 exactly), blanket-biscuits 2.64 (was π/2), d-bath −1.68 + pose
+`side` (was 1.6 — 172° off, staring at the tub wall), d-bed +π/2 (was −1.2).
+Decoy spots may carry an optional `pose`; `placeDecoyAt` honours it.
 Queue: seeded shuffle, cycle at 10, no repeats inside a round, no same-spot
 respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance) — engine unchanged
 from the slice, `winAt: 10`.
@@ -221,8 +228,8 @@ Spawns: living (0.98,−1.5)+0.6 · living (−1.5,−1.8)+2.6 · living
 (−2.6,6.55)−0.79 · bedroom (−1.2,4.7)−1.4 · bedroom (−1.35,6.6)+0.85
 (was (−0.2,6.75), which sat on the basket's pad — issue #27).
 Decoys: d-rug (0.15,0.55) · d-plant (2.55,−1.6) · d-hall (−0.5,3.45) ·
-d-bath (−2.4,3.4) · d-bed (−1.7,6.8) — one per room so the wrong cat can
-ambush anywhere.
+d-bath (−2.4,3.4, lying on its side there — pose `side`, issue #27) · d-bed
+(−1.7,6.8) — one per room so the wrong cat can ambush anywhere.
 
 ## Full-flat colliders (16)
 

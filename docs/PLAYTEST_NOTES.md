@@ -754,8 +754,8 @@ Brandon hand-playtested `main` on desktop and found three classes of bug: the
 bedroom headboard floating 0.69 m off the wall, a bathroom you could walk into
 and never walk out of — while being able to see through walls "some" — and
 cats facing away from him (plus no lying-on-side/back poses). Part 1 of the fix
-(this section) covers the layout/walls; the cats part ships in the follow-up
-PR that closes the issue.
+(this section) covers the layout/walls; the cats part ships in the follow-up PR
+that closes the issue — both parts are recorded here.
 
 ### Bug 1 — the floating headboard (cause + fix)
 The full flat's bed, headboard, nightstand and lamp were authored at z≈5.0–5.15
@@ -817,10 +817,47 @@ visible.)
   per-frame pixel sampling because it covers every allowed camera position, not
   three of them.
 
+### Bug 4 (part 2) — cats facing away (cause + fix)
+The angle convention above is *correct* and shared with cameras, but a cat rig
+faces local **+z**, and the engine wrote `rotation.y = faceYaw` raw — a bare 180°
+conversion error, so every spot authored against this doc rendered backwards:
+"every cat seems to be facing away from me". One conversion, `catRootYaw(a) =
+a + π`, is now used by every cat-root writer (Bobo, decoy, respawn cats, probes).
+Then the new selfTest check `cats-face-the-room` *measures*: it turns a real
+probe rig to each declared yaw, reads head−tail in world space, and demands the
+face sit within 90° of `bestApproach`'s nearest standable cell (the reachability
+grid from part 1) with a clear eye-high sight line. Measurement, not opinion,
+picked the new numbers: three spots genuinely failed (window-bird 124°, d-bath
+172° — it stared at the tub wall, d-bed 159° — into the corner) and three sat
+exactly on the 90° knife-edge (desk-pen, keyboard-sit, blanket-biscuits, slice
+bed-sprawl), so they were re-authored to 29–45° off their approach — too straight
+to read as away, too turned to drift through the limit on the next geometry edit.
+
+### Bug 5 (part 2) — no lying poses
+Bobo had sit/loaf, the decoy sit/sprawl — nothing horizontal. New poses in
+`src/cat.js`: `side` (the loaf egg rolled 90° onto its flank — contact box
+bottom still exactly y 0, far forepaw and a kicked-out hindfoot poke along the
+floor so the silhouette reads "lying", not "fallen loaf", cheek down with the
+face tipped up) and `back` (belly-up mid-roll: paws fly up, torso-only contact,
+chin to the ceiling). The decoy gets `side`. The issue's own examples are now
+the game: couch-loaf loaf→side, laundry-nap loaf→side, bed-stretch sit→back,
+and the bathroom decoy lies on its side by the mat (decoy spots take an
+optional `pose`). Marking rules exist per pose; the decoy's side collar is a
+band across the TOP of the neck — vertex-counted (0 vs 13 whites in the same
+ellipsoid) to be disjoint from Bobo's side bib, so `cats-distinguishable`
+cannot trade tells between the animals. A rolled pose's local x is world-up, so
+both idles and the three rewritten moment anims breathe in the world-horizontal
+plane only on rolled poses — contacts never rock or sink; upright poses run the
+exact original code path. New selfTest check `lying-poses`: ≥3 lying moments
+plus ≥1 lying decoy, and an eye-high ray from each lying cat's nearest clear
+approach must hit BOTH head and body of the staged rig — a sleeping Bobo is
+still pointable, which is the whole game.
+
 ### What changed in the counts
-selfTest is now **49/49** (full) and **45/45** (slice) — +2 checks in part 1,
-+1 (`cats-face-the-room`) lands with the cats PR, making 50/46; stress
-`--checks` bumped to match (49 full / 45→46 slice). Expected pixel changes:
-bedroom scenes (flush furniture, moved rug/plant/lamp, moments), bathroom
-(toilet relocation), first-person frames hugging walls (6 cm clamp). All other
-rooms are untouched geometry.
+Part 1: selfTest **49/49** full, **45/45** slice (+2 checks). Part 2 adds
+`cats-face-the-room` (both pages) and `lying-poses` (full): **51/51** full,
+**46/46** slice, stress `--checks` bumped to match (51 full / 46 slice).
+Expected pixel changes: bedroom scenes (flush furniture, moved rug/plant/lamp,
+moments), bathroom (toilet relocation, lying decoy), first-person frames
+hugging walls (6 cm clamp), and every cat in frame — the facing fixes turn
+most cats around, and three moments plus one decoy spot change pose.
