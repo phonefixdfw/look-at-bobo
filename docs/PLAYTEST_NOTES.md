@@ -11,7 +11,7 @@ rounded from memory. Scratch output lands in `captures/…` (gitignored).
 
 ---
 
-## 1. Playing it by hand (what Step 7 will do with real hands)
+## 1. Playing it by hand (still outstanding — what human hands will add; Step 7 was machines only)
 
 ```bash
 npm install
@@ -31,11 +31,12 @@ parameter are in `docs/HANDOFF.md` §5.
 
 | Command | What it proves | Verdict (measured) |
 |---|---|---|
-| `npm run capture:slice` | 144-frame matrix: 8 stages (5 find moments + catch + wrong + win) × 6 views × 3 times, `?gate=off&score=2`; **40 selfTest checks run on every frame** | `selfTest PASS (40/40)`, `budget PASS (drawCalls 97<=150 · triangles 94640<=150000 · passes 1<=3 · shadowLights 1<=2 · realLights 4<=6)`, pixels luma 49.6..96.4 · colours 81..195, **console clean**, `VERDICT: PASS` |
+| `npm run capture:slice` | 144-frame matrix: 8 stages (5 find moments + catch + wrong + win) × 6 views × 3 times, `?gate=off&score=2`; **42 selfTest checks run on every frame** | `selfTest PASS (42/42)`, `budget PASS (drawCalls 97<=150 · triangles 94640<=150000 · passes 1<=3 · shadowLights 1<=2 · realLights 4<=6)`, pixels luma 49.6..96.4 · colours 81..195, **console clean**, `VERDICT: PASS` |
 | `npm run capture:slice:determinism` | same page re-rendered twice, PNG-vs-PNG | `determinism 8/8 frames byte-identical on re-render`, PASS |
-| `npm run capture:slice:weak` | same capture on software GL (SwiftShader) — the numbers don't lean on the GPU | PASS (40/40) |
+| `npm run capture:slice:weak` | same capture on software GL (SwiftShader) — the numbers don't lean on the GPU | PASS (42/42) |
 | `npm run audio:slicecheck` | real audio in real Chrome, §4 below | **23/23**, exit 0 |
 | `npm run playtest:bot` | scripted full playthrough through public APIs, §3 below | exit 0, log below |
+| `npm run playtest:stress` | 11 hostile-condition scenarios on the real page, §10 below | **11/11 PASS**, exit 0 |
 | `npm run gate` | the Step 2 tool itself still catches planted faults | PASS |
 
 The look is protected structurally rather than by a re-render hash:
@@ -239,3 +240,111 @@ legible in under a minute, and nothing punishes exploring.
 - Headless runs use `?gate=off` only because pointer lock needs a real
   desktop; the live gate path itself is proven by `audio:slicecheck` (trusted
   click) and is what a human uses.
+
+---
+
+## 10. Step 7 — automated playtest + fixes (this branch, PR open — closes #13)
+
+No human hands yet (§1 stands — that's Brandon's ask, HANDOFF item 15). Instead: a bot stress suite that
+attacks the slice the way a hostile player and a hostile browser would, plus written critic / genre-director /
+narrative-director re-passes over what it found. `npm run playtest:stress` — 11 scenarios, **11/11 PASS**, ~50 s,
+headless Chrome, every scenario starts from a fresh page.
+
+### The scenarios and what each proves (measured at HEAD of this PR)
+1. **Full win, 3 seeds, per-round audit** — every round: score ticks exactly +1, Bobo's moment rotates with no
+   repeats, decoy always lands in a legal room, ≥0.3 m clear of geometry, ≥1.2 m from Bobo, and reachable (the
+   bot shouts it from ≤8 m). 3/3 seeds win at 5.
+2. **Decoy floor** — decoy shouts through *real* keyboard+mouse input (no API score edits): score walks 3 → 0
+   and never goes negative.
+3. **Space-mash through the win** — hammering Space at 20 Hz across the win wrap: the win voice fires **once**
+   (0 → 1 across the 6 s wrap, never 2), the exact `your did it! you wind` holds, and the win screen can't be
+   restarted until the 0.6 s cooldown passes.
+4. **Pause → resume** — real `pointerlockchange` semantics: lock loss pauses the sim, clicking the card
+   resumes it, no dt jump after the resume (1 s pause → one 0.0167 s step).
+5. **Blur mid-run** — window blur while W is held: the key is released internally, the sim pauses, nothing
+   drifts, and the resume keeps going clean.
+6. **Mid-run reload** — reload at score 4, replay to the win: no stale state, hash-shaped sim behaves.
+7. **The 500 ms block** — a synchronous 0.5 s jam of the main thread: the loop clamps (dt capped 0.25 s, 16
+   catch-up steps max) and the block’s catch-up frame advanced game time by at most a clamped frame — measured
+   +0.033 s on the first frame after the block — no spiral, no teleport, no explosion.
+8. **Rate-independence** — driving the sim loop at 10/30/60/120/240 Hz cadences: all reach the identical
+   5-point win; a 10 ms cadence tracks wall time exactly to four decimals (+1.0000 s per 1 s); a simulated 0.8 s
+   spike clamps to the cap (+0.250 s, clamped=1).
+9. **Camera follows the player** — after a *trusted* gate click, WASD turns and mouse-look turns: the camera
+   stays within 0.05 m of the player at eye height 1.62. (This is the scenario that caught the critical bug below.)
+10. **Live selfTest from first person** — after a trusted gate click, `LC.selfTest()` runs from the real
+    live view: **42/42**, and the view it ran from is `player-camera`.
+11. **Live tells** — the moment chip is absent live (`getClientRects().length === 0`), `?label=on` restores it,
+    the reticle carries the coral decoy-soften class while aimed at the decoy, and the mustard `nudge` pulse
+    appears on a shout at nothing and clears after 0.6 s.
+
+### Bugs it found (all fixed, each regression-tested by the scenario above)
+1. **CRITICAL — the camera never followed the player in live play.** `startGame()` set `game.view`
+   (the `LC.view` contract value) but never `viewName` (what the render loop actually reads), so a human who clicked
+   start and walked saw a frozen lobby camera. Bots cannot see this class of bug: `LC.aimAt` teleports the camera
+   and applies it directly, which is what every existing proof used. Fixed by routing view changes through
+   `applyView` and making it accept the live `player-camera` view; scenario 9 now proves follow, and scenario 10
+   runs the whole 42-check selfTest *from* the live view so a future break fails everywhere at once.
+2. **Frame-time fragility.** The loop asked for a fixed 1/60 step and (by design, for capture) never read real
+   clock deltas — so under a real browser it stepped a constant number of times per frame regardless of how long
+   frames took: background-tab throttling silently slowed game time and any frame spike was unclamped. Fixed: the
+   loop now consumes rAF timestamps as dt, clamps dt to 0.25 s and catch-up to 16 steps, and `LC.play()` resets
+   the clock. Capture is untouched (it never enters live view; the sim is still pure). Proven by 7 + 8.
+3. **Spawns could sit inside furniture — and did.** The cycle-4 lamp spawn (−2.0, −1.8) was inside the sofa
+   footprint (caught while writing the suite, before a human ever would); respawn could also drop Bobo or the
+   decoy on top of the other cat's spot. Fixed: the offending spawn moved to (−1.5, −1.8), `pickSpawn` grew an
+   avoid list (≥1.2 m from the other cat / previous spot; room rules still outrank distance, and the fallbacks
+   relax distance *before* room rules), and every spawn gets a `standClearOfCats` push-out backstop through the
+   real collision resolver. Two new selfTest checks (`respawn-clear-of-cats` — all moment × decoy × prev-room
+   × cycle combinations through the real picker; `spawn-clearance` — every spawn ≥0.3 m from every collider)
+   take selfTest to **42**; 42/42 on every frame of the 144-frame capture, live *and* headless.
+4. **The win line replayed and Space-mashing skipped the win screen.** The wrap-to-win frame reset the cue book,
+   so the win voice retriggered; and each mash step advanced the win clock, so mashing could dismiss
+   `your did it! you wind` in well under its read time. Fixed: cue reset only at run start; win timing is its own
+   monotonic clock (`LC.state.winElapsed`); 0.6 s restart cooldown. (Spellings untouched: `your did it! you wind`,
+   `DAG!`.)
+5. **Blur / pointer-lock left ghosts.** Held keys survived blur (bobo walked into a wall forever), losing the
+   lock pushed one giant look-delta pop, and a *failed* re-lock left the game paused behind a card that no longer
+   responded to clicks. Fixed in `src/input.js` (blur on window+document, `pointerlockerror` -> `onLockError`,
+   deltas zeroed on lock loss) and in the pause card (click resumes; re-grabs the lock when the browser demands
+   a gesture; on failure the card stays up honestly).
+
+### UI tells Step 7 added (critic-driven, see passes below)
+- The moment-name chip spoils the find, so it's hidden live; capture and `?gate=off` keep it (every existing
+  frame-level proof still sees it). `?label=on` restores it live.
+- Reticle: coral soften while aimed at the decoy during find (the "is that…?" beat, no text needed), and a
+  0.6 s mustard pulse when a shout hits nothing — the game now always answers a shout, even a wasted one.
+
+### Critic pass — do the fixes look right? (re-run over the changed surfaces)
+Budget is untouched (97 draws / 94,640 tris worst frame — the new checks are sim-side, nothing renders per
+frame that didn't before). The reticle tells reuse the two ART_STYLE signal colours exactly as specced (coral =
+wrong/danger, mustard = signal), at dot size they read as feel, not UI panels; no new type, no new chrome. The
+hidden chip keeps the only text in live play to score + shouts, which matches the Step 6 look verdict. Palette
+lint stays deferred (item: Step 8+) — the changes stay inside tokens already in it.
+
+### Genre-director pass — does the loop hold up under abuse?
+The core 20-second loop survives everything the suite can throw, and the two tells close the two dead-air states
+this genre actually punishes: the hesitation before shouting at a cat that might be the decoy (now has a soft
+answer) and the shout into nothing (now acknowledged). The 0.6 s restart cooldown is inside the "read the win,
+then go" window — a genre-native beat — without feeling like input lag. Rate-independence matters for the
+real market: laptop tab-switching can no longer desync game time from wall time.
+
+### Narrative-director pass — does it still say the thing?
+The win moment is the whole point ("your did it! you wind" is the joke and the payoff), and Step 7 protected it
+twice: it now plays once, and it can't be mashed past. Hiding the moment chip puts the *finding* back in a find
+game — the story beat is you noticing bobo, not reading a nameplate. The decoy keeps his role clean: the coral
+tell softens confusion without ever telling you the answer — you can still shout at him and learn, which is the
+story the score already tells. No invented lore was added or removed.
+
+### First-time-player pass (headless dry-run — what hands will still need to confirm)
+Walking the onboarding as a machine: title says start → one click → locked camera, bobo's call answers every
+5.5 s, the hand points, and (now) the camera follows — the whole find loop is navigable without ever reading a
+label. Riskiest remaining confusion points, for real hands: (a) learning click *and* Space both shout (learned in
+~1 shout), (b) knowing the other cat is *not* bobo (the coral soften + −1 sound teaches it; the write-up in §6
+still recommends not resolving it with text), (c) Esc-to-pause then click-to-resume (now robust to the browser's
+lock dance). None of these can be settled honestly by a bot — they need item 15.
+
+### Known gaps Step 7 left open (deliberate)
+- Human hands (§1 / item 15) — the suite proves mechanics, not feel.
+- Frozen snapshot `snapshots/m1-slice` — waiting on sign-off (item 18).
+- Palette-lint / colour-blind / photosensitivity probes; audio ducking while paused; a wider weak-GL matrix.

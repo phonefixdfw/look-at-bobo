@@ -123,7 +123,7 @@ in a face, but you can't stand inside a cat.
 | cycle 1 | bedroom | (−2.6, 6.4) | −0.79 | corner, faces the bed |
 | cycle 2 | hall | (−0.55, 3.5) | 0 | faces the living doorway |
 | cycle 3 | bedroom | (−2.2, 4.8) | −1.2 | faces east into the bedroom |
-| cycle 4 | living | (−2.0, −1.8) | +2.6 | NW corner, looks south across the room |
+| cycle 4 | living | (−1.5, −1.8) | +2.6 | NW corner, looks south across the room (**moved from −2.0 in Step 7 — the old spot sat inside the sofa**) |
 | cycle 5 | living | (2.6, 1.8) | +0.85 | SE, looks north-west across the rug |
 
 After each catch, respawn takes the next cycle entry whose **room ≠ Bobo's
@@ -131,6 +131,8 @@ new room and ≠ the previous spawn room** ("respawn elsewhere", issue #11);
 the cycle covers all three rooms so that always succeeds. Every moment is
 reachable from every spawn — one open doorway chain, checked by
 `walk-rects-connected` + `spots-walkable`.
+
+Step 7 added a clearance rule on top (stress-suite bug #3): every pick also avoids landing within `SPAWN_AVOID_DIST` (1.2 m) of the other cat or the previous spot — room rules still outrank distance, and the fallbacks relax distance before room rules — with a `standClearOfCats` push-out through the real collision resolver as a backstop. Both paths are regression-tested by the `respawn-clear-of-cats` and `spawn-clearance` selfTest checks.
 
 ## Capture views (exact `LC.setView` inputs)
 
