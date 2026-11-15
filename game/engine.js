@@ -1098,6 +1098,13 @@ export function bootGame(cfg) {
       ...wallBoxes,
       ...COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: LOS_TOP })),
     ];
+    // One shared vantage map for the sight-line and face checks: the cells a run
+    // can actually stand on. Deriving it per cat (nearest-standable + a flood) is
+    // both 38 floods a frame and wrong for a cat tucked into an alcove, because
+    // the nearest-standable spiral grows on Chebyshev rings and can cross a wall
+    // into another room — a bathroom cat got the living room's approach cells.
+    const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
+    const reachShared = bodyGrid.flood(bodyGrid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1])); // NB a spawn's pos is [x, z] (two numbers); a moment spot is [x, support, z].
     const catSpots = [
       ...MOMENTS.map((m) => ({
         id: m.id,
@@ -1118,8 +1125,6 @@ export function bootGame(cfg) {
         pose: d.pose ?? 'sprawl', // a decoy spot may lie down too (issue #27)
       })),
     ];
-    const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
-    // NB a spawn's pos is [x, z] (two numbers); a moment spot is [x, support, z].
 
     // --- issue #27 (bug 3): seeing through walls.
     // Plaster is opaque and single-sided; the only way to look through it from
@@ -1194,13 +1199,11 @@ export function bootGame(cfg) {
       const vTmp = new THREE.Vector3();
       const tTmp = new THREE.Vector3();
       for (const sp of catSpots) {
-        // Approach area = the body-sized cells this cat is actually cut off
-        // to, seen from beside the cat itself. `walk-reachable` is the check
-        // that says a player can GET to that component; here the question is
-        // only which way the cat is pointing relative to the players it can
-        // plausibly have.
-        const near = nearestStandable(bodyGrid, sp.x, sp.z);
-        const a = bestApproach(bodyGrid, bodyGrid.flood(near.idx), { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
+        // Approach area = the body-sized cells a run can stand on, from the
+        // shared map above. `walk-reachable` is the check that says a player can
+        // GET there; here the question is only which way the cat is pointing
+        // relative to the players it can plausibly have.
+        const a = bestApproach(bodyGrid, reachShared, { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
         if (!a) {
           bad.push(`${sp.id}: no standable sight line`);
           continue;
@@ -1239,14 +1242,18 @@ export function bootGame(cfg) {
     }
 
     // scripted dash north: 400 walking steps must stop AT the north wall,
-    // inside the walk union (?plant=no-collision sails through it)
+    // inside the walk union (?plant=no-collision sails through it). The level
+    // can state its own lane and band (WALK_BLOCK, game/full-level.js); the
+    // slice's literals are the fallback, unchanged.
     {
+      const WB = cfg.level.WALK_BLOCK || { pos: [0.4, 0], yaw: 0, lo: -2.53, hi: -2.4, wall: '−2.52' };
       const saved = { ...player };
-      spawnPlayerAt({ pos: [0.4, 0], yaw: 0 });
+      spawnPlayerAt({ pos: WB.pos.slice(), yaw: WB.yaw });
       for (let i = 0; i < 400; i++) stepPlayer(1 / 60, { fwd: 1 });
       const z = player.z;
       Object.assign(player, saved);
-      add('walk-blocked', `z=${z.toFixed(2)}`, 'stops at the north wall (−2.52), never through it', z >= -2.53 && z <= -2.4 && inUnion(player.x, z), 'walls are not a rumour (the walk rect is the wall, inset)');
+      const wallLabel = WB.wall ?? WALK_RECTS[0].z0;
+      add('walk-blocked', `z=${z.toFixed(2)}`, `stops at the north wall (${wallLabel}), never through it`, z >= WB.lo && z <= WB.hi && inUnion(player.x, z), 'walls are not a rumour (the walk rect is the wall, inset)');
     }
 
     let respawnOk = true;

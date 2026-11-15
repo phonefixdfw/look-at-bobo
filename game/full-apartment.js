@@ -1,45 +1,59 @@
-// game/full-apartment.js — the FULL one-bedroom flat (Step 8): buildRoom()'s
-// living room and lighting rig untouched, the slice's hall + bedroom around
-// it, and the rooms the slice never opened: a kitchenette along the living
-// room's south wall, the bathroom behind a new doorway in the hall's west
-// wall, and the bedroom's desk + laundry basket + foot-of-bed blanket. Same
-// technique as game/apartment.js and src/room.js: everything static merges
-// into one mesh per material; every surface a cat stands on is MEASURED, not
-// assumed. Geometry numbers are documented in docs/LEVEL_LAYOUT.md.
-//
-// Lighting budget (docs/ART_STYLE.md §4): the sun stays the ONLY shadow
-// light; the rooms beyond the style-test rig get no-shadow point fill
-// (bed, bathroom, kitchenette) — 5 real lights total, cap is 6.
-
+/*!
+ * game/full-apartment.js — the real-size flat, rendered (issue #39).
+ *
+ * This builder draws game/full-shell.js and nothing else: every plaster slab,
+ * floor and ceiling comes from that file's numbers, so the shell the checks
+ * measure and the shell you see are literally the same data (that is the whole
+ * point of the split — see the header of game/full-shell.js). Furniture is
+ * NOT here yet: COLLIDERS footprints in game/full-level.js are placeholders
+ * until the furniture chunk lands. What this file adds on top of the raw shell
+ * is the things a shell still needs to read as a room: floor finishes, door
+ * leaves and casings, glass, sills, baseboards, the balcony railing, sky
+ * outside the windows, and the light rig.
+ *
+ * Layout conventions live in game/full-shell.js (y 0 = finish floor, wall
+ * tops 0.20 m above the ceiling, band thicknesses from BAND_T). The rig:
+ *   sun  — one shadow-casting light, positioned outside the flat's north
+ *          window line so the living room's light patch arrives THROUGH the
+ *          glass (docs/ISSUE_33_REBUILD.md §5; the engine's sun-through-window
+ *          check re-proves z < WALL_Z and y > 2);
+ *   hemi — the free sky/ground wash (the budget only counts punctual lights);
+ *   4 point fills, one per dark zone (kitchen, hall+entry, bedroom, bathroom)
+ *          — 5 punctual lights total, inside the `realLights <= 6` budget.
+ */
 import * as THREE from 'three';
 import { TOKENS } from '../src/tokens.js';
-import { std } from '../src/materials.js';
-import { buildRoom } from '../src/room.js';
 import { floorMap, floorRough, skyMap } from '../src/textures.js';
-import { hash1 } from '../src/util.js';
 import { slabAABB } from '../src/reach.js';
-import { SURFACES, fabric, worldUV, tvScreenMaterial, glowMaterial, contactShadows, leafGeo, broadLeafGeo } from '../src/polish.js';
-
-// -- Step 9 (issue #19): the flat's surfaces come from src/polish.js — wood
-// grain with a normal map and a wear map, marble, tiled grout, plaster with
-// float texture, brushed metal, a woven rug, book spines, wall art, terracotta
-// and leaves. All procedural canvases, drawn once at import, seeded through
-// hash1 exactly like src/textures.js (which stays byte-stable for the Step 3
-// baselines). mergedMesh below now bakes world-projected UVs, which is what
-// lets a MERGED prop carry a texture at all: Step 8's grain only reached the
-// handful of unmerged meshes.
+import { SURFACES, surface, worldUV } from '../src/polish.js';
+import {
+  WALL_H,
+  CEIL_Y,
+  LEAF_W,
+  LEAF_H,
+  DOOR_HEAD,
+  JAMB_INSET,
+  SLIDER_HEAD,
+  BAND_T,
+  ROOMS,
+  ROOM_BY_ID,
+  WALL_DEFS,
+  OPENINGS,
+  FLOORS,
+  STRUCTURE,
+  CEILINGS,
+  SUPPORT_DEFS,
+} from './full-shell.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
-const cone = (r, h, seg = 6) => new THREE.ConeGeometry(r, h, seg);
 
 /** Same trick as src/room.js: bake transforms into merged, per-material
- *  buffers. (Its helper is module-private; this is the compact copy.)
- *  Step 9 adds two things: the UV channel survives the merge, and by default
- *  the UVs are RE-BAKED from world position at the density the material asks
- *  for (src/polish.js `worldUV`) — that is what finally lets a merged prop
- *  show its wood grain instead of one sampled texel. A part that brought its
- *  own meaningful UVs (a leaf card) opts out with `keepUV: true`. */
+ *  buffers, so the whole flat's plaster costs one draw per material. (Its
+ *  helper is module-private; this is the compact copy the old builder used.)
+ *  UVs are RE-BAKED from world position at the density each material asks for
+ *  (src/polish.js `worldUV`) — that is what lets a merged wall show plaster
+ *  grain at a constant scale instead of one stretched texel. */
 function mergedMesh(parent, entries, { cast = true, receive = true } = {}) {
   const _x = new THREE.Object3D();
   const byMat = new Map();
@@ -83,572 +97,483 @@ function mergedMesh(parent, entries, { cast = true, receive = true } = {}) {
   return out;
 }
 
-const topY = (mesh) => new THREE.Box3().setFromObject(mesh).max.y;
+/** A shell slab definition (w/h/d/x/y/z, straight from full-shell.js) as a
+ *  merged box entry. The boxes the checks measure are the boxes drawn. */
+const slabEntry = (def, mat) => ({ geo: box(def.w, def.h, def.d), mat, at: [def.x, def.y, def.z] });
 
-/** Repeat the oak grain at the living room's density on a new plane. */
-function oakAt(w, d) {
-  const map = floorMap.clone();
-  map.needsUpdate = true;
-  map.repeat.set((w / 6.4) * 4, (d / 5.2) * 3.5);
-  const roughnessMap = floorRough.clone();
-  roughnessMap.needsUpdate = true;
-  roughnessMap.repeat.copy(map.repeat);
-  return std(TOKENS.oakFloor, { roughness: 0.55, map, roughnessMap });
+/** An opening's wall band: which side of its `fixed` face the plaster sits on,
+ *  and the band's outer face. The side is whichever room face the opening sits
+ *  in (bands are always OUTSIDE the room's interior face); the thickness is
+ *  whatever the piers framing THIS opening are — the living room's east line
+ *  is 0.12 in front of the kitchen doorway and 0.20 where the window is, so
+ *  matching a pier has to overlap the opening's own span, not just its band. */
+function openingBand(o) {
+  const room = ROOM_BY_ID[o.room];
+  const [bandLoKey, bandHiKey] = o.axis === 'z' ? ['z0', 'z1'] : ['x0', 'x1'];
+  const [runLoKey, runHiKey] = o.axis === 'z' ? ['x0', 'x1'] : ['z0', 'z1'];
+  const sign = o.fixed === room[bandLoKey] ? -1 : 1;
+  const frame = WALL_DEFS.find(
+    (d) =>
+      d.axis === o.axis &&
+      (d[bandLoKey] === o.fixed || d[bandHiKey] === o.fixed) &&
+      d[runLoKey] < o.hi - 0.01 &&
+      d[runHiKey] > o.lo + 0.01,
+  );
+  const t = BAND_T[frame ? frame.kind : 'wall-ext'];
+  const b0 = sign < 0 ? o.fixed - t : o.fixed;
+  const b1 = sign < 0 ? o.fixed : o.fixed + t;
+  return { sign, t, b0, b1 };
 }
 
-/** Build the full flat: buildRoom + hall + bedroom (as the slice) + the
- *  kitchenette, bathroom and extra bedroom furniture (Step 8).
- *  Returns { living, supports, lights, pen }. */
+/** The structural gap an opening punches through its band: the clear width
+ *  plus the casing inset each side for the door-like kinds (the casing is
+ *  what fills it visually — game/full-shell.js header), and the clear width
+ *  itself for windows (jambs flush) and the shut front door. */
+function gapSpan(o) {
+  const inset = o.kind === 'window' || o.kind === 'sealed' ? 0 : JAMB_INSET;
+  return [o.lo - inset, o.hi + inset];
+}
+
+/* -------------------------------------------------------------------------- *
+ *  Materials. Floors and plaster carry a `uvTile` (metres per texture tile)
+ *  so merged geometry gets world-scaled UVs; the baked `repeat` on the shared
+ *  canvases would multiply on top of that, so every map that goes onto merged
+ *  geometry is cloned to repeat [1,1] first.
+ * -------------------------------------------------------------------------- */
+
+/** Clone a shared canvas texture for one merged material, reset to 1:1 so
+ *  only `uvTile` decides the world density. */
+function tile1(t) {
+  const c = t.clone();
+  c.needsUpdate = true;
+  c.repeat.set(1, 1);
+  return c;
+}
+
+/** Oak floorboards: one texture tile (four planks) per 1.6 m, the density the
+ *  old builder got from `oakAt()`'s hand-set repeats. */
+function oakFloor() {
+  return surface(TOKENS.oakFloor, {
+    uvTile: 1.6,
+    roughness: 0.55,
+    map: tile1(floorMap),
+    roughnessMap: tile1(floorRough),
+  });
+}
+
+/** Balcony slab: bare weathered concrete, no map — the polish grain is enough
+ *  at the scale you actually see it (a metre of ledge under a chair). */
+function concreteFloor() {
+  return surface(0x9a948a, { uvTile: 2.4, roughness: 0.94 });
+}
+
+/** Painted trim: baseboards, door casings, sills. Slightly warmer than the
+ *  plaster so relief reads against the wall, glossier so it catches light. */
+function trimPaint() {
+  return surface(0xf2eee5, { uvTile: 0.8, roughness: 0.6 });
+}
+
+/** Window glass: cheap transparent standard material, `depthWrite: false` so
+ *  the sky and the room never fight through the same pane. */
+function glassMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0xdfeaf2,
+    transparent: true,
+    opacity: 0.22,
+    roughness: 0.08,
+    metalness: 0.1,
+    depthWrite: false,
+  });
+}
+
+/** What every window looks out on: the flat, tone-mapping-exempt sky, so the
+ *  sunlit opening stays bright without turning the room into a white box
+ *  (same material src/room.js proved the look with). */
+function skyMaterial() {
+  return new THREE.MeshBasicMaterial({ map: skyMap, toneMapped: false, side: THREE.DoubleSide });
+}
+
+/* -------------------------------------------------------------------------- *
+ *  The builder.
+ * -------------------------------------------------------------------------- */
+
+/** The flat's north wall line, interior face: the living room's z0. The rig
+ *  hangs off it, and the engine reads it as `living.WALL_Z` (the
+ *  sun-through-window check asks the sun sits north of THIS number). */
+const LIVING = ROOM_BY_ID.living;
+const WALL_Z = LIVING.z0; // -2.9
+
+/** Build the real-size shell into `scene`.
+ *  Returns { living, supports, wallBoxes, pen } in the shape bootGame reads:
+ *  `living.sun`, `living.WALL_Z`, `supports` as name -> surface y, and every
+ *  plaster/ceiling slab as an AABB for the camera-gap and sight-line checks. */
 export function buildFullApartment(scene) {
-  const living = buildRoom(scene); // the untouched style-test look + rig
   const flat = new THREE.Group();
   scene.add(flat);
 
-  const plaster = SURFACES.plaster(); // float texture + a normal map: big lit walls stop being one flat value
+  const plaster = SURFACES.plaster(); // float texture + grain: lit walls stop being one flat value
   const metal = SURFACES.metal(); // brushed streaks in colour AND roughness
-  const walnut = SURFACES.wood(); // cathedral figure + pores + a wear map
-  const paleWood = SURFACES.woodPale();
-  const ceramic = SURFACES.marble(); // worktop laminate + porcelain: veins and sparkle
-  const mirror = new THREE.MeshBasicMaterial({ color: 0x9db3bd }); // a flat readable slate (no envmap here)
-  const tile = SURFACES.bathTile(); // bathroom floor: bevelled tiles, matte grout
-  const backsplash = SURFACES.kitchenTile(); // small-format splashback behind the sink
-  // The counter's base carcass. Step 8 gave it the WALL material; once walls
-  // grew a normal map, that small box started shadow-acne speckling (a
-  // normal-perturbed surface inside the shadow map's bias range reads as
-  // black-and-white noise). It is really painted MDF: flat, smooth, satin.
-  const paintedBoard = std(TOKENS.plaster, { roughness: 0.55 });
-  const weaved = (color, r) => fabric(color, { roughness: r }); // the fabric family, now with relief
+  const walnut = SURFACES.wood(); // door leaves read as wood at arm's length
+  const trim = trimPaint();
+  const oak = oakFloor();
+  const kitchenTile = SURFACES.kitchenTile();
+  const bathTile = SURFACES.bathTile();
+  const concrete = concreteFloor();
+  const glass = glassMaterial();
+  const sky = skyMaterial();
 
-  // ---- walls (0.12 slabs flush with buildRoom's), docs/LEVEL_LAYOUT.md ----
-  // vs the slice: the hall's west wall is TWO slabs with a doorway at
-  // z∈[3.36,3.94] — the bathroom's door (door3 walk rect).
-  const H = 2.6;
-  const cy = H / 2;
-  const walls = [
-    // living: east wall, south wall with the doorway at x∈[−1.13,−0.07]
-    { geo: box(0.12, H, 5.32), mat: plaster, at: [3.2, cy, 0] },
-    { geo: box(2.13, H, 0.12), mat: plaster, at: [-2.195, cy, 2.6] },
-    { geo: box(3.27, H, 0.12), mat: plaster, at: [1.565, cy, 2.6] },
-    // hall: east wall, west wall with the bathroom doorway
-    { geo: box(0.12, H, 1.6), mat: plaster, at: [0.4, cy, 3.46] },
-    { geo: box(0.12, H, 0.7), mat: plaster, at: [-1.4, cy, 3.01] },
-    { geo: box(0.12, H, 0.2), mat: plaster, at: [-1.4, cy, 4.04] },
-    // hall south / bedroom north wall, doorway at x∈[−1.13,−0.07]
-    { geo: box(2.13, H, 0.12), mat: plaster, at: [-2.195, cy, 4.2] },
-    { geo: box(2.19, H, 0.12), mat: plaster, at: [1.025, cy, 4.2] },
-    // bedroom: west continues the living west wall, east, south with window
-    { geo: box(0.12, H, 4.4), mat: plaster, at: [-3.2, cy, 4.86] },
-    { geo: box(0.12, H, 2.92), mat: plaster, at: [2.06, cy, 5.6] },
-    { geo: box(2.11, H, 0.12), mat: plaster, at: [-2.205, cy, 7.0] },
-    { geo: box(0.97, H, 0.12), mat: plaster, at: [1.635, cy, 7.0] },
-    { geo: box(2.3, 0.5, 0.12), mat: plaster, at: [0, 0.25, 7.0] },
-    { geo: box(2.3, 0.6, 0.12), mat: plaster, at: [0, 2.3, 7.0] },
-    // kitchenette carcass + bathroom vanity body share the plaster walls
-    { geo: box(1.8, 0.9, 0.6), mat: paintedBoard, at: [1.5, 0.45, 2.24] },
-    { geo: box(0.73, 0.8, 0.32), mat: paintedBoard, at: [-2.725, 0.4, 2.82] },
-  ];
-  mergedMesh(flat, walls, { receive: true });
+  // ── plaster: every opaque slab in the flat, walls and ceilings together ──
+  // Piers come from WALL_DEFS (including the balcony parapets, which ARE
+  // plaster for the camera-gap check), ceilings from CEILINGS. One merged
+  // mesh, one draw call; `wallBoxes` below is the same data as AABBs.
+  mergedMesh(flat, [...WALL_DEFS, ...CEILINGS].map((d) => slabEntry(d, plaster)), {
+    cast: true,
+    receive: true,
+  });
 
-  // ---- bedroom window: the same flat sky + the same frame bars ----
-  // (the plane's default face is +z, i.e. away from the room — turned to face in)
-  const sky = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.6, 2.4),
-    new THREE.MeshBasicMaterial({ map: skyMap, toneMapped: false }),
-  );
-  sky.position.set(0, 1.28, 7.2);
-  sky.rotation.y = Math.PI;
-  sky.userData.tag = 'sky';
-  flat.add(sky);
-  mergedMesh(flat, [
-    { geo: box(0.06, 1.5, 0.06), mat: metal, at: [0, 1.25, 6.98] },
-    { geo: box(2.3, 0.06, 0.06), mat: metal, at: [0, 1.25, 6.98] },
-    // bathroom: vanity basin + faucet, mirror (basin is porcelain-ceramic and
-    // the mirror a flat readable slate — bare metal renders black without an envmap)
-    { geo: cyl(0.15, 0.12, 0.1, 14), mat: ceramic, at: [-2.725, 0.85, 2.82] },
-    { geo: cyl(0.015, 0.015, 0.16, 8), mat: metal, at: [-2.725, 0.96, 2.7] },
-    { geo: box(0.5, 0.6, 0.03), mat: mirror, at: [-2.725, 1.5, 2.675] },
+  // ── floors: one merged mesh per finish, top face exactly y 0 ─────────────
+  // full-shell.js says a room's floor is its walkable plane; a floor slab
+  // that poked above 0 would put every cat's contact probe under the boards.
+  // Kitchen tile and entry tile share one material — the two rooms are the
+  // same large-format porcelain — while the bathroom gets its small tile.
+  const floorFinish = new Map([
+    ['living', oak],
+    ['hall', oak],
+    ['bedroom', oak],
+    ['kitchen', kitchenTile],
+    ['entry', kitchenTile],
+    ['bathroom', bathTile],
+    ['balcony', concrete],
   ]);
-  // kitchenette worktop and desk keyboard: their own meshes so counterTop and
-  // kbTop are MEASURED, not asserted (the whole apartment's rule). The top is
-  // laminate, not steel — metal without an envmap renders as a black slab.
-  const [counterMesh] = mergedMesh(flat, [{ geo: box(1.84, 0.04, 0.64), mat: ceramic, at: [1.5, 0.88, 2.24] }]);
-  const [kbMesh] = mergedMesh(flat, [{ geo: box(0.14, 0.03, 0.44), mat: metal, at: [-2.84, 0.775, 5.87] }]);
-  mergedMesh(flat, [
-    // kitchenette: recessed sink basin + faucet against the backsplash
-    { geo: box(0.5, 0.02, 0.36), mat: metal, at: [2.05, 0.861, 2.2] },
-    { geo: cyl(0.018, 0.018, 0.3, 10), mat: metal, at: [2.05, 1.05, 2.42] },
-    { geo: box(0.035, 0.035, 0.14), mat: metal, at: [2.05, 1.18, 2.36] },
-  ]);
-
-  // ---- floors (same oak; the bathroom gets wipeable tile) ----
-  for (const [w, d, cx, cz] of [
-    [1.92, 1.72, -0.5, 3.4], // hall
-    [5.38, 2.92, -0.57, 5.6], // bedroom
-  ]) {
-    const f = new THREE.Mesh(new THREE.PlaneGeometry(w, d), oakAt(w, d));
-    f.rotation.x = -Math.PI / 2;
-    f.position.set(cx, 0, cz);
-    f.receiveShadow = true;
-    flat.add(f);
+  const byFinish = new Map();
+  for (const f of FLOORS) {
+    const mat = floorFinish.get(f.room);
+    if (!byFinish.has(mat)) byFinish.set(mat, []);
+    byFinish.get(mat).push({
+      geo: box(f.x1 - f.x0, 0.05, f.z1 - f.z0),
+      mat,
+      at: [(f.x0 + f.x1) / 2, -0.025, (f.z0 + f.z1) / 2],
+    });
   }
-  const bathFloor = new THREE.Mesh(new THREE.PlaneGeometry(1.68, 1.48), tile);
-  bathFloor.rotation.x = -Math.PI / 2;
-  bathFloor.position.set(-2.3, 0, 3.4);
-  bathFloor.receiveShadow = true;
-  bathFloor.userData.tag = 'bath-floor';
-  flat.add(bathFloor);
+  for (const entries of byFinish.values()) mergedMesh(flat, entries, { cast: false, receive: true });
 
-  // ---- the bedroom: bed, nightstand, desk (docs/LEVEL_LAYOUT.md) ----
-  // The headboard and the nightstand are FLUSH to the north wall's inner face
-  // (z = 4.26): they used to sit 0.69 m off it, so you could walk behind them
-  // and the room read as furniture floating in a gap (issue #27, bug 1).
-  mergedMesh(flat, [
-    // bed frame + headboard + nightstand + desk legs share walnut
-    { geo: box(1.5, 0.26, 1.7), mat: walnut, at: [1.2, 0.13, 5.11] },
-    { geo: box(1.5, 0.7, 0.1), mat: walnut, at: [1.2, 0.35, 4.31] },
-    { geo: box(0.44, 0.42, 0.44), mat: walnut, at: [0.25, 0.23, 4.48] },
-    { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-3.08, 0.36, 5.26] },
-    { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-3.08, 0.36, 6.14] },
-    { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-2.6, 0.36, 5.26] },
-    { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-2.6, 0.36, 6.14] },
-  ]);
-  // desk top — its own mesh so deskTop is MEASURED (0.76)
-  const [deskTopMesh] = mergedMesh(flat, [{ geo: box(0.6, 0.04, 1.0), mat: walnut, at: [-2.84, 0.74, 5.7] }]);
-  const bedding = weaved(TOKENS.uiPaper, 0.92);
-  mergedMesh(flat, [{ geo: box(1.4, 0.18, 1.6), mat: bedding, at: [1.2, 0.35, 5.11] }]);
-  const duvetMat = weaved(TOKENS.couch, 0.92);
-  mergedMesh(flat, [{ geo: box(1.44, 0.1, 1.12), mat: duvetMat, at: [1.2, 0.45, 5.37] }]);
-  const pillowMat = weaved(TOKENS.pillow, 0.9);
-  // blanket over the foot of the bed — its own mesh, blanketTop measured (0.58)
-  const [blanketMesh] = mergedMesh(flat, [{ geo: box(1.4, 0.06, 0.56), mat: pillowMat, at: [1.2, 0.55, 5.63] }]);
-  mergedMesh(flat, [{ geo: box(0.6, 0.1, 0.4), mat: pillowMat, at: [1.2, 0.51, 4.59] }]);
-
-  // ---- the laundry basket (replaces the slice's floor pile) ----
-  const basketMat = std(TOKENS.lampShade, { roughness: 0.8 });
-  mergedMesh(flat, [
-    { geo: box(0.62, 0.22, 0.03), mat: basketMat, at: [-0.45, 0.11, 5.995] },
-    { geo: box(0.62, 0.22, 0.03), mat: basketMat, at: [-0.45, 0.11, 6.405] },
-    { geo: box(0.03, 0.22, 0.41), mat: basketMat, at: [-0.745, 0.11, 6.2] },
-    { geo: box(0.03, 0.22, 0.41), mat: basketMat, at: [-0.155, 0.11, 6.2] },
-  ], { cast: true });
-  const laundryMat = weaved(TOKENS.uiMustard, 0.95);
-  // the pile a cat naps on — laundryTop (0.18) is MEASURED from this mesh
-  const [laundryMesh] = mergedMesh(flat, [{ geo: cyl(0.27, 0.24, 0.1, 14), mat: laundryMat, at: [-0.45, 0.13, 6.2] }], { cast: true });
-  const laundry2 = weaved(TOKENS.uiCoral, 0.95);
-  mergedMesh(flat, [{ geo: cyl(0.16, 0.14, 0.04, 12), mat: laundry2, at: [-0.4, 0.16, 6.18], rot: [0, 0.6, 0] }], { cast: true });
-
-  // ---- bathroom furniture: ceramics + a towel + a mat ----
-  // The toilet moved from the doorway corner to the far (west) end of the same
-  // wall: its push pad used to lie across the bathroom's ONLY door and cut the
-  // room off from the flat (issue #27, bug 2). A 0.30 m body now has a 0.9 m
-  // clear strip from the door to the bowl.
-  mergedMesh(flat, [
-    { geo: box(0.35, 0.42, 0.5), mat: ceramic, at: [-2.955, 0.21, 3.87] }, // toilet bowl
-    { geo: box(0.36, 0.04, 0.5), mat: ceramic, at: [-2.955, 0.44, 3.85] }, // seat
-    { geo: box(0.35, 0.4, 0.16), mat: ceramic, at: [-2.955, 0.62, 4.04] }, // cistern
-  ]);
-  mergedMesh(flat, [{ geo: box(0.03, 0.5, 0.3), mat: weaved(TOKENS.uiCoral, 0.95), at: [-3.125, 1.25, 3.7] }], { cast: true });
-  mergedMesh(flat, [{ geo: box(0.62, 0.012, 0.42), mat: fabric(TOKENS.rug, { roughness: 0.98, uvTile: 0.4 }), at: [-2.42, 0.006, 3.52] }], { cast: false });
-
-  // ---- the pen: Bobo's target on the desk, and the game's little trickster.
-  // Its own tiny mesh (one draw) because its pose is WRITTEN EVERY FRAME by
-  // game/full.js (rest vs knock-off) — order-independence, like the cats.
-  const pen = new THREE.Group();
-  const penMesh = new THREE.Mesh(cyl(0.012, 0.012, 0.16, 8), std(TOKENS.uiMustard, { roughness: 0.4 }));
-  penMesh.rotation.x = Math.PI / 2; // lie the barrel along Z, then yaw the group
-  penMesh.castShadow = true;
-  pen.add(penMesh);
-  pen.name = 'pen';
-  flat.add(pen);
-
-  // ---- Step 8 furniture (Brandon's list): a TV + stand, a bookshelf, a
-  // coffee table, a kitchen table with chairs + fridge, a hall console, a
-  // bedside lamp, bedroom curtains, a bathroom shelf — and proper plants.
-  // Draw budget: every prop below merges into ONE of two meshes (the soft
-  // items that must not cast shadows form the other), so the whole block
-  // costs 13 draws, not one per prop: mergedMesh batches by material, and
-  // these material consts are what make props share a batch.
-  const black = std(0x14161a, { roughness: 0.5 }); // TV bezel, fridge seam
-  const booksA = weaved(TOKENS.uiCoral, 0.85); // an apple, a magazine, a cushion
-  const booksB = weaved(TOKENS.uiMustard, 0.85);
-  const spines = SURFACES.spines(); // a shelf of books reads as BOOKS at 2 m
-  const art = SURFACES.poster(); // framed prints: the room has someone living in it
-  const terracotta = SURFACES.pot(); // flower pots: throwing rings + mineral bloom
-  const soil = std(0x4a3628, { roughness: 0.98 });
-  const shade = fabric(TOKENS.lampShade, { roughness: 0.86, uvTile: 0.07, sheen: 0.45 }); // bedside lamp
-  const foliage = SURFACES.leaf(); // leaf cards carry their own midrib UVs (keepUV)
-  const curtainBedroom = fabric(0xe9e2d4, { roughness: 0.98, uvTile: 0.16 });
-  const bedRug = SURFACES.rug(); // woven pile with bands, not a flat slab
-  const glaze = std(0xf3ede2, { roughness: 0.2 }); // mugs, a glass, a soap dish
-  const rubber = std(0x191c22, { roughness: 0.72 }); // cables, a shoe sole
-  const leather = std(0x4a3a30, { roughness: 0.62 }); // shoes by the door
-  const paper = std(0xf4f1e8, { roughness: 0.92 }); // a note, a book's pages
-  const fur = []; // every shadow-casting furniture piece
-  const furSoft = []; // thin/flat things: no cast shadow, no collider needed
-
-  // living room: the media wall on the north wall (the east wall belongs to
-  // the capture cameras), the bookshelf in the west corner, a low table on
-  // the rug's west end. The sofa already faces this way.
-  fur.push(
-    { geo: box(1.2, 0.3, 0.4), mat: walnut, at: [1.81, 0.24, -2.32] }, // TV stand body
-    { geo: box(1.24, 0.04, 0.46), mat: walnut, at: [1.81, 0.41, -2.32] }, // top
-    { geo: box(0.05, 0.09, 0.05), mat: walnut, at: [1.31, 0.045, -2.16] }, // 4 legs
-    { geo: box(0.05, 0.09, 0.05), mat: walnut, at: [2.31, 0.045, -2.16] },
-    { geo: box(0.05, 0.09, 0.05), mat: walnut, at: [1.31, 0.045, -2.48] },
-    { geo: box(0.05, 0.09, 0.05), mat: walnut, at: [2.31, 0.045, -2.48] },
-    { geo: box(0.96, 0.6, 0.05), mat: black, at: [1.81, 0.75, -2.46] }, // bezel
+  // ── the structural slab, and a stone saddle in every doorway band ────────
+  // The slab (STRUCTURE) closes the floor under the wall bands and the
+  // service void. Its drawn top sits 2 cm below the finish floor: exactly
+  // coplanar tops would z-fight along every room edge, and a hair of shade in
+  // a band you only ever see through a doorway is the honest fix. The saddles
+  // bring the walkable y 0 across each band (that is what the bridging walk
+  // rectangles stand on), so only the saddles reach y 0 over band footprints.
+  mergedMesh(
+    flat,
+    [
+      {
+        geo: box(STRUCTURE.x1 - STRUCTURE.x0, 0.18, STRUCTURE.z1 - STRUCTURE.z0),
+        mat: concrete,
+        at: [(STRUCTURE.x0 + STRUCTURE.x1) / 2, -0.11, (STRUCTURE.z0 + STRUCTURE.z1) / 2],
+      },
+      ...OPENINGS.filter((o) => o.kind !== 'window').map((o) => {
+        const b = openingBand(o);
+        const [a0, a1] = gapSpan(o);
+        return o.axis === 'z'
+          ? { geo: box(a1 - a0, 0.05, b.b1 - b.b0), mat: concrete, at: [(a0 + a1) / 2, -0.025, (b.b0 + b.b1) / 2] }
+          : { geo: box(b.b1 - b.b0, 0.05, a1 - a0), mat: concrete, at: [(b.b0 + b.b1) / 2, -0.025, (a0 + a1) / 2] };
+      }),
+    ],
+    { cast: false, receive: true },
   );
-  const tvScreen = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.88, 0.52),
-    tvScreenMaterial(), // Step 9: the TV is ON — an emissive still frame that
-  ); // throws real light-looking glow without being a real light (cap is 6)
-  tvScreen.position.set(1.81, 0.75, -2.432);
-  tvScreen.userData.tag = 'tv';
-  flat.add(tvScreen);
-  {
-    // Two additive decals sell it: a halo just off the panel, and the pool of
-    // spill the screen paints on the wall around the bezel. Both are pure
-    // geometry — no flicker, so nothing here can strobe (issue #19, #5).
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(1.26, 0.88), glowMaterial(0x9ecbe8, 0.28));
-    halo.position.set(1.81, 0.75, -2.425);
-    halo.userData.tag = 'tv-glow';
-    halo.renderOrder = 3;
-    flat.add(halo);
-    const spill = new THREE.Mesh(new THREE.PlaneGeometry(1.78, 1.3), glowMaterial(0x86b6d8, 0.13));
-    spill.position.set(1.81, 0.78, -2.47);
-    spill.userData.tag = 'tv-spill';
-    spill.renderOrder = 1;
-    flat.add(spill);
-  }
 
-  // bookshelf, west corner: carcass + shelves, then books in two colours
-  const shelfX = -2.99;
-  fur.push(
-    { geo: box(0.3, 1.8, 0.04), mat: walnut, at: [shelfX, 0.9, -2.52] },
-    { geo: box(0.3, 1.8, 0.04), mat: walnut, at: [shelfX, 0.9, -1.9] },
-    { geo: box(0.03, 1.8, 0.66), mat: walnut, at: [-3.13, 0.9, -2.21] }, // back on the wall
-    { geo: box(0.28, 0.03, 0.62), mat: walnut, at: [shelfX, 0.45, -2.21] },
-    { geo: box(0.28, 0.03, 0.62), mat: walnut, at: [shelfX, 0.9, -2.21] },
-    { geo: box(0.28, 0.03, 0.62), mat: walnut, at: [shelfX, 1.35, -2.21] },
-    { geo: box(0.28, 0.03, 0.62), mat: walnut, at: [shelfX, 1.79, -2.21] },
-  );
-  {
-    let z = -2.44;
-    for (const [shelfY, n] of [[0.47, 5], [0.92, 4], [1.37, 5]]) {
-      for (let i = 0; i < n; i++) {
-        const h = 0.2 + hash1(shelfY * 100 + i) * 0.12;
-        const t = 0.03 + hash1(shelfY * 31 + i * 7) * 0.03;
-        fur.push({ geo: box(0.16, h, t), mat: (i + (shelfY > 1 ? 1 : 0)) % 2 ? booksA : booksB, at: [shelfX + 0.02, shelfY + h / 2 + 0.015, z], rot: [0, 0, hash1(i * 3 + shelfY) > 0.75 ? 0.06 : 0] });
-        z += t + 0.022;
-        if (z > -1.98) z = -2.44;
-      }
+  // ── the openings: casings, leaves, glass, sills, and the sky beyond ──────
+  // Every piece here is relief modelling derived from OPENINGS — the plaster
+  // gap is already exactly right, so casings merely fill the 0.08 m casing
+  // inset (2 cm shy of the walk rectangle's edge: trim the camera could
+  // graze is trim the camera-gap check can't see) and frame the hole.
+  const casings = [];
+  const trimBoards = [];
+  const leafBoards = []; // walnut: door leaves
+  const hardware = []; // metal: knobs, slider frames
+  const frameBoards = []; // trim-painted: window frames
+  const sillBoards = [];
+  const panes = [];
+  const skyPlanes = [];
+
+  /** A world-aligned box from a run interval, a band interval and a y span,
+   *  laid out for which axis the band's thickness runs along. */
+  const bb = (axis, r0, r1, b0, b1, y0, y1) =>
+    axis === 'z'
+      ? { geo: box(r1 - r0, y1 - y0, b1 - b0), at: [(r0 + r1) / 2, (y0 + y1) / 2, (b0 + b1) / 2] }
+      : { geo: box(b1 - b0, y1 - y0, r1 - r0), at: [(b0 + b1) / 2, (y0 + y1) / 2, (r0 + r1) / 2] };
+
+  for (const o of OPENINGS) {
+    const b = openingBand(o);
+    const [a0, a1] = gapSpan(o);
+    const mid = (b.b0 + b.b1) / 2;
+    const faceIn = o.fixed; // the room's plaster face at this band
+    const faceOut = b.sign < 0 ? b.b0 : b.b1;
+
+    if (o.kind === 'window') {
+      // glass mid-band, a plain ring + one mullion, and a sill board whose
+      // top lands exactly on the sill height the ruler's row measures.
+      panes.push(bb(o.axis, o.lo, o.hi, mid - 0.006, mid + 0.006, o.sill, o.head));
+      const F = 0.05;
+      frameBoards.push(
+        bb(o.axis, o.lo, o.lo + F, mid - 0.025, mid + 0.025, o.sill, o.head),
+        bb(o.axis, o.hi - F, o.hi, mid - 0.025, mid + 0.025, o.sill, o.head),
+        bb(o.axis, o.lo, o.hi, mid - 0.025, mid + 0.025, o.sill, o.sill + F),
+        bb(o.axis, o.lo, o.hi, mid - 0.025, mid + 0.025, o.head - F, o.head),
+        bb(o.axis, (o.lo + o.hi) / 2 - 0.02, (o.lo + o.hi) / 2 + 0.02, mid - 0.02, mid + 0.02, o.sill, o.head),
+      );
+      const sA = faceIn - b.sign * 0.12; // 12 cm into the room, 1 cm into the band
+      const sB = faceIn + b.sign * 0.01;
+      const [z0, z1] = [Math.min(sA, sB), Math.max(sA, sB)];
+      sillBoards.push(
+        o.axis === 'z'
+          ? { geo: box(o.hi - o.lo + 0.1, 0.04, z1 - z0), mat: trim, at: [(o.lo + o.hi) / 2, o.sill - 0.02, (z0 + z1) / 2] }
+          : { geo: box(z1 - z0, 0.04, o.hi - o.lo + 0.1), mat: trim, at: [(z0 + z1) / 2, o.sill - 0.02, (o.lo + o.hi) / 2] },
+      );
+      skyPlanes.push({
+        pos:
+          o.axis === 'z'
+            ? [(o.lo + o.hi) / 2, (o.sill + o.head) / 2, faceOut + b.sign * 0.14]
+            : [faceOut + b.sign * 0.14, (o.sill + o.head) / 2, (o.lo + o.hi) / 2],
+        rotY: o.axis === 'z' ? (b.sign < 0 ? 0 : Math.PI) : b.sign < 0 ? Math.PI / 2 : -Math.PI / 2,
+        w: o.hi - o.lo + 1.4,
+        h: Math.max(2, o.head - o.sill + 0.9),
+      });
+      continue;
+    }
+
+    // door-like: fill the casing inset (for the sealed front door, up to the
+    // leaf's own edge), then a 6 x 2 cm trim frame on both faces.
+    const leafLo = o.kind === 'sealed' ? (a0 + a1) / 2 - LEAF_W / 2 : o.lo - 0.02;
+    const leafHi = o.kind === 'sealed' ? (a0 + a1) / 2 + LEAF_W / 2 : o.hi + 0.02;
+    casings.push(
+      bb(o.axis, a0, leafLo, b.b0, b.b1, o.sill, o.head),
+      bb(o.axis, leafHi, a1, b.b0, b.b1, o.sill, o.head),
+    );
+    for (const [f, dir] of [
+      [faceIn, -b.sign],
+      [faceOut, b.sign],
+    ]) {
+      const p0 = Math.min(f, f + dir * 0.02);
+      const p1 = Math.max(f, f + dir * 0.02);
+      trimBoards.push(
+        bb(o.axis, a0 - 0.06, a0, p0, p1, o.sill, o.head + 0.06),
+        bb(o.axis, a1, a1 + 0.06, p0, p1, o.sill, o.head + 0.06),
+        bb(o.axis, a0 - 0.06, a1 + 0.06, p0, p1, o.head, o.head + 0.06),
+      );
+    }
+
+    if (o.kind === 'door') {
+      // the leaf stays OPEN, swung flat against the room-side plaster — this
+      // flat has no door you can shut (issue #31's lesson, game/full-shell.js)
+      const c = faceIn - b.sign * 0.05;
+      leafBoards.push(bb(o.axis, o.lo + 0.02, o.lo + 0.02 + LEAF_W, c - 0.02, c + 0.02, 0.005, LEAF_H));
+      hardware.push({
+        geo: cyl(0.02, 0.02, 0.03, 10),
+        rot: [Math.PI / 2, 0, 0],
+        mat: metal,
+        at:
+          o.axis === 'z'
+            ? [o.hi - 0.06, 1.0, faceIn - b.sign * 0.08]
+            : [faceIn - b.sign * 0.08, 1.0, o.hi - 0.06],
+      });
+    } else if (o.kind === 'sealed') {
+      leafBoards.push(bb(o.axis, leafLo, leafHi, mid - 0.025, mid + 0.025, 0.005, LEAF_H));
+      hardware.push({
+        geo: cyl(0.02, 0.02, 0.03, 10),
+        rot: [Math.PI / 2, 0, 0],
+        mat: metal,
+        at: [leafHi - 0.08, 1.05, faceIn + 0.07],
+      });
+    } else if (o.kind === 'slider') {
+      // one fixed pane across the clear width (the sun and the sky come
+      // through it) and the real leaf parked OPEN against the plaster west
+      // of the opening — the balcony is entered through a hole that is a
+      // leaf-width clear, which is what a stopped slider looks like.
+      panes.push(bb(o.axis, o.lo, o.hi, mid - 0.006, mid + 0.006, 0.002, SLIDER_HEAD));
+      const c = faceIn - b.sign * 0.06;
+      const pr0 = o.lo - 1.13;
+      const pr1 = pr0 + 1.3;
+      panes.push(bb(o.axis, pr0 + 0.04, pr1 - 0.04, c - 0.008, c + 0.008, 0.03, SLIDER_HEAD - 0.03));
+      hardware.push(
+        bb(o.axis, pr0, pr0 + 0.04, c - 0.016, c + 0.016, 0.01, SLIDER_HEAD - 0.01),
+        bb(o.axis, pr1 - 0.04, pr1, c - 0.016, c + 0.016, 0.01, SLIDER_HEAD - 0.01),
+        bb(o.axis, pr0, pr1, c - 0.016, c + 0.016, SLIDER_HEAD - 0.05, SLIDER_HEAD - 0.01),
+        bb(o.axis, o.lo, o.lo + 0.04, mid - 0.02, mid + 0.02, 0, SLIDER_HEAD),
+        bb(o.axis, o.hi - 0.04, o.hi, mid - 0.02, mid + 0.02, 0, SLIDER_HEAD),
+        bb(o.axis, o.lo, o.hi, mid - 0.02, mid + 0.02, SLIDER_HEAD - 0.04, SLIDER_HEAD),
+      );
     }
   }
 
-  // low table on the rug + a magazine on it
-  fur.push(
-    { geo: box(0.9, 0.035, 0.55), mat: walnut, at: [-1.15, 0.36, 0.55] },
-    { geo: box(0.05, 0.35, 0.05), mat: walnut, at: [-1.53, 0.18, 0.34] },
-    { geo: box(0.05, 0.35, 0.05), mat: walnut, at: [-0.77, 0.18, 0.34] },
-    { geo: box(0.05, 0.35, 0.05), mat: walnut, at: [-1.53, 0.18, 0.76] },
-    { geo: box(0.05, 0.35, 0.05), mat: walnut, at: [-0.77, 0.18, 0.76] },
-    { geo: box(0.22, 0.008, 0.3), mat: booksA, at: [-1.24, 0.383, 0.55], rot: [0, -0.35, 0] },
-  );
-
-  // kitchenette, finished: fridge at the counter's west end (inside the
-  // counter collider), a kettle, and a table for two snug to the east wall
-  // (clear of every capture ray — see the clearance note in the COLLIDERS).
-  fur.push(
-    { geo: box(0.46, 1.58, 0.52), mat: metal, at: [0.85, 0.79, 2.26] }, // fridge body
-    { geo: cyl(0.013, 0.013, 0.5, 8), mat: walnut, at: [0.64, 1.02, 1.975] }, // handle (dark so it reads)
-    { geo: box(0.42, 0.014, 0.012), mat: black, at: [0.85, 0.86, 1.994] }, // freezer seam on the face
-    { geo: cyl(0.085, 0.095, 0.17, 12), mat: metal, at: [1.35, 0.985, 2.2] }, // kettle
-    { geo: box(0.02, 0.02, 0.09), mat: metal, at: [1.27, 1.02, 2.2], rot: [0, 0, -0.6] }, // spout
-    { geo: cyl(0.012, 0.012, 0.07, 8), mat: metal, at: [1.42, 1.11, 2.2] }, // lid knob
-    { geo: box(0.6, 0.035, 0.65), mat: walnut, at: [2.85, 0.72, 1.62] }, // table for two
-    { geo: box(0.05, 0.72, 0.05), mat: walnut, at: [2.63, 0.36, 1.38] },
-    { geo: box(0.05, 0.72, 0.05), mat: walnut, at: [3.07, 0.36, 1.38] },
-    { geo: box(0.05, 0.72, 0.05), mat: walnut, at: [2.63, 0.36, 1.86] },
-    { geo: box(0.05, 0.72, 0.05), mat: walnut, at: [3.07, 0.36, 1.86] },
-    { geo: box(0.4, 0.035, 0.42), mat: walnut, at: [2.35, 0.45, 1.62] }, // one chair, tucked west
-    { geo: box(0.4, 0.45, 0.035), mat: walnut, at: [2.35, 0.68, 1.83] },
-    { geo: box(0.04, 0.42, 0.04), mat: walnut, at: [2.21, 0.21, 1.47] },
-    { geo: box(0.04, 0.42, 0.04), mat: walnut, at: [2.49, 0.21, 1.47] },
-    { geo: box(0.04, 0.42, 0.04), mat: walnut, at: [2.21, 0.21, 1.77] },
-    { geo: box(0.04, 0.42, 0.04), mat: walnut, at: [2.49, 0.21, 1.77] },
-    { geo: cyl(0.12, 0.075, 0.05, 14), mat: ceramic, at: [2.85, 0.765, 1.62] }, // fruit bowl…
-    { geo: new THREE.SphereGeometry(0.035, 10, 8), mat: booksA, at: [2.89, 0.8, 1.65] }, // …a coral apple…
-    { geo: cyl(0.035, 0.03, 0.07, 10), mat: ceramic, at: [3.0, 0.772, 1.45] }, // a mug, still warm
-  );
-  furSoft.push({ geo: new THREE.SphereGeometry(0.035, 10, 8), mat: foliage, at: [2.82, 0.8, 1.59] }); // …a green one
-
-  // hall: a console under the hooks, keys in a dish
-  fur.push(
-    { geo: box(0.24, 0.035, 0.7), mat: walnut, at: [0.2, 0.82, 3.5] },
-    { geo: box(0.22, 0.8, 0.035), mat: walnut, at: [0.2, 0.4, 3.17] },
-    { geo: box(0.22, 0.8, 0.035), mat: walnut, at: [0.2, 0.4, 3.83] },
-    { geo: cyl(0.01, 0.01, 0.07, 6), mat: metal, at: [0.33, 1.62, 3.22], rot: [0, 0, 1.2] }, // coat hooks
-    { geo: cyl(0.01, 0.01, 0.07, 6), mat: metal, at: [0.33, 1.62, 3.5], rot: [0, 0, 1.2] },
-    { geo: cyl(0.01, 0.01, 0.07, 6), mat: metal, at: [0.33, 1.62, 3.78], rot: [0, 0, 1.2] },
-    { geo: cyl(0.07, 0.055, 0.025, 12), mat: metal, at: [0.2, 0.85, 3.5] }, // keys dish
-  );
-
-  // bedroom: a lamp on the nightstand, a rug along the bed, curtains at the window
-  fur.push(
-    { geo: cyl(0.05, 0.07, 0.02, 12), mat: metal, at: [0.25, 0.45, 4.48] }, // bedside lamp
-    { geo: cyl(0.012, 0.012, 0.2, 8), mat: metal, at: [0.25, 0.55, 4.48] },
-    { geo: cyl(0.1, 0.13, 0.15, 12, true), mat: shade, at: [0.25, 0.68, 4.48] },
-    // the bed is flush to the wall now, so its runner moved to the side you
-    // actually step out onto (it used to lie in the gap behind the headboard)
-    { geo: box(0.5, 0.012, 1.3), mat: bedRug, at: [0.19, 0.006, 5.4] },
-  );
-  furSoft.push(
-    { geo: box(0.24, 2.0, 0.05), mat: curtainBedroom, at: [-1.32, 1.25, 6.94] },
-    { geo: box(0.24, 2.0, 0.05), mat: curtainBedroom, at: [1.32, 1.25, 6.94] },
-  );
-
-  // bathroom: a shelf over the cistern with a small succulent on it
-  fur.push(
-    { geo: box(0.5, 0.03, 0.2), mat: walnut, at: [-2.1, 1.15, 2.66] },
-    { geo: box(0.03, 0.12, 0.18), mat: walnut, at: [-2.32, 1.08, 2.66] },
-    { geo: box(0.03, 0.12, 0.18), mat: walnut, at: [-1.88, 1.08, 2.66] },
-    { geo: cyl(0.05, 0.04, 0.06, 10), mat: terracotta, at: [-2.1, 1.195, 2.63] },
-  );
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    furSoft.push({ geo: cone(0.016, 0.09, 5), mat: foliage, at: [-2.1 + Math.cos(a) * 0.022, 1.26, 2.63 + Math.sin(a) * 0.022], rot: [Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55] });
+  // the sky the flat has windows for: one plane per window outside its own
+  // wall, and three big ones beyond the balcony's parapets (the VIEWS.balcony
+  // camera looks east at the chair, so the "city" has to exist that way too).
+  for (const s of [
+    ...skyPlanes,
+    { pos: [1.5, 2.2, -5.02], rotY: 0, w: 9, h: 6 }, // beyond the far parapet
+    { pos: [3.1, 2.2, -3.8], rotY: -Math.PI / 2, w: 7, h: 6 }, // east
+    { pos: [-0.2, 2.2, -3.8], rotY: Math.PI / 2, w: 6, h: 6 }, // west
+  ]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), sky);
+    m.position.set(...s.pos);
+    m.rotation.y = s.rotY;
+    m.castShadow = false;
+    m.receiveShadow = false;
+    m.userData.tag = 'sky';
+    flat.add(m);
   }
 
-  // the big plant by the window (in the lamp/curtain corner, clear of the
-  // respawn and the bird-watching spot), detailed like Brandon asked: a pot
-  // with rim + soil, two leaf clusters — upright sword leaves and broad
-  // blades — each leaf its own shape, all in the two merged furniture draws
-  fur.push(
-    { geo: cyl(0.185, 0.145, 0.32, 18), mat: terracotta, at: [-1.655, 0.16, -2.32] }, // pot
-    { geo: cyl(0.205, 0.19, 0.05, 18), mat: terracotta, at: [-1.655, 0.345, -2.32] }, // rim
-    { geo: cyl(0.175, 0.175, 0.02, 16), mat: soil, at: [-1.655, 0.36, -2.32] }, // soil
+  mergedMesh(flat, casings.map((e) => ({ ...e, mat: trim })));
+  mergedMesh(flat, trimBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
+  mergedMesh(flat, frameBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
+  mergedMesh(flat, sillBoards, { cast: false });
+  mergedMesh(flat, leafBoards.map((e) => ({ ...e, mat: walnut })));
+  mergedMesh(flat, hardware.map((e) => ({ ...e, mat: e.mat ?? metal })));
+  mergedMesh(flat, panes.map((e) => ({ ...e, mat: glass })), { cast: false, receive: false });
+
+  // ── baseboards: 10 cm tall, 1.8 cm off the plaster, every interior room ──
+  // Generated from the same data instead of typed: a face gets a board when
+  // some pier's face lies on it; door-like openings (including the sealed
+  // front door and the slider) break the run where the door TRIM ends, since
+  // the trim frame is the trim there; windows do not break it — in every real
+  // flat the baseboard runs on under the window. Outdoor rooms get none.
+  // The 1.8 cm proud is comfortably inside the walk rectangles' 8 cm inset,
+  // so no board is ever a corner the camera-gap check can graze.
+  const boards = [];
+  for (const room of ROOMS) {
+    if (room.outdoor) continue;
+    for (const [axis, faceKey] of [
+      ['z', 'z0'],
+      ['z', 'z1'],
+      ['x', 'x0'],
+      ['x', 'x1'],
+    ]) {
+      const face = room[faceKey];
+      const [bandKeyLo, bandKeyHi] = axis === 'z' ? ['z0', 'z1'] : ['x0', 'x1'];
+      if (!WALL_DEFS.some((d) => d.axis === axis && (d[bandKeyLo] === face || d[bandKeyHi] === face))) continue;
+      const [rKey0, rKey1] = axis === 'z' ? ['x0', 'x1'] : ['z0', 'z1'];
+      const breaks = OPENINGS.filter((o) => {
+        if (o.kind === 'window') return false;
+        const b = openingBand(o);
+        return o.axis === axis && (b.b0 === face || b.b1 === face);
+      }).map((o) => {
+        const [a0, a1] = gapSpan(o);
+        return [a0 - 0.06, a1 + 0.06];
+      });
+      const inward = faceKey.endsWith('0') ? 1 : -1;
+      let cursor = room[rKey0];
+      const pieces = [];
+      for (const [g0, g1] of breaks.sort((p, q) => p[0] - q[0])) {
+        if (g0 > cursor + 0.02) pieces.push([cursor, Math.min(g0, room[rKey1])]);
+        cursor = Math.max(cursor, g1);
+      }
+      if (cursor < room[rKey1] - 0.02) pieces.push([cursor, room[rKey1]]);
+      for (const [p0, p1] of pieces) {
+        if (p1 - p0 < 0.05) continue;
+        boards.push(
+          axis === 'z'
+            ? { geo: box(p1 - p0, 0.1, 0.018), at: [(p0 + p1) / 2, 0.05, face + inward * 0.009] }
+            : { geo: box(0.018, 0.1, p1 - p0), at: [face + inward * 0.009, 0.05, (p0 + p1) / 2] },
+        );
+      }
+    }
+  }
+  mergedMesh(flat, boards.map((e) => ({ ...e, mat: trim })), { cast: false });
+
+  // ── the balcony railing: a collider-mesh, deliberately not plaster ───────
+  // full-shell.js explains why the railing lives outside wallBoxes (you see
+  // THROUGH a railing; the gap test must not be told it is a wall). Posts
+  // stand on the slab against the far parapet's inner face, inside the
+  // balcony-railing footprint in game/full-level.js, top at 1.13 m: a
+  // parapet-and-rail barrier you cannot step, and the VIEWS.balcony camera
+  // sees it from the chair end.
+  const rail = [];
+  const RZ = -4.365; // mid-plane of the posts, off the parapet's inner face
+  for (let x = 0.565; x <= 2.44; x += 0.374) {
+    rail.push({ geo: box(0.03, 1.08, 0.03), mat: metal, at: [x, 0.54, RZ] });
+  }
+  rail.push(
+    { geo: box(1.92, 0.05, 0.05), mat: metal, at: [1.5, 1.105, RZ] },
+    { geo: box(1.9, 0.03, 0.03), mat: metal, at: [1.5, 0.78, RZ] },
+    { geo: box(1.9, 0.03, 0.03), mat: metal, at: [1.5, 0.36, RZ] },
   );
-  // ===========================================================================
-  // Step 9 (issue #19) — the lived-in pass.
-  // Everything below joins the SAME two merged draws as the furniture above (a
-  // new material costs at most one more draw), so a flat that looks twice as
-  // full still costs the same handful of draw calls. The rules that kept it
-  // honest: nothing here moves a measured surface, nothing stands in a cat
-  // spot, a spawn or a capture view, and every floor prop is either flat enough
-  // to walk over or sits inside a footprint the walk rects already exclude.
-  // Nothing about the real apartment is invented: this is generic clutter that
-  // belongs in a one-bedroom flat.
-  // ===========================================================================
+  mergedMesh(flat, rail);
 
-  /** Leaf cards are built along +z and droop toward -y; this stands one up at
-   *  an angle so a cluster reads as a plant rather than a fan of green. */
-  const sprout = (geo, { x, y, z, a = 0, tilt = -0.6, roll = 0 }) => {
-    geo.rotateZ(roll).rotateX(tilt).rotateY(a).translate(x, y, z);
-    return geo;
-  };
-  const range = (n, fn) => Array.from({ length: n }, (_, i) => fn(i));
-  const sword = (place, h) => ({ geo: sprout(leafGeo({ len: h, wid: 0.055, bend: 0.06, twist: 0.22, segs: 5, cup: 0.55 }), place), mat: foliage, keepUV: true });
-  const paddle = (place, opts = {}) => ({ geo: sprout(broadLeafGeo({ len: 0.2, wid: 0.15, bend: 0.09, ...opts }), place), mat: foliage, keepUV: true });
-  const stem = (place, len) => {
-    const g = cyl(0.005, 0.007, len, 6);
-    g.rotateX(Math.PI / 2);
-    g.translate(0, 0, len / 2);
-    return { geo: sprout(g, place), mat: foliage, keepUV: false };
-  };
-
-  // the big plant by the window, rebuilt like Brandon asked: real leaf cards
-  // with a midrib and a tip, two clusters, stems under the broad paddles
-  furSoft.push(
-    ...range(12, (i) => {
-      const a = (i / 12) * Math.PI * 2 + hash1(i * 5) * 0.5;
-      return sword(
-        { x: -1.655 + Math.cos(a) * 0.05, y: 0.372, z: -2.32 + Math.sin(a) * 0.05, a, tilt: -1.38 + hash1(i * 11) * 0.24, roll: hash1(i * 13) * 0.5 - 0.25 },
-        0.4 + hash1(i * 7) * 0.3,
-      );
-    }),
-    ...range(8, (i) => {
-      const a = (i / 8) * Math.PI * 2 + 0.35;
-      const tilt = -0.5 - hash1(i * 17) * 0.35;
-      const place = { x: -1.655 + Math.cos(a) * 0.07, y: 0.372, z: -2.32 + Math.sin(a) * 0.07, a, tilt, roll: hash1(i) * 0.6 - 0.3 };
-      return paddle(
-        { ...place, y: 0.372 + 0.17 },
-        { len: 0.2 + hash1(i * 3 + 40) * 0.09, wid: 0.15 + hash1(i * 9) * 0.05, bend: 0.1 + hash1(i * 5) * 0.06 },
-      );
-    }),
-    ...range(8, (i) => {
-      const a = (i / 8) * Math.PI * 2 + 0.35;
-      return stem({ x: -1.655 + Math.cos(a) * 0.07, y: 0.372, z: -2.32 + Math.sin(a) * 0.07, a, tilt: -1.15 - hash1(i * 17) * 0.2 }, 0.19);
-    }),
+  // ── the pen: the one prop with a script (game/full.js moves it) ──────────
+  // Built standing at the bedroom desk; the desk-pen moment re-places it
+  // every find frame, so where it rests is exactly where resetPen puts it.
+  const penRoot = new THREE.Group();
+  const penBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.16, 10),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(TOKENS.uiCoral), roughness: 0.45 }),
   );
-
-  // --- living room: a table someone was just sitting at ---------------------
-  const coffeeTop = 0.378;
-  const standTop = 0.43;
-  furSoft.push(
-    // coffee table: a stack of books, a mug on a coaster, two remotes
-    { geo: box(0.2, 0.028, 0.26), mat: spines, at: [-0.98, coffeeTop + 0.014, 0.4], rot: [0, 0.2, 0] },
-    { geo: box(0.19, 0.024, 0.24), mat: spines, at: [-0.98, coffeeTop + 0.04, 0.42], rot: [0, 0.44, 0] },
-    { geo: cyl(0.05, 0.05, 0.005, 12), mat: walnut, at: [-1.28, coffeeTop + 0.003, 0.68] },
-    { geo: cyl(0.033, 0.03, 0.075, 12), mat: glaze, at: [-1.28, coffeeTop + 0.043, 0.68] },
-    { geo: box(0.045, 0.018, 0.13), mat: black, at: [-1.34, coffeeTop + 0.009, 0.44], rot: [0, -0.32, 0] },
-    { geo: box(0.045, 0.016, 0.12), mat: black, at: [-1.27, coffeeTop + 0.008, 0.5], rot: [0, 0.18, 0] },
-    // media wall: books, a speaker, a remote, and a small pot that likes the TV's warmth
-    { geo: box(0.24, 0.03, 0.19), mat: spines, at: [1.35, standTop + 0.015, -2.29], rot: [0, 0.12, 0] },
-    { geo: box(0.22, 0.026, 0.17), mat: spines, at: [1.35, standTop + 0.043, -2.3], rot: [0, -0.1, 0] },
-    { geo: box(0.1, 0.24, 0.1), mat: black, at: [2.24, standTop + 0.12, -2.31] },
-    { geo: box(0.05, 0.018, 0.13), mat: black, at: [1.66, standTop + 0.009, -2.24], rot: [0, 0.5, 0] },
-    { geo: cyl(0.055, 0.045, 0.07, 12), mat: terracotta, at: [2.0, standTop + 0.035, -2.29] },
-    { geo: cyl(0.048, 0.048, 0.008, 12), mat: soil, at: [2.0, standTop + 0.072, -2.29] },
-    ...range(7, (i) => {
-      const a = (i / 7) * Math.PI * 2 + 0.4;
-      return paddle({ x: 2.0 + Math.cos(a) * 0.018, y: standTop + 0.076, z: -2.29 + Math.sin(a) * 0.018, a, tilt: -0.62 - hash1(i * 5) * 0.5 }, { len: 0.1 + hash1(i * 3) * 0.05, wid: 0.075, bend: 0.05 });
-    }),
-    // the cables every media wall has, running down to a power strip
-    { geo: box(0.02, 0.4, 0.02), mat: rubber, at: [1.2, 0.2, -2.5] },
-    { geo: box(0.016, 0.32, 0.016), mat: rubber, at: [1.26, 0.16, -2.51] },
-    { geo: box(0.44, 0.016, 0.016), mat: rubber, at: [1.0, 0.012, -2.5] },
-    { geo: box(0.17, 0.035, 0.055), mat: rubber, at: [0.8, 0.018, -2.5] },
-    // the couch: one accent cushion at the far end and a throw over the arm
-    // (clear of Bobo's couch spot at [-2.55, cushion, 0.46] by 0.3 m)
-    { geo: box(0.34, 0.34, 0.12), mat: booksB, at: [-2.63, 0.62, -0.8], rot: [0.24, 0.16, 0.2] },
-    { geo: box(0.78, 0.05, 0.3), mat: booksA, at: [-2.6, 0.745, 1.1] },
-    { geo: box(0.7, 0.42, 0.04), mat: booksA, at: [-2.56, 0.55, 1.24] },
-    // wall art: a print over the kitchenette, one in the hall, one over the desk
-    { geo: box(0.42, 0.52, 0.02), mat: walnut, at: [1.05, 1.62, 2.528] },
-    { geo: box(0.36, 0.46, 0.02), mat: art, at: [1.05, 1.62, 2.516] },
-    { geo: box(0.02, 0.48, 0.4), mat: walnut, at: [-1.332, 1.46, 3.1] },
-    { geo: box(0.02, 0.42, 0.34), mat: art, at: [-1.32, 1.46, 3.1] },
-    { geo: box(0.02, 0.5, 0.58), mat: walnut, at: [-3.132, 1.52, 5.7] },
-    { geo: box(0.02, 0.44, 0.5), mat: art, at: [-3.12, 1.52, 5.7] },
+  const penTip = new THREE.Mesh(
+    new THREE.ConeGeometry(0.011, 0.03, 10),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(TOKENS.uiInk), roughness: 0.5 }),
   );
+  penTip.position.y = 0.095;
+  penBody.castShadow = true;
+  penTip.castShadow = true;
+  penBody.add(penTip);
+  penRoot.add(penBody);
+  penRoot.position.set(-1.85, 0.83, 5.67);
+  penRoot.rotation.x = Math.PI / 2; // build pose: lying down (resetPen rights it)
+  flat.add(penRoot);
 
-  // --- kitchenette: a room that was used this morning -----------------------
-  furSoft.push(
-    // a tea towel over the counter's room-facing edge
-    { geo: box(0.24, 0.02, 0.1), mat: laundry2, at: [1.1, 0.902, 1.99] },
-    { geo: box(0.24, 0.3, 0.02), mat: laundry2, at: [1.1, 0.75, 1.942] },
-    // two bowls by the sink, a soap bottle, a jar, and herbs in a pot
-    { geo: cyl(0.075, 0.06, 0.035, 12), mat: glaze, at: [1.22, 0.918, 2.44] },
-    { geo: cyl(0.07, 0.056, 0.032, 12), mat: glaze, at: [1.22, 0.952, 2.44], rot: [0, 0.4, 0.04] },
-    { geo: cyl(0.028, 0.03, 0.11, 10), mat: glaze, at: [2.3, 0.955, 2.45] },
-    { geo: cyl(0.04, 0.04, 0.13, 10), mat: glaze, at: [1.86, 0.965, 2.46] },
-    { geo: cyl(0.05, 0.042, 0.065, 12), mat: terracotta, at: [1.62, 0.932, 2.45] },
-    { geo: cyl(0.044, 0.044, 0.008, 12), mat: soil, at: [1.62, 0.966, 2.45] },
-    ...range(8, (i) => {
-      const a = (i / 8) * Math.PI * 2 + 0.2;
-      return paddle({ x: 1.62 + Math.cos(a) * 0.016, y: 0.97, z: 2.45 + Math.sin(a) * 0.016, a, tilt: -0.9 - hash1(i * 7) * 0.7 }, { len: 0.07 + hash1(i * 3) * 0.04, wid: 0.05, bend: 0.03 });
-    }),
-    // the kitchen table: two places, one still used
-    { geo: cyl(0.036, 0.032, 0.075, 12), mat: glaze, at: [2.72, 0.775, 1.5] },
-    { geo: cyl(0.09, 0.085, 0.012, 14), mat: glaze, at: [2.96, 0.744, 1.74] },
-    { geo: box(0.16, 0.006, 0.22), mat: paper, at: [2.62, 0.741, 1.72], rot: [0, 0.3, 0] },
-  );
 
-  // --- bathroom: someone lives here ----------------------------------------
-  furSoft.push(
-    { geo: cyl(0.032, 0.03, 0.075, 10), mat: glaze, at: [-2.45, 0.838, 2.9] }, // brushes in a mug
-    { geo: cyl(0.005, 0.005, 0.16, 6), mat: black, at: [-2.45, 0.9, 2.9], rot: [0.12, 0, 0.16] },
-    { geo: cyl(0.005, 0.005, 0.16, 6), mat: booksA, at: [-2.462, 0.895, 2.888], rot: [0.1, 0, -0.14] },
-    { geo: cyl(0.028, 0.03, 0.1, 10), mat: glaze, at: [-2.95, 0.85, 2.88] }, // soap
-    { geo: box(0.3, 0.05, 0.16), mat: laundry2, at: [-2.1, 1.19, 2.66] }, // folded towels on the shelf
-    { geo: box(0.28, 0.045, 0.15), mat: laundryMat, at: [-2.1, 1.238, 2.66], rot: [0, 0.12, 0] },
-    { geo: cyl(0.05, 0.05, 0.28, 10), mat: laundryMat, at: [-2.9, 0.062, 3.98], rot: [0, 0, Math.PI / 2] }, // a rolled towel, on its side
-  );
+  // ── the rig: sun outside the north windows, sky wash, four fills ─────────
+  const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
+  hemi.position.set(0, CEIL_Y, 0);
+  scene.add(hemi);
 
-  // --- hall: shoes, a coat, a bag, a mat -----------------------------------
-  furSoft.push(
-    { geo: box(0.24, 0.055, 0.1), mat: leather, at: [0.12, 0.028, 2.98], rot: [0, 0.4, 0] },
-    { geo: box(0.24, 0.055, 0.1), mat: leather, at: [0.22, 0.028, 2.9], rot: [0, -0.2, 0] },
-    { geo: box(0.25, 0.014, 0.11), mat: rubber, at: [0.12, 0.007, 2.98], rot: [0, 0.4, 0] },
-    { geo: box(0.02, 0.5, 0.28), mat: duvetMat, at: [0.31, 1.34, 3.22] }, // a coat on the hooks
-    { geo: box(0.16, 0.22, 0.1), mat: laundryMat, at: [0.2, 0.948, 3.62] }, // a tote on the console
-    { geo: box(0.62, 0.012, 0.42), mat: bedRug, at: [-0.5, 0.006, 3.92] }, // the door mat
-  );
+  const sun = new THREE.DirectionalLight(0xfff2df, 2.8);
+  sun.position.set(-4.0, 8.6, -15.0); // high, west, NORTH of the window wall
+  sun.target.position.set(1.2, 0.3, 3.0); // raking south into the living room
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -9;
+  sun.shadow.camera.right = 9;
+  sun.shadow.camera.top = 9;
+  sun.shadow.camera.bottom = -9;
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 40;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.02;
+  scene.add(sun, sun.target);
 
-  // --- bedroom: the side of the bed that gets used -------------------------
-  furSoft.push(
-    { geo: box(0.56, 0.1, 0.38), mat: pillowMat, at: [0.88, 0.5, 5.32], rot: [0, 0.12, 0.03] }, // a second pillow
-    { geo: box(1.36, 0.07, 0.24), mat: laundry2, at: [1.2, 0.535, 5.55] }, // a folded throw at the head
-    { geo: cyl(0.035, 0.032, 0.08, 12), mat: glaze, at: [-2.6, 0.8, 6.1] }, // a mug on the desk
-    { geo: box(0.21, 0.006, 0.29), mat: paper, at: [-2.98, 0.764, 6.05], rot: [0, -0.2, 0] }, // a page
-    // a floor plant in the bedroom's north-east corner, beside the head of
-    // the bed (collider in full-level.js; clear of both bedroom spawns, the
-    // door route and every capture camera)
-    { geo: cyl(0.14, 0.11, 0.24, 16), mat: terracotta, at: [1.7, 0.12, 4.5] },
-    { geo: cyl(0.155, 0.145, 0.04, 16), mat: terracotta, at: [1.7, 0.255, 4.5] },
-    { geo: cyl(0.132, 0.132, 0.02, 14), mat: soil, at: [1.7, 0.27, 4.5] },
-    ...range(9, (i) => {
-      const a = (i / 9) * Math.PI * 2 + hash1(i * 3 + 20) * 0.4;
-      return paddle(
-        { x: 1.7 + Math.cos(a) * 0.045, y: 0.3 + 0.14, z: 4.5 + Math.sin(a) * 0.045, a, tilt: -0.5 - hash1(i * 9) * 0.5 },
-        { len: 0.22 + hash1(i * 5) * 0.1, wid: 0.17 + hash1(i * 11) * 0.05, bend: 0.12 },
-      );
-    }),
-    ...range(9, (i) => {
-      const a = (i / 9) * Math.PI * 2 + hash1(i * 3 + 20) * 0.4;
-      return stem({ x: 1.7 + Math.cos(a) * 0.045, y: 0.3, z: 4.5 + Math.sin(a) * 0.045, a, tilt: -1.1 - hash1(i * 9) * 0.25 }, 0.16);
-    }),
-  );
+  // One warm fill per dark zone. The living room and the balcony get daylight
+  // through real openings, so they get none — a room that is bright in an
+  // empty corner is the tell this rig exists to avoid. decay 2 + a distance
+  // roughly the room's diagonal: light that stops at its own room.
+  const fills = [
+    { at: [4.0, 2.34, -1.1], color: 0xffe6c4, i: 5.0, d: 7.0 }, // kitchen run + aisle
+    { at: [0.0, 2.34, 3.6], color: 0xffe6c4, i: 4.0, d: 6.0 }, // hall, spilling into the entry
+    { at: [-0.7, 2.34, 7.3], color: 0xffdcc0, i: 5.0, d: 7.5 }, // bedroom
+    { at: [-2.1, 2.34, 3.0], color: 0xf0e8f0, i: 3.2, d: 5.0 }, // bathroom (cooler: a different fixture)
+  ].map((f) => {
+    const p = new THREE.PointLight(f.color, f.i, f.d, 2);
+    p.position.set(...f.at);
+    p.castShadow = false;
+    scene.add(p);
+    return p;
+  });
 
-  // --- contact shadows: one InstancedMesh, one draw call, every prop --------
-  // This is what makes furniture look like it weighs something. The sun already
-  // casts the real shadows; these are the ambient-occlusion-ish pools the
-  // shadow map never resolves under a leg or a pot.
-  contactShadows(flat, [
-    { x: -2.6, z: 0, w: 1.25, d: 2.75, k: 1 }, // couch
-    { x: -1.15, z: 0.55, w: 1.15, d: 0.8, k: 0.8 }, // coffee table
-    { x: 1.81, z: -2.32, w: 1.5, d: 0.72, k: 0.9 }, // TV stand
-    { x: -2.99, z: -2.21, w: 0.6, d: 0.98, k: 1 }, // bookshelf
-    { x: -1.655, z: -2.32, w: 0.62, d: 0.62, k: 1 }, // big plant
-    { x: 2.62, z: -1.55, w: 0.7, d: 0.7, k: 1 }, // the room.js pot
-    { x: 1.75, z: 0.75, w: 0.78, d: 0.62, k: 0.8 }, // cardboard box
-    { x: 1.5, z: 2.24, w: 2.05, d: 0.86, k: 1.1 }, // kitchenette
-    { x: 2.85, z: 1.62, w: 0.86, d: 0.9, k: 0.9 }, // kitchen table
-    { x: 2.35, z: 1.62, w: 0.66, d: 0.66, k: 0.8 }, // its chair
-    { x: 0.2, z: 3.5, w: 0.44, d: 0.94, k: 0.8 }, // hall console
-    { x: -0.5, z: 3.92, w: 0.86, d: 0.62, k: 0.5 }, // door mat
-    { x: -2.72, z: 2.82, w: 0.98, d: 0.56, k: 0.9 }, // vanity
-    { x: -1.68, z: 3.86, w: 0.6, d: 0.78, k: 0.9 }, // toilet
-    { x: 1.2, z: 5.8, w: 1.9, d: 2.05, k: 1.15 }, // bed
-    { x: 0.25, z: 5.15, w: 0.66, d: 0.66, k: 0.85 }, // nightstand
-    { x: -0.45, z: 6.2, w: 0.86, d: 0.66, k: 0.75 }, // laundry basket
-    { x: -2.84, z: 5.7, w: 0.86, d: 1.26, k: 0.95 }, // desk
-    { x: 1.7, z: 4.5, w: 0.5, d: 0.5, k: 1 }, // the new plant
-    { x: 0.16, z: 2.94, w: 0.6, d: 0.34, k: 0.5 }, // shoes
-  ]);
-
-  mergedMesh(flat, fur);
-  mergedMesh(flat, furSoft, { cast: false });
-
-  // ---- fill light for the rooms the style-test rig never lit ----
-  // Budget: sun stays the only shadow light; 3 more real lights, 5 total.
-  const bedLight = new THREE.PointLight(0xffd9b0, 3.2, 6, 2);
-  bedLight.position.set(0.9, 2.35, 5.11); // over the flush bed's centre (issue #27)
-  bedLight.castShadow = false;
-  const bathLight = new THREE.PointLight(0xdfeaf2, 2.2, 4.5, 2);
-  bathLight.position.set(-2.3, 2.3, 3.4);
-  bathLight.castShadow = false;
-  const kitchenLight = new THREE.PointLight(0xffe6c4, 2.6, 5.5, 2);
-  kitchenLight.position.set(1.5, 2.3, 2.0);
-  kitchenLight.castShadow = false;
-  scene.add(bedLight, bathLight, kitchenLight);
+  // ── what the engine and the checks get back ──────────────────────────────
+  // supports: name -> world y, straight off the ruler table. No furniture is
+  // drawn for them yet (that is the next chunk), but the tops are the data's,
+  // so a cat staged on 'counterTop' already sits at the measured 0.90.
+  const supports = Object.fromEntries(Object.entries(SUPPORT_DEFS).map(([name, s]) => [name, s.top]));
 
   return {
-    living,
-    supports: {
-      ...living.SUPPORTS,
-      boxFloor: 0.02, // the box's own measured floor (as in the slice)
-      bedTop: 0.5, // duvet top — by construction, like the slice's
-      counterTop: topY(counterMesh), // kitchenette worktop (measured 0.90)
-      deskTop: topY(deskTopMesh), // 0.76
-      kbTop: topY(kbMesh), // keyboard on the desk (measured 0.79)
-      laundryTop: topY(laundryMesh), // the pile in the basket (0.18)
-      blanketTop: topY(blanketMesh), // foot-of-bed blanket (0.58)
-    },
-    lights: { bedLight, bathLight, kitchenLight },
-    pen: { root: pen, barrel: penMesh },
-    // every plaster slab as an AABB, from the definitions that got built
-    // (src/reach.js measures the walls you can actually see)
-    wallBoxes: [...living.wallBoxes, ...walls.map((d, i) => slabAABB(d, `full#${i}`))],
+    living: { sun, WALL_Z, SUPPORTS: supports },
+    supports,
+    lights: { hemi, sun, fills },
+    pen: { root: penRoot, barrel: penBody },
+    // every plaster slab (walls, parapets, ceilings) as an AABB, from the
+    // definitions that were actually built (src/reach.js measures the walls
+    // you can actually see — floors are not walls and are deliberately out)
+    wallBoxes: [...WALL_DEFS, ...CEILINGS].map((d) => slabAABB(d, d.id)),
   };
 }
