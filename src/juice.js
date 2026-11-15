@@ -51,6 +51,10 @@ function createConfetti(scene) {
   points.visible = false;
   points.userData.tag = 'confetti';
   scene.add(points);
+  const confetti = {
+    points,
+    enabled: true, // the engine turns this off on ?quality=low
+  };
   /** Pure in t: each bit falls on its own seeded loop with a sine sway. */
   function update(t) {
     for (let i = 0; i < N; i++) {
@@ -62,7 +66,8 @@ function createConfetti(scene) {
     }
     posAttr.needsUpdate = true;
   }
-  return { points, update };
+  confetti.update = update;
+  return confetti;
 }
 
 /** One call per frame from applyTime. Writes ONLY pure f(phase, t) values —
@@ -95,9 +100,10 @@ function juiceFrame({ phase, t, renderer, els, confetti, baseExposure, calm }) {
     els.wrongFlash.style.opacity = o.toFixed(4);
   }
   // 4. Confetti rides the win only; win's own t drives the fall. (Calm mode
-  //    hides it; HUD_SPEC in the engine also gates the rain and fireworks.)
+  //    hides it; the engine disables it outright on ?quality=low. HUD_SPEC in
+  //    the engine also gates the rain and fireworks.)
   if (confetti) {
-    confetti.points.visible = !calm && phase === 'win';
+    confetti.points.visible = !calm && confetti.enabled !== false && phase === 'win';
     if (confetti.points.visible) confetti.update(t);
   }
 }
