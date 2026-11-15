@@ -38,6 +38,17 @@ const require = createRequire(join(REPO, 'package.json'));
 const { chromium } = require('playwright-core');
 const exe = ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync);
 
+// Which page to stress: the Step 6 slice by default, or the full game
+// (`--page game/full.html --checks 46`). Every scenario's own scripts use
+// ?win=3, so they stay short on either page.
+const argv = process.argv.slice(2);
+const arg = (name, dflt) => {
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 ? argv[i + 1] : dflt;
+};
+const PAGE = arg('page', 'game/slice.html');
+const CHECKS = Number(arg('checks', 42));
+
 const server = await startStaticServer({ root: REPO, port: 0 });
 const browser = await chromium.launch({
   executablePath: exe || undefined,
@@ -59,7 +70,7 @@ async function newPage(params = '') {
   const page = await browser.newPage({ viewport: { width: 800, height: 500 } });
   page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
   page.on('pageerror', (e) => pageErrors.push(String(e)));
-  await page.goto(`${server.url}game/slice.html${params}`, { waitUntil: 'load' });
+  await page.goto(`${server.url}${PAGE}${params}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 30000 });
   return page;
 }
@@ -279,7 +290,7 @@ try {
   await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 30000 });
   const fresh = await page.evaluate(() => ({ s: window.LC.state(), st: window.LC.selfTest() }));
   check('reload mid-run lands on a clean fresh run', fresh.s.score === 0 && fresh.s.phase === 'find', `score ${fresh.s.score}, phase ${fresh.s.phase}`);
-  check('selfTest still passes after reload', fresh.st.pass, fresh.st.checks.filter((c) => !c.pass).map((c) => c.name).join(', ') || '42/42');
+  check('selfTest still passes after reload', fresh.st.pass, fresh.st.checks.filter((c) => !c.pass).map((c) => c.name).join(', ') || `${CHECKS}/${CHECKS}`);
   await page.close();
 } catch (err) {
   check('reload-mid-run', false, String(err).split('\n')[0]);
@@ -404,7 +415,7 @@ try {
     const r = window.LC.selfTest();
     return { pass: r.pass, n: r.checks.length, failed: r.checks.filter((c) => !c.pass).map((c) => `${c.name}=${c.value}`), view: window.LC.state().view };
   });
-  check(`selfTest passes LIVE from the player-camera view (${st.n} checks)`, st.pass && st.n === 42 && st.view === 'player-camera', st.failed.join(', ') || `all ${st.n} green, view ${st.view}`);
+  check(`selfTest passes LIVE from the player-camera view (${st.n} checks)`, st.pass && st.n === CHECKS && st.view === 'player-camera', st.failed.join(', ') || `all ${st.n} green, view ${st.view}`);
   const afterTest = await page.evaluate(() => window.LC.state());
   check('the live game keeps playing after the self-test', afterTest.phase === 'find' && afterTest.score === 0, `phase ${afterTest.phase}, score ${afterTest.score}`);
   await page.close();
