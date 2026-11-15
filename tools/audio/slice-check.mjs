@@ -32,6 +32,11 @@ const { chromium } = require('playwright-core');
 const CHROME = ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
 const executablePath = CHROME.find(existsSync);
 
+// Which page to check: the slice by default; `--page game/full.html` runs the
+// identical audio contract against the full game (its own boot, same cues).
+const argv = process.argv.slice(2);
+const PAGE = argv.includes('--page') ? argv[argv.indexOf('--page') + 1] : 'game/slice.html';
+
 const results = [];
 let failed = 0;
 const check = (name, ok, extra = '') => {
@@ -68,7 +73,7 @@ const waitFor = (fn, label, ms = 60000) =>
     });
 
 try {
-  const resp = await page.goto(`${server.url}game/slice.html?win=3`, { waitUntil: 'load', timeout: 30000 });
+  const resp = await page.goto(`${server.url}${PAGE}?win=3`, { waitUntil: 'load', timeout: 30000 });
   check('page-served', resp?.status() === 200, `HTTP ${resp?.status()}`);
   await page.waitForFunction(() => window.LCError || (window.LC && window.LC.ready === true), null, { timeout: 40000 });
   check('page-boots', !(await page.evaluate(() => window.LCError)), await page.evaluate(() => window.LCError ?? 'LC.ready'));

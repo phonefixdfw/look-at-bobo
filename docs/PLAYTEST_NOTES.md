@@ -348,3 +348,68 @@ lock dance). None of these can be settled honestly by a bot — they need item 1
 - Human hands (§1 / item 15) — the suite proves mechanics, not feel.
 - Frozen snapshot `snapshots/m1-slice` — waiting on sign-off (item 18).
 - Palette-lint / colour-blind / photosensitivity probes; audio ducking while paused; a wider weak-GL matrix.
+
+## 11. Step 8 — the rest of the game (branch `codeden/build-a-game-step-8-the-rest-78bb`, PR closes #15)
+
+**What shipped.** The slice's engine was extracted into `game/engine.js` as
+`bootGame(cfg)` (zero-diff `src/` kept); `game/slice.html` became a thin boot
+on top of it, byte-identical in behaviour. The full game is `game/full.html`
++ `game/full-level.js` + `game/full-apartment.js`: the whole flat (living
+room, hall, kitchenette, bathroom, bedroom with desk), **all ten moments**
+(generic list — Brandon swaps the real ones in the data files), win at 10
+with the head-rain and the exact `your did it! you wind`, title →
+3-second tip → hunt → pause → win → play-again flow, hint fade after
+3 points, decoy relocating ≥1.2 m per catch, wrong cat = DAG! and −1
+floor-0'd. Brandon's step-8 feedback round is in the same PR: a TV +
+stand on the living-room north wall, a bookshelf, a coffee table, a
+finished kitchenette (fridge, kettle, table for two + chair, fruit bowl,
+mug), a hall console with hooks, a bedside lamp, bedroom curtains, a bath
+shelf with a succulent, the big plant rebuilt as a real plant (pot/rim/
+soil, 9 sword leaves + 6 broad DoubleSide blades, seeded), and five
+procedural canvas textures (walnut, marble, bath tile, fabric weave, TV
+glass) — all built in code, **$0.000, zero new paid calls, no downloads**.
+
+**Machine playtests (headless Chrome, all exit 0):**
+- `npm run playtest:bot:full` — **wins at 10/10**: 11 bobo shouts (one
+  per queued moment + one answering the opening call), exactly one DAG!
+  (deliberate wrong-cat mid-run), score never below 0, final phase `win`
+  with the exact ending string, zero console errors. Queue proof: the
+  10-moment round came out **10/10 distinct** (seeded cycle, no repeats,
+  re-shuffled against the previous order).
+- `npm run playtest:stress:full` — **63 PASS / 0 FAIL** across the same
+  eleven scenario families as the slice (dt spikes/clamps, blur &
+  pointer-lock loss, mash-spam, pause races, reticle rules), run against
+  the full page with `?win=10?`, plus no-console-errors across every
+  scenario.
+- Slice side re-run unchanged as a regression: `playtest:bot` wins at 5,
+  `playtest:stress` 63/0.
+
+**Capture proof:**
+- `capture:full` — 351 frames (10 moments × 3 t × 9 views + 27 event
+  frames), **selfTest 46/46 every frame**, budget **PASS at 126 draws /
+  98,576 triangles / 5 lights / 1 shadow light / 1 pass**, pixels in the
+  luma 53.6–155.3 / 71–218-colour envelope, GPU-counted draw calls match
+  the page's claim, console clean. (The furniture round first landed at
+  exactly 150 draws — at the cap — so every prop was merged into two
+  shared-material meshes; the block now costs 13 draws.)
+- `capture:full:determinism` — **PASS** (identical frames across boots;
+  the new textures are hash1-seeded canvas draws, so they're deterministic
+  like the rest).
+- `capture:full:planted` — **FAIL as required** (the exact-text plant is
+  still caught; the gate works on the full page too).
+- Slice capture re-run: 42/42, 97 draws, PASS; slice determinism PASS;
+  `audio:fullcheck` and `audio:slicecheck` **23/23** each (three real
+  voice lines fire from the live loop on both pages).
+
+**Furniture clearance pass (new, in docs/LEVEL_LAYOUT.md).** Six new
+colliders were placed by a probe asserting every spawn, capture camera,
+moment spot and decoy pot stays ≥0.30 m clear of them; three kitchen-table
+pairs are hand-ray exemptions (0.20–0.30 m) whose frames were inspected
+frame-by-frame in the capture. Contact sheet reviewed panel-by-panel for
+occlusions (TV reads beside the window, fridge/kettle/table for two
+beside the sink run, plant clear of the curtain seam, pen on the desk).
+
+**Honest caveats.** The ten moment ids/props are invented-generic per the
+brief — real Bobo details stay TBD and live in the data files, never in
+`src/`. Machine playtests still aren't hands (item 15 stands). Bot runs
+seeded (`?seed=`); a human's order will differ and that's the point.

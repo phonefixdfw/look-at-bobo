@@ -151,3 +151,121 @@ measured 0.65 m, `bobo`↔`bobo-face`).
 | `bobo-face` | (2.45, 0.62, 0.75) | +π/2 | −0.35 | 22 | no — 0.7 m face close-up |
 | `decoy-face` | (−0.45, 0.6, −0.35) | −2.56 | −0.23 | 24 | no — decoy close-up (collar, no dash) |
 | `bedroom` | (−0.6, 1.62, 4.35) | −2.28 | −0.35 | 55 | yes — the doorway view of `bed-sprawl` |
+
+---
+
+# The full flat (Step 8 — `game/full-level.js` + `game/full-apartment.js`)
+
+The slice above stays byte-identical (`game/slice.html` still ships it). The
+full game builds the same living room, hall and bedroom, then adds the
+rooms `docs/LOCATIONS.md` promised: a **kitchenette** along the living
+room's north-east arm (counter run x∈[0.6,2.4] z≈2.24, marble laminate,
+fridge + kettle), and a **bathroom** off the hall's west side (tub, vanity,
+toilet, round mirror, bath mat, tiled walls). The bedroom gains a desk +
+keyboard against the west wall, a laundry basket, and a window with
+curtains. `game/full.html` boots `bootGame()` from `game/engine.js` against
+this file; every number below is what `game/full-level.js` uses.
+
+```
+          z=−2.6 ┌───── plant ── TV wall ──── window ───────┐
+                 │ LIVING  couch W · rug · box · big plant  │
+   bookshelf NW  │            kitchenette NE (counter,      │
+                 │            fridge, kettle, sink-sit)     │
+          z=2.6  └──────┐  door                    table 2E ┘
+                 HALL   └──────────────┐ console ┌──────────
+          z=4.2  ┌──────┴── bath W ────┴── door ─┴──────────┐
+                 │ BATH (tub·vanity·toilet·mat) │           │
+          z=2.6… ├──────────────────────────────┤  BEDROOM  │  z up to 7.0
+                 │  (hall continues)            │ desk W ·  │
+                 │                              │ bed · rug │
+                 └──────────────────────────────┴───────────┘
+```
+
+## The ten moments (all generic — Brandon swaps the real ones later)
+
+| id | room | pose | Bobo's spot | support y | decoy for the staged frame | rig write (game/full.js) |
+|---|---|---|---|---|---|---|
+| `couch-loaf` | living | loaf | (−2.55, cushion, 0.46) | 0.44 | d-plant | loaf breathe + slow blink |
+| `window-bird` | living | sit | (−0.6, floor, −2.2) | 0 | d-rug | head tracks an arc (the bird), ear twitches |
+| `box-sit` | living | sit | (1.75, boxFloor, 0.75) | 0.02 | d-rug | canonical event tableau (unchanged) |
+| `sink-sit` | living | sit | (2.05, counterTop, 2.2) | 0.9 | d-rug | taps head to the faucet, drips |
+| `desk-pen` | bedroom | sit | (−2.84, deskTop, 5.55) | 0.76 | d-bed | bats the pen off the desk (pen reset per frame — order-safe) |
+| `keyboard-sit` | bedroom | sit | (−2.84, kbTop, 5.87) | 0.79 | d-bed | walks paws on the keys |
+| `laundry-nap` | bedroom | loaf | (−0.45, laundryTop, 6.2) | 0.18 | d-hall | deep loaf, fabric-rise breathing |
+| `bed-stretch` | bedroom | sit | (1.2, bedTop, 5.9) | 0.5 | d-bed | front-paw stretch + quivering hindquarters |
+| `blanket-biscuits` | bedroom | sit | (1.2, blanketTop, 6.3) | 0.58 | d-bed | alternating kneading, purr bounce |
+| `hall-chase` | hall | loaf | (−0.5, floor, 3.42) | 0 | d-rug | chatter-teeth, tail lash, haunch wiggle |
+
+Extra supports come from `EXTRA_SUPPORTS`; `cushion`/`rug` are the slice's.
+Queue: seeded shuffle, cycle at 10, no repeats inside a round, no same-spot
+respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance) — engine unchanged
+from the slice, `winAt: 10`.
+
+## Respawns (8) and decoy spots (5)
+
+Spawns: living (0.98,−1.5)+0.6 · living (−1.5,−1.8)+2.6 · living
+(−2.2,1.7)−2.2 · hall (−0.55,3.5)0 · bathroom (−2.3,3.3)+1.9 · bedroom
+(−2.6,6.55)−0.79 · bedroom (−1.2,4.7)−1.4 · bedroom (−0.2,6.75)+0.85.
+Decoys: d-rug (0.15,0.55) · d-plant (2.55,−1.6) · d-hall (−0.5,3.45) ·
+d-bath (−2.4,3.4) · d-bed (−1.7,6.8) — one per room so the wrong cat can
+ambush anywhere.
+
+## Full-flat colliders (16)
+
+| name | x0, z0 → x1, z1 |
+|---|---|
+| couch | (−3.16, −1.2) → (−2.15, 1.2) |
+| side-table | (−2.76, −1.81) → (−2.24, −1.29) |
+| floor-lamp | (−2.13, −2.18) → (−1.87, −1.92) |
+| plant-pot | (2.45, −2.22) → (2.79, −1.88) |
+| box | (1.44, 0.53) → (2.06, 0.97) |
+| counter (kitchenette) | (0.6, 1.94) → (2.4, 2.54) |
+| bed | (0.45, 4.95) → (1.95, 6.65) |
+| nightstand | (0.03, 4.93) → (0.47, 5.37) |
+| basket (laundry) | (−0.76, 5.97) → (−0.14, 6.43) |
+| desk (bedroom) | (−3.14, 5.2) → (−2.54, 6.2) |
+| vanity (bath) | (−3.09, 2.66) → (−2.36, 2.98) |
+| toilet | (−1.86, 3.61) → (−1.49, 4.12) |
+| tv-stand | (1.19, −2.55) → (2.43, −2.09) |
+| bookshelf | (−3.14, −2.55) → (−2.84, −1.85) |
+| coffee-table | (−1.6, 0.27) → (−0.7, 0.83) |
+| kitchen-table | (2.1, 1.25) → (3.15, 2.0) |
+| hall-console | (0.06, 3.14) → (0.34, 3.86) |
+| big-plant | (−1.87, −2.53) → (−1.44, −2.11) |
+
+**Furniture-round-2 clearance rule (Brandon's TV/props list).** The six new
+boxes were placed by a probe (`/tmp/opencode/clear-check.mjs`, re-runnable)
+asserting every spawn, capture camera, moment spot and decoy spot stays
+**≥ 0.30 m** from a new blocker, with no blocker overlaps and no corridor
+pinches. Three hand-ray-checked exemptions, all for the kitchen table: the
+`bobo` and `diorama` cameras and the `sink-sit` spot sit within 0.20–0.30 m
+of its collider — the table is 0.72 m tall and the two cameras are above it
+looking west/east over the top, and the chair back is 0.45 m of walnut with
+the sink cat on the counter at hip height, so the frames are clear (proof:
+frames 03/01/102 in the capture). The fridge stands **inside** the counter
+collider's row (x 0.62–1.08 at z 2.26) rather than adding a 17th box. The
+TV moved to the north wall centred x 1.81 because the east wall is where
+three capture cameras physically sit.
+
+## New capture views (Step 8)
+
+| view | position | yaw | pitch | fov | hand |
+|---|---|---|---|---|---|
+| `kitchen` | (0.9, 1.5, 0.9) | −2.417 | −0.137 | 50 | no — aimed at the sink run |
+| `bathroom` | (−1.25, 1.62, 3.65) | +1.357 | −0.872 | 55 | yes — doorway view of the mat |
+| `desk` | (−1.35, 1.2, 5.55) | +π/2 | −0.266 | 40 | no — pen + Bobo on the desk |
+
+All nine views pairwise ≥ 0.5 m (`views-distinct`, 46-check selfTest).
+
+## Procedural textures (Step 8, code-only — no downloads, no paid calls)
+
+`game/full-apartment.js` builds five canvas textures at boot through the
+existing `src/textures.js` helpers (`canvasTexture` + seeded `hash1`, so
+they are byte-stable and the determinism suites are unaffected): **walnut
+grain** (TV stand, bookshelf, tables, console, shelves), **marble laminate**
+(counter + porcelain sink), **bath tile grid** (bathroom walls), **fabric
+weave** (sofa cushion refresh, curtains, plant leaves), **TV glass** (the
+off screen: near-black with one diagonal sheen). The whole furniture set
+merges into **two** meshes (`fur` casts shadows, `furSoft` doesn't) by
+sharing material consts — the round took the draw count from the 150 cap
+back down to **126** at 98,576 triangles, 5 lights, 1 shadow light, 1 pass.

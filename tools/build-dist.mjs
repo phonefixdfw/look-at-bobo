@@ -28,8 +28,10 @@ import { fileURLToPath } from 'node:url';
 
 /** The current game entry page, relative to the repo root. Step 8 may rename
  *  or replace it — this is the ONLY constant to change; the build fails loudly
- *  if the file is missing. */
-const ENTRY = 'game/slice.html';
+ *  if the file is missing. Step 8 shipped the full game, so the site root
+ *  opens game/full.html; the slice still ships (game/ is copied wholesale) and
+ *  stays reachable at its own path /game/slice.html. */
+const ENTRY = 'game/full.html';
 
 /** Directories the game loads from at runtime. Copied wholesale (never
  *  filtered per-file) so new files in them ship automatically. */
