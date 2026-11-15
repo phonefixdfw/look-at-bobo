@@ -513,3 +513,83 @@ pre-boot and gone at `ready`.
 **Honest caveats.** Nobody has hand-played the game yet (item 15 stands) —
 the comfort panel and calm mode are wired and machine-probed but untested by
 human hands. Machine ears and pixels only, as ever.
+
+## 13. Step 9 follow-up — the loading screen broke capture determinism (issue #23)
+
+Step 9 part 3 (PR #22) put a loading screen on `game/full.html`: static from
+the first byte, `opacity` fading out over 0.35 s once the flat was built, and
+removed from the DOM 450 ms later. On that commit `capture:full:determinism`
+began failing on `main`: **frame #01 (`box-sit` / `first-person` / `t=1.20`)
+"not deterministic", 7/8 frames byte-identical, selfTest 47/47, console clean,
+reproduced 3/3 runs** — every other full-page suite still green, and the slice
+and demo (which have no overlay) never moved.
+
+**Root cause, measured.** A capture is a screenshot of the *whole page*, not of
+the canvas, and the tool starts capturing the moment `LC.ready` is true. The
+overlay is `position: fixed; inset: 0; z-index: 70` on an opaque background, so
+it was still painted over the flat when frame #01 was taken, and the fade kept
+advancing between the two screenshots the determinism check takes. Probed on
+`e965bb1` doing exactly what the tool does (goto → wait `ready` → `pause()` →
+`setMoment`+`seek`+`setView`+`renderNow` → screenshot, twice):
+
+| | overlay at `ready` | frame #01, first shot | frame #01, second shot | identical |
+|---|---|---|---|---|
+| `e965bb1` (before) | present, opacity **0.969** | `f4490a4f94cf` 337,865 B | `75bd1e1ff099` 494,598 B | **no** |
+| this branch (after) | **gone from the DOM** | `75bd1e1ff099` 494,598 B | `75bd1e1ff099` 494,598 B | **yes** |
+
+Same moment, same view, same time, two different pictures — the first is a
+crossfade of "Getting your flat ready…" and the flat, so it is never the same
+twice. The byte sizes tell the same story (338 KB of dark card vs 495 KB of
+game), and only frame #01 could ever fail because the fade finishes inside the
+first round trip. Note the clean-frame hash is **the same on both trees**:
+`75bd1e1ff099` — the game's own pixels never changed, so the fix cannot have
+moved the look.
+
+**What a player could see (checked, nothing to fix).** No flash and no visual
+glitch: with no URL params (the title gate up), sampled through the fade before
+and after the fix, page mean luma runs 24.0 → 27.3 → 35.4 — the same 0.35 s
+crossfade from the loading card to the title card, sampled at a slightly
+different point of it. `.gone` sets `pointer-events: none`, so "click to start"
+already took clicks through the fading card. The defect was the **contract**:
+`LC.ready` said "capture me" while a loading card was still on the screen the
+tool was photographing.
+
+**The fix (`d8c3511`) — one mechanism, no new checks, no tool change.** In
+`game/engine.js` the overlay is retired on its own `transitionend` (`opacity`,
+`target === node`), the existing 450 ms timer stays as the backstop (a hidden
+tab runs no transitions and `ready` must never hang on a paint that will not
+come), and `window.LC.ready` is announced in the same task the node is removed.
+Nothing is left in the DOM to paint, so the capture/LC contract no longer
+depends on loading-screen timing. Chosen over a capture-mode special case
+(`?gate=off` never shows the overlay) because the contract would still have lied
+for the next tool that screenshots before it clicks — and over removing the fade,
+which would change what a player sees. `game/full.html` keeps its CSS and copy
+(the comment that claimed the overlay "never appears in a captured frame" now
+states how that is actually guaranteed), and `docs/CAPTURE.md` documents `ready`
+as "the scene is built AND nothing is painted over the canvas", with the lesson
+in its notes.
+
+**Proof (this tree, Node 24.22, headless Chrome, `$0.000`, nothing deployed).**
+- `capture:full:determinism` **three consecutive runs: 3/3 PASS, 8/8 frames
+  byte-identical each time**, 47/47 selfTest, budget 145 draws / 100,670 tris.
+- The **22-suite chain, all as expected (unexpected = 0)**, the three planted
+  runs failing by design:
+  `capture:full` 351 frames 47/47 · `gate` PASS · `build` dist/ 33 files 2.40 MB
+  · `capture:style` 72 frames 36/36 · `capture:demo` 48 frames 37/37 ·
+  `capture:demo:determinism` 8/8 · `capture:demo:planted` **FAIL as required**
+  (36/37) · `audio:pagecheck` 24/24 · `audio:democheck` 17/17 ·
+  `capture:slice` 144 frames 43/43 · `capture:slice:determinism` 8/8 ·
+  `capture:slice:planted` **FAIL** (42/43) · `capture:slice:weak` 43/43 ·
+  `audio:slicecheck` 23/23 · `playtest:bot` win at 5/5, replay-hash unchanged
+  `-3.07486|-1.5|0.4394|0.0572|860.167` · `capture:full:determinism` 8/8 ·
+  `capture:full:planted` **FAIL** (46/47, `ending-text-exact`) ·
+  `capture:full:weak` 47/47 · `audio:fullcheck` 23/23 · `playtest:bot:full` win
+  at 10/10, queue 10/10 distinct, one DAG, exact `your did it! you wind` ·
+  `playtest:stress` **63 PASS / 0 FAIL** · `playtest:stress:full`
+  **63 PASS / 0 FAIL**. Consoles clean; selfTest counts unchanged (47/43/37/36).
+- Player-path probe (params-free boot, sampled through the fade): loading card
+  opaque pre-`ready`, mid-fade at 0.73, gone at `ready`; luma 24.0 → 27.3 → 35.4.
+
+**Caveats.** Nobody has hand-played the game yet (item 15 stands); the fade
+still hands over to an already-interactive title card, which is 0.35 s of
+crossfade, not a bug. Machine ears and pixels only, as ever.
