@@ -1,0 +1,114 @@
+# issue #23 — suite evidence
+# Worktree a1e46432, branch codeden/fix-capture-full-determinism-failure-a1e4
+# Node 24.22, headless Chrome (playwright-core), $0.000 spent, nothing deployed.
+
+## 1. Tool-shaped probe: pre-fix tree (e965bb1) vs this tree
+# Each run mirrors tools/capture.mjs around frame #01:
+#   goto game/full.html?gate=off&score=2 -> wait LC.ready -> LC.pause()
+#   -> setMoment('box-sit') + seek(1.2) + setView('first-person') + renderNow
+#   -> screenshot -> (the same again) -> screenshot, then compare the two PNGs.
+
+### pre-fix, run A (a git archive of e965bb1)
+  at ready: overlay present=true opacity=0.969
+  frame #01 first   f4490a4f94cf 337,865 B
+  frame #01 second  75bd1e1ff099 494,598 B
+  identical=false   pageerrors=0
+
+### pre-fix, run B
+  at ready: overlay present=true opacity=1.000
+  frame #01 first   e81a2f8f784e 287,445 B
+  frame #01 second  75bd1e1ff099 494,598 B
+  identical=false   pageerrors=0
+
+### this tree (fixed), run twice — same result both times
+  at ready: overlay present=false (removed from the DOM)
+  frame #01 first   75bd1e1ff099 494,598 B
+  frame #01 second  75bd1e1ff099 494,598 B
+  identical=true    pageerrors=0
+
+# Before the fix the overlay was still painted over the flat when the tool's very
+# first frame was taken (opacity 0.97–1.0, depending on where ready landed in the
+# 0.35 s fade), and the two shots never matched: a 287–338 KB frame of dark
+# loading card against the 495 KB game frame. After the fix the node is gone at
+# ready and both shots hash 75bd1e1ff099 — the SAME bytes as the clean second
+# shot on the old tree, so the game's own pixels never moved.
+
+## 2. Player path (no URL params, title gate up), sampled through the fade
+# before the fix:
+#   +661ms  ready=false  overlay present, opacity 1.00  page mean luma 24.0
+#   +775ms  ready=true   overlay present, opacity 0.83  page mean luma 26.3
+#   +926ms  ready=true   overlay gone                   page mean luma 35.4
+# after the fix (the same crossfade; ready now lands after it):
+#   +669ms  ready=false  overlay present, opacity 1.00  page mean luma 24.0
+#   +797ms  ready=false  overlay present, opacity 0.73  page mean luma 27.3
+#   +932ms  ready=true   overlay gone                   page mean luma 35.4
+# No flash, the same three luma readings: nothing was taken away from the player.
+
+## 3. capture:full:determinism on main before the fix — three runs, three FAILs
+#   run 1: determinism 7/8 byte-identical; frame #1 (box-sit/first-person t=1.2):
+#          not deterministic — re-rendering the same moment+view+time gave different pixels
+#   run 2: same frame, same message
+#   run 3: same frame, same message
+#   (selfTest 47/47 and console clean in all three; VERDICT: FAIL each time)
+
+## 4. capture:full:determinism after the fix — three consecutive passes
+  determinism pass 1 exit=0 verdict=VERDICT: PASS det=determinism 8/8 frames byte-identical on re-render
+  determinism pass 2 exit=0 verdict=VERDICT: PASS det=determinism 8/8 frames byte-identical on re-render
+  determinism pass 3 exit=0 verdict=VERDICT: PASS det=determinism 8/8 frames byte-identical on re-render
+
+## 5. The 22-suite chain on this tree (the three planted runs must fail by design)
+[1/22] capture:full -> PASS (want PASS) rc=0 ok
+[2/22] gate -> PASS (want PASS) rc=0 ok
+[3/22] build -> PASS (want PASS) rc=0 ok
+[4/22] capture:style -> PASS (want PASS) rc=0 ok
+[5/22] capture:demo -> PASS (want PASS) rc=0 ok
+[6/22] capture:demo:determinism -> PASS (want PASS) rc=0 ok
+[7/22] capture:demo:planted -> FAIL (want FAIL) rc=1 ok
+[8/22] audio:pagecheck -> PASS (want PASS) rc=0 ok
+[9/22] audio:democheck -> PASS (want PASS) rc=0 ok
+[10/22] capture:slice -> PASS (want PASS) rc=0 ok
+[11/22] capture:slice:determinism -> PASS (want PASS) rc=0 ok
+[12/22] capture:slice:planted -> FAIL (want FAIL) rc=1 ok
+[13/22] capture:slice:weak -> PASS (want PASS) rc=0 ok
+[14/22] audio:slicecheck -> PASS (want PASS) rc=0 ok
+[15/22] playtest:bot -> PASS (want PASS) rc=0 ok
+[16/22] capture:full:determinism -> PASS (want PASS) rc=0 ok
+[17/22] capture:full:planted -> FAIL (want FAIL) rc=1 ok
+[18/22] capture:full:weak -> PASS (want PASS) rc=0 ok
+[19/22] audio:fullcheck -> PASS (want PASS) rc=0 ok
+[20/22] playtest:bot:full -> PASS (want PASS) rc=0 ok
+[21/22] playtest:stress -> PASS (want PASS) rc=0 ok
+[22/22] playtest:stress:full -> PASS (want PASS) rc=0 ok
+chain done: unexpected=0 suites=22
+
+## 6. Per-suite numbers
+  capture:full              351 frames, selfTest 47/47, budget 145 draws / 100,670 tris / 5 lights / 1 shadow / 1 pass, console clean
+  gate                      PASS — clean scene passes, five planted faults caught by name
+  build                     dist/ 33 files, 2.40 MB, entry game/full.html (graph + assets verified)
+  capture:style             72 frames, 36/36, console clean
+  capture:demo              48 frames, 37/37, console clean
+  capture:demo:determinism  8/8 byte-identical
+  capture:demo:planted      FAIL BY DESIGN — 36/37 (ending-text-exact)
+  audio:pagecheck           24/24 (six takes ready, every mp3 decodes)
+  audio:democheck           17/17 (each line starts AND ends, durations match docs)
+  capture:slice             144 frames, 43/43
+  capture:slice:determinism 8/8 byte-identical
+  capture:slice:planted     FAIL BY DESIGN — 42/43
+  capture:slice:weak        43/43 on swiftshader (CPU GL)
+  audio:slicecheck          23/23
+  playtest:bot              win at 5/5, queue 5/5 distinct, replay-hash -3.07486|-1.5|0.4394|0.0572|860.167 (unchanged)
+  capture:full:determinism  8/8 byte-identical, 47/47, 145 draws, 0.27–0.29 ms/frame
+  capture:full:planted      FAIL BY DESIGN — 46/47 (ending-text-exact = 'you did it! you win')
+  capture:full:weak         47/47 on swiftshader (CPU GL)
+  audio:fullcheck           23/23
+  playtest:bot:full         win at 10/10, queue 10/10 distinct, one DAG, exact 'your did it! you wind'
+  playtest:stress           63 PASS / 0 FAIL (slice)
+  playtest:stress:full      63 PASS / 0 FAIL (full game)
+
+# The stress suites cover full wins on 3 seeds with a per-round audit, a decoy
+# shout flooring the score at 0 through real input, Space-mashing past the win
+# line, window blur mid-run, mid-run reload, a 500 ms main-thread block, rate-
+# independence at 30/60/120/240 Hz plus a 10 ms cadence and an 0.8 s spike,
+# camera-follow, live selfTest from first person after a trusted gate click, and
+# the label/reticle tells. Both finished this time; the Step 9 chain log
+# (suite-chain4.log) stopped at scenario suite 21 and never reported them.
