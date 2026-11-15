@@ -38,6 +38,11 @@
 //   10  #29 the build stamp: card + gear panel + ?stamp=on corner and title, and
 //       nothing at all under ?gate=off
 //   11  #29 isTouchDevice() signal matrix, run in the page
+//   12  #38 the always-visible stick + first-run hints: the ring rests in view
+//       from the first frame and glides back on release, the chips and the
+//       swipe cue show once, retire on the first game touch, auto-fade with no
+//       touch at all, and never appear on desktop or in a capture frame; the
+//       stick, the shout button and the HUD never overlap on a short phone
 //
 //   npm run check:mobile
 
@@ -662,6 +667,182 @@ try {
     check('#29 detector: a touchscreen laptop says touch (as of #26)', m.touchscreenLaptop === true);
     check('#29 detector: a desktop says mouse', m.desktop === false);
     check('#29 detector: a phone lying about itself says mouse — and the live switch (8) is what saves it', m.blindPhone === false);
+    await page.context().close();
+  }
+
+  // ===========================================================================
+  // 12. Issue #38: the always-visible stick and the first-run hints. Brandon's
+  //     phone feedback: a control you cannot see is a control you never find.
+  //     The ring has to rest in view from the first frame, brighten under the
+  //     thumb, and GLIDE HOME on release — never vanish. The chips and the
+  //     swipe cue appear once when play starts and retire on the first touch
+  //     (or by themselves after a few seconds). Desktop and capture (?gate=off)
+  //     must show none of it, so every baseline pixel stays put.
+  // ===========================================================================
+  {
+    const page = await phonePage('?seed=11');
+    const rest = await page.evaluate(() => {
+      const b = document.getElementById('stick-base');
+      const cs = getComputedStyle(b);
+      const r = b.getBoundingClientRect();
+      return {
+        display: cs.display,
+        opacity: parseFloat(cs.opacity),
+        border: cs.borderTopColor,
+        shadow: cs.boxShadow,
+        chev: document.querySelectorAll('#stick-base .sb-chev').length,
+        cx: (r.left + r.right) / 2,
+        cy: (r.top + r.bottom) / 2,
+        inView: r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1,
+        intro: parseFloat(getComputedStyle(document.getElementById('touch-intro')).opacity),
+        cue: parseFloat(getComputedStyle(document.getElementById('look-hint')).opacity),
+      };
+    });
+    check('#38 the ring rests in view while the gate is up', rest.display === 'block' && rest.opacity > 0.5 && rest.inView && rest.chev === 4, `${rest.display} @ ${rest.opacity.toFixed(2)}`);
+    check('#38 ring contrast: light ring AND dark outline (bright and dark scenes)', /rgba?\(247, 244, 238/.test(rest.border) && /rgba?\(10, 13, 18/.test(rest.shadow), `${rest.border} / ${rest.shadow.slice(0, 42)}…`);
+    check('#38 hints stay asleep until the gate lifts', rest.intro < 0.1 && rest.cue < 0.1);
+
+    await page.tap('#gate-btn');
+    await waitPhase(page, 'find');
+    const shown = await page
+      .waitForFunction(
+        () => {
+          const i = parseFloat(getComputedStyle(document.getElementById('touch-intro')).opacity);
+          return i > 0.9 && window.LC.touchDebug().controls?.intro === 'show';
+        },
+        null,
+        { timeout: 6000 },
+      )
+      .then(() =>
+        page.evaluate(() => ({
+          intro: parseFloat(getComputedStyle(document.getElementById('touch-intro')).opacity),
+          cue: parseFloat(getComputedStyle(document.getElementById('look-hint')).opacity),
+          pulse: document.getElementById('stick-base').classList.contains('pulse'),
+          oldHint: getComputedStyle(document.getElementById('hint')).display,
+        })),
+      )
+      .catch(() => null);
+    check('#38 first-run chips + swipe cue rise with the first frame of play', shown !== null && shown.intro > 0.9 && shown.cue > 0.4, JSON.stringify(shown));
+    check('#38 the stick breathes gently once (first run)', shown?.pulse === true);
+    check('#38 the old faint hint line is retired on phones', shown?.oldHint === 'none');
+
+    const touch = await touchDriver(page);
+    await touch.down(31, 140, 330); // the visible ring is where the thumb lands
+    await touch.moveTo(31, 140, 258); // 72 px up → clamped to the 52 px rim
+    await simSteps(page, 6);
+    const pressed = await page.evaluate(() => {
+      const b = document.getElementById('stick-base');
+      const r = b.getBoundingClientRect();
+      return {
+        active: b.classList.contains('active'),
+        opacity: parseFloat(getComputedStyle(b).opacity),
+        cx: (r.left + r.right) / 2,
+        cy: (r.top + r.bottom) / 2,
+        knob: getComputedStyle(document.getElementById('stick-knob')).transform,
+      };
+    });
+    check('#38 under the thumb: instant recentre, full brightness', pressed.active === true && pressed.opacity > 0.95 && Math.abs(pressed.cx - 140) < 6 && Math.abs(pressed.cy - 258) < 6, JSON.stringify(pressed));
+    check('#38 the knob tracks the finger', /matrix\(1, 0, 0, 1, 0, -5[12]/.test(pressed.knob), pressed.knob);
+    const retired = await page
+      .waitForFunction(() => document.getElementById('touch-intro').classList.contains('gone'), null, { timeout: 3000 })
+      .then(() =>
+        page.evaluate(() => ({
+          intro: parseFloat(getComputedStyle(document.getElementById('touch-intro')).opacity),
+          cue: parseFloat(getComputedStyle(document.getElementById('look-hint')).opacity),
+          pulse: document.getElementById('stick-base').classList.contains('pulse'),
+        })),
+      )
+      .catch(() => null);
+    await page.waitForTimeout(700); // the 0.6 s fade lands
+    const faded = await page.evaluate(() => ({
+      intro: parseFloat(getComputedStyle(document.getElementById('touch-intro')).opacity),
+      cue: parseFloat(getComputedStyle(document.getElementById('look-hint')).opacity),
+    }));
+    check('#38 the first game touch retires chips + cue + pulse', retired !== null && retired.pulse === false && faded.intro < 0.1 && faded.cue < 0.1, JSON.stringify({ retired, faded }));
+
+    await touch.up(31);
+    await page.waitForTimeout(500); // the 0.25 s glide home
+    const home = await page.evaluate(() => {
+      const b = document.getElementById('stick-base');
+      const r = b.getBoundingClientRect();
+      return {
+        display: getComputedStyle(b).display,
+        opacity: parseFloat(getComputedStyle(b).opacity),
+        active: b.classList.contains('active'),
+        cx: (r.left + r.right) / 2,
+        cy: (r.top + r.bottom) / 2,
+        knob: getComputedStyle(document.getElementById('stick-knob')).transform,
+      };
+    });
+    check('#38 releasing glides the ring home — it stays visible', home.display === 'block' && home.active === false && home.opacity > 0.5 && Math.abs(home.cx - rest.cx) < 2 && Math.abs(home.cy - rest.cy) < 2, `${home.display} @ ${home.opacity.toFixed(2)} (${home.cx.toFixed(0)}, ${home.cy.toFixed(0)})`);
+    check('#38 the knob returns to centre', home.knob === 'none' || /matrix\(1, 0, 0, 1, 0, 0\)/.test(home.knob), home.knob);
+    check('#38 page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 12b/12c. #38 on a short landscape phone: nobody's thumb targets overlap,
+  // and the chips auto-fade with no touch at all.
+  // ---------------------------------------------------------------------------
+  {
+    const page = await phonePage('?seed=11', { viewport: { width: 740, height: 360 }, dsf: 2 });
+    const lay = await page.evaluate(() => {
+      const r = (id) => {
+        const q = document.getElementById(id).getBoundingClientRect();
+        return { x0: q.left, y0: q.top, x1: q.right, y1: q.bottom };
+      };
+      const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+      const stick = r('stick-base');
+      const shout = r('shout-btn');
+      const score = r('hud-score');
+      const gear = r('settings-btn');
+      return {
+        stickInView: stick.y1 <= innerHeight + 1 && stick.y0 >= -1 && stick.x0 >= -1,
+        so: hit(stick, shout),
+        sc: hit(stick, score),
+        sg: hit(stick, gear),
+        ho: hit(shout, score),
+        hgd: hit(shout, gear),
+      };
+    });
+    check('#38 short landscape: stick, shout, score, gear never overlap', !lay.so && !lay.sc && !lay.sg && !lay.ho && !lay.hgd, JSON.stringify(lay));
+    check('#38 short landscape: the resting ring is fully on screen', lay.stickInView);
+    await page.tap('#gate-btn');
+    await waitPhase(page, 'find');
+    const autoFade = await page
+      .waitForFunction(() => document.getElementById('touch-intro').classList.contains('gone') && window.LC.touchDebug().controls?.intro === 'gone', null, { timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    check('#38 chips retire on their own with no touch at all', autoFade);
+    check('#38 short landscape page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 12d/12e. #38 none of it leaks to desktop or into a capture frame.
+  // ---------------------------------------------------------------------------
+  {
+    const page = await desktopPage('?seed=11');
+    const dom = await page.evaluate(() => ({
+      stick: getComputedStyle(document.getElementById('stick-base')).display,
+      intro: getComputedStyle(document.getElementById('touch-intro')).display,
+      look: getComputedStyle(document.getElementById('look-hint')).display,
+      hint: getComputedStyle(document.getElementById('hint')).display,
+    }));
+    check('#38 desktop: no resting ring, no chips, no cue, hint line unchanged', dom.stick === 'none' && dom.intro === 'none' && dom.look === 'none' && dom.hint !== 'none', JSON.stringify(dom));
+    await page.context().close();
+  }
+  {
+    const page = await phonePage('?gate=off');
+    const dom = await page.evaluate(() => ({
+      capture: document.body.classList.contains('capture'),
+      stick: getComputedStyle(document.getElementById('stick-base')).display,
+      intro: getComputedStyle(document.getElementById('touch-intro')).display,
+      look: getComputedStyle(document.getElementById('look-hint')).display,
+      touch: window.LC.touchDebug().controls?.intro ?? null,
+    }));
+    check('#38 capture mode (?gate=off) carries none of the teaching chrome', dom.capture === true && dom.stick === 'none' && dom.intro === 'none' && dom.look === 'none', JSON.stringify(dom));
+    check('#38 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
   }
 } finally {
