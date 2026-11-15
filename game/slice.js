@@ -125,13 +125,17 @@ const planFor = (phase) => audioPlanFor(phase === 'find' ? 'idle' : phase, PLAN_
 let firedCues = new Set();
 
 function markCuesUpTo(t) {
+  // epsilon: cue times like 0.25 must not slip through a float gap between
+  // an accumulated clock value (0.24999999999999997) and its re-derived
+  // neighbour (0.25); firedCues already prevents double-firing, so an
+  // inclusive `<=` with tolerance is all the boundary needs.
   planFor(game.phase).forEach((c, i) => {
-    if (c.at <= t) firedCues.add(i);
+    if (c.at <= t + 1e-9) firedCues.add(i);
   });
 }
 function advanceCues(from, to) {
   planFor(game.phase).forEach((c, i) => {
-    if (!firedCues.has(i) && c.at > from && c.at <= to) {
+    if (!firedCues.has(i) && c.at <= to + 1e-9 && c.at > from - 1e-9) {
       firedCues.add(i);
       voices.fire(c.line, c.file);
     }
@@ -1105,6 +1109,11 @@ function installContract() {
     },
     audioPlan(phase = game.phase) {
       return planFor(phase);
+    },
+    /** Cue bookkeeping for the audio check / step 7 bot: which planned cues
+     *  are already consumed for the current phase, and the phase clock. */
+    cuesDebug() {
+      return { fired: [...firedCues], phase: game.phase, time: round(game.time), plan: planFor(game.phase).map((c) => `${c.line}@${c.at}`) };
     },
     audioStatus() {
       return { unlocked: gateOpen, engineUnlocked: voices.audioUnlocked(), lines: voices.audioStatus() };
