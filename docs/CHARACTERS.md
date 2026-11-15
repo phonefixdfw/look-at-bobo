@@ -26,12 +26,12 @@
 - **Color/markings (from Brandon):**
   - Mostly black coat.
   - White feet.
-  - White **neck** (Bobo's is a white **bib** — the neck-vs-bib pattern is one of the tells).
+  - White **feet only** — no white neck, no bib, no white muzzle. (Bobo's white **bib** is Bobo-only; issue #34 took the decoy's neck white away.)
   - **No white spot on his forehead.** Bobo's white vertical forehead dash is the **key tell** distinguishing the two cats.
 - **Eyes:** TBD (not supplied — do not invent). *Art placeholder only:* the Step 3 style test renders him with Bobo's yellow-green token so the scene can run; it is explicitly flagged in `docs/ART_STYLE.md` §11 and is not a claim about his real eyes.
 - **Role in gameplay:** If the player aims at him and shouts "LOOK AT BOBO!", they get a gentle, silly X, a voice says **"DAG!"** (spelled exactly that way, on purpose), and they lose 1 of their 10 points. The score floors at 0; there is no game over.
 - **Treatment rules:** He is never harmed, scared or mocked. He stays cute and oblivious, exactly like the scenery he is.
-- **In-game look:** Same build approach as Bobo (softly stylized, fur-shaded, built in code). He should read similarly to Bobo at a glance — that's the joke — while the forehead dash, the neck-vs-bib pattern and the size difference keep him clearly distinguishable on a second look.
+- **In-game look:** Same build approach as Bobo (softly stylized, fur-shaded, built in code). He should read similarly to Bobo at a glance — that's the joke — while the forehead dash, Bobo's bib (the decoy has no white above his feet at all) and the size difference keep him clearly distinguishable on a second look.
 - **Placement/movement:** TBD — open questions with suggested defaults live in [`docs/DECOY_CAT.md`](DECOY_CAT.md) (e.g. he lounges in 3–5 fixed spots, relocates between rounds, and must never be in the same spot as Bobo).
 
 ## The Player

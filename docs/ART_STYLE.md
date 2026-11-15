@@ -25,7 +25,7 @@ Four pillars, in priority order:
    every shadow in the room; everything else is fill. The window stays bright
    without blowing the room out (filmic tone mapping + a tone-mapping-exempt sky
    plane behind it).
-2. **Bobo-first legibility** — the tells (dash / bib-vs-neck band / size) must
+2. **Bobo-first legibility** — the tells (dash / bib / size) must
    survive searching distance. If a marking can't be proven to read in pixels,
    it doesn't ship. The selfTest measures exactly that.
 3. **Warm paper-and-mustard playfulness** — UI is warm paper on deep ink with
@@ -122,8 +122,8 @@ turns and the bib stays put across poses.
 | forehead dash (box, head space, centre `[0, 0.036, 0.058]`, half-size `[0.0095, 0.036, 0.032]` m) | ✅ **THE tell** | ❌ must be absent |
 | chest bib (ellipsoid, front of chest) | ✅ | ❌ |
 | belly patch | ✅ | ❌ |
-| white neck band/collar (ring around the neck) | ❌ | ✅ |
-| white muzzle | ✅ | ✅ |
+| white neck band/collar (ring around the neck) | ❌ | ❌ — **removed, issue #34** |
+| white muzzle | ✅ | ❌ — **removed, issue #34** |
 | white paws (literal white parts) | ✅ | ✅ |
 
 The dash is **deliberately exaggerated** versus the photo's thin ~4 × 20 mm
@@ -135,10 +135,16 @@ of the real one.
 Because both cats share the builder, selfTest can *measure* the tells instead
 of trusting someone painted the right spot: `bobo-dash-white` (37 white verts),
 `decoy-no-dash` (exactly 0), `bobo-bib-white` (484), `decoy-no-bib` (0),
-`decoy-collar-white` (241), `bobo-no-collar` (0), `cats-distinguishable`, plus
-the two legibility checks above. Fault injection (`?plant=dash`, `?plant=size`,
+`bobo-head-white` (150: muzzle + dash), `decoy-head-black` (exactly 0 — issue
+#34 took his white muzzle too), `decoy-neck-black` (exactly 0, measured in the
+exact zone the old neck band occupied), `bobo-neck-black` (0),
+`white-feet-both` (4/4 literal white foot parts — the one marking they share),
+`cats-distinguishable`, plus the two legibility checks above. Fault injection
+(`?plant=dash`, `?plant=neck`, `?plant=size`,
 `?plant=text`, `?plant=stats`) proves each of those checks bites — each exits 1
-naming its check.
+naming its check. `?plant=neck` is issue #34's proof: it paints the deleted
+neck band back onto the decoy (241 white verts, the old count) and
+`decoy-neck-black` + `cats-distinguishable` fail on it.
 
 ## 6. The cats' proportions (and the photo caveat)
 
@@ -157,9 +163,11 @@ naming its check.
   per §5.
 - **Decoy cat** (root scale `(1.30, 1.13, 1.12)` — wide and heavy, not tall):
   sit, sprawl and `side` poses (sprawl is belly-down, hips out, the 22 lb
-  signature; `side` from issue #27, with the collar band across the TOP of the
-  neck — the one neck region Bobo's lying bib never reaches, so the scan can't
-  trade tells). Measured in
+  signature; `side` added by issue #27 so the scenery cat can lie down too).
+  He carries no marking rules at all since issue #34 — his only white is the
+  literal white foot parts — so what keeps him distinguishable is the absence of
+  Bobo's dash and bib (measured in the zones those markings occupy) plus size.
+  Measured in
   the same sit pose: **1.32× Bobo's width, 1.68× his bulk** (limits ≥1.25 /
   ≥1.35). Slow "breath" animation is sideways-only — scaling the belly in y
   would sink it into the rug and (rightly) fail the contact checks.
@@ -230,13 +238,13 @@ DOM, not geometry (crisp at any size, free for the render budget). Colors are
 | Check | Measured | Limit |
 |---|---|---|
 | Frames captured | 72/72 PASS (6 moments × 4 views × 3 times) | all pass |
-| selfTest | 36/36 on every frame | 36/36 |
+| selfTest | 39/39 on every frame | 39/39 |
 | drawCalls / triangles (worst) | 89 / 101,636 | ≤150 / ≤150k |
 | shadow lights / real lights | 1 / 2 | ≤1 by design / ≤6 |
 | Render time | 0.06–0.13 ms/frame | — |
 | dash legibility | 26.9 px @2.5 m · 11.2 px @6 m | ≥20 px · ≥8 px |
 | size tell (same pose) | 1.32× wide · 1.68× bulk | ≥1.25× · ≥1.35× |
-| tells (vertex counts) | dash 37 / bib 484 · decoy collar 241, dash 0, bib 0 | ≥6 / ≥40 · exactly 0 |
+| tells (vertex counts) | Bobo dash 37 / bib 484 / head white 150, neck 0 · decoy dash 0, bib 0, neck 0, head 0 · white foot parts 4/4 both | ≥6 / ≥40 / ≥25 · exactly 0 · ≥2 each |
 | contacts (both cats, every moment) | within −1e-9..0 m | −0.001..+0.002 m |
 | marking / UI contrast | 14.1:1 / 8.3:1 | ≥10:1 / ≥4.5:1 |
 | exact strings | `your did it! you wind`, `DAG!` | byte-exact |

@@ -38,7 +38,9 @@ function cylinderBetween(a, b, r, mat, tag, segments = 1) {
   const dir = new THREE.Vector3().subVectors(vb, va);
   const len = dir.length();
   // more height segments than a cylinder needs, because the markings are vertex
-  // colours: a two-row cylinder has nowhere to put a white neck band.
+  // colours: a two-row cylinder has nowhere to put Bobo's bib where it rides up
+  // onto the chest, and issue #34's proof that the decoy's neck is plain black
+  // counts vertices in that zone — they have to exist to be counted.
   const g = new THREE.CylinderGeometry(r, r * 1.06, len, 20, segments, false);
   const m = new THREE.Mesh(g, mat);
   m.position.copy(va).add(vb).multiplyScalar(0.5);

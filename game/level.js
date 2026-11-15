@@ -56,7 +56,7 @@ export const EVENT_PHASES = ['catch', 'wrong', 'win'];
 export const ALL_STAGE_IDS = [...MOMENT_IDS, ...EVENT_PHASES];
 export const CANONICAL_EVENT_MOMENT = 'cardboard-box';
 
-/** The decoy: 22 lb scenery with a collar and no dash (docs/DECOY_CAT.md). */
+/** The decoy: 22 lb scenery, white on his feet only, no dash (docs/DECOY_CAT.md). */
 export const DECOY_SPOTS = [
   { id: 'd-rug', room: 'living', pos: [0.15, 'rug', 0.55], faceYaw: 0.9 },
   { id: 'd-plant', room: 'living', pos: [2.55, 'floor', -1.6], faceYaw: 2.4 },

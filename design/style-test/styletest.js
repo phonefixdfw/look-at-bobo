@@ -15,7 +15,8 @@
 //     walls, a window with real sun through it, couch, rug, lamp, plant, box);
 //   - BOBO (~15 lb) and the DECOY CAT (~22 lb) from ONE parametric cat builder:
 //     the only difference between them is which marking rules are switched on
-//     (forehead dash + chest bib + belly patch vs. a white neck collar);
+//     (Bobo: forehead dash + chest bib + belly patch + muzzle; the decoy: none at
+//     all — since issue #34 his only white is the literal white foot parts);
 //   - the HUD vocabulary: score pill, the gentle round X + "DAG!", and the win
 //     celebration raining little Bobo heads with the exact ending text.
 //
@@ -31,9 +32,9 @@ import { TOKENS } from '../../src/tokens.js';
 import { clamp, easeOutBack, seededShuffle, projectedPx, srgbLuma, contrast, round } from '../../src/util.js';
 import { buildRoom } from '../../src/room.js';
 import { buildCat, CAT_SPECS, setCatPose } from '../../src/cat.js';
-import { rulesBobo, paintPose } from '../../src/markings.js';
+import { rulesBobo, paintPose, ellSDF } from '../../src/markings.js';
 import { createCelebration } from '../../src/celebrate.js';
-import { scanMarkings, contactGap } from '../../src/measure.js';
+import { scanMarkings, contactGap, NECK_ZONE_EXPECT } from '../../src/measure.js';
 
 /** Fixed strings. Exact. On purpose. Never "fixed". */
 const EXACT_ENDING = 'your did it! you wind';
@@ -42,6 +43,7 @@ const EXACT_DAG = 'DAG!';
 const params = new URLSearchParams(location.search);
 /** Fault injection, so the tell checks can be proven to bite:
  *  ?plant=dash  — Bobo's forehead-dash rule is switched off
+ *  ?plant=neck  — the decoy's OLD white neck band is painted back on (issue #34)
  *  ?plant=size  — the decoy cat is built at Bobo's size
  *  ?plant=text  — the joke ending gets "fixed"
  *  ?plant=stats — the page lies about how cheap its frames are
@@ -283,9 +285,12 @@ function selfTest() {
   add('bobo-dash-white', bb.dash, '≥6 white vertices', bb.dash >= 6, `forehead dash on ${bobo.current}, moment ${momentName}`);
   add('decoy-no-dash', dd.dash, 'exactly 0', dd.dash === 0, 'the decoy must NOT have the dash');
   add('bobo-bib-white', bb.bib, '≥40 white vertices', bb.bib >= 40, 'the chest bib is Bobo-only');
-  add('decoy-no-bib', dd.bib, 'exactly 0', dd.bib === 0, 'the decoy has a neck band, not a bib');
-  add('decoy-collar-white', dd.collar, '≥25 white vertices', dd.collar >= 25, `neck band on ${decoy.current}`);
-  add('bobo-no-collar', bb.collar, 'exactly 0', bb.collar === 0, 'Bobo has no neck band');
+  add('decoy-no-bib', dd.bib, 'exactly 0', dd.bib === 0, 'the decoy has no bib (issue #34)');
+  add('bobo-head-white', bb.headWhite, '≥25 white vertices', bb.headWhite >= 25, 'muzzle + dash paint on Bobo’s head');
+  add('decoy-head-black', dd.headWhite, 'exactly 0', dd.headWhite === 0, 'no white muzzle on the decoy (issue #34)');
+  add('decoy-neck-black', dd.neckWhite, 'exactly 0', dd.neckWhite === 0, 'the neck band is gone — white on his feet only');
+  add('bobo-neck-black', bb.neckWhite, 'exactly 0', bb.neckWhite === 0, 'Bobo never had neck white');
+  add('white-feet-both', `${bb.feet}/${dd.feet}`, '≥2 white foot parts on each cat', bb.feet >= 2 && dd.feet >= 2, 'the one marking both cats keep');
 
   // the dash is the tell that matters: it must read at searching distance
   const nearPx = projectedPx(bb.dashExtent, 2.5, 60);
@@ -300,10 +305,19 @@ function selfTest() {
   add('dash-legibility-far', farPx, '≥8 px at 6 m (1080p, fov 60)', farPx >= 8, 'the tell survives across the room');
   add(
     'cats-distinguishable',
-    `${bb.dash}>0=${bb.dash > 0 && dd.dash === 0}, bib ${bb.bib}/collar ${dd.collar}`,
-    'dash + bib on Bobo, collar on the decoy, never both',
-    bb.dash > 0 && dd.dash === 0 && bb.bib > 0 && dd.bib === 0 && dd.collar > 0 && bb.collar === 0,
-    'one builder, different marking rules',
+    `dash ${bb.dash}>0 bib ${bb.bib}>0 · decoy dash ${dd.dash}, bib ${dd.bib}, neck ${dd.neckWhite}, head white ${dd.headWhite} · feet ${bb.feet}/${dd.feet}`,
+    'dash + bib on Bobo only; decoy black except his feet',
+    bb.dash > 0 &&
+      dd.dash === 0 &&
+      bb.bib > 0 &&
+      dd.bib === 0 &&
+      bb.headWhite > 0 &&
+      dd.headWhite === 0 &&
+      bb.neckWhite === 0 &&
+      dd.neckWhite === 0 &&
+      bb.feet > 0 &&
+      dd.feet > 0,
+    'one builder, different marking rules (issue #34: the decoy keeps white on his feet only)',
   );
 
   // --- the size tell: 22 lb vs 15 lb, measured as built --------------------
@@ -588,13 +602,26 @@ if (PLANT === 'dash') {
     const rules = rulesBobo(pose);
     paintPose(bobo, pose, { head: rules.head.filter((r) => r.name !== 'dash'), body: rules.body }, bobo.pivots[pose].head);
   }
+} else if (PLANT === 'neck') {
+  // Issue #34's absence proof has to bite too: paint the OLD white neck band
+  // back onto the decoy, over the exact zones src/measure.js counts as his
+  // neck, and `decoy-neck-black` + `cats-distinguishable` must fail.
+  for (const pose of CAT_SPECS.decoy.poses) {
+    const zone = NECK_ZONE_EXPECT[pose] ?? NECK_ZONE_EXPECT.sit;
+    paintPose(
+      decoy,
+      pose,
+      { head: [], body: [{ sdf: (p) => ellSDF(p, zone.c, zone.h), name: 'neck-fault' }] },
+      decoy.pivots[pose].head,
+    );
+  }
 } else if (PLANT === 'size') {
   // applied where the decoy is built: the 22 lb cat shrinks to Bobo's size
 } else if (PLANT === 'text') {
   // the joke "fixed": ending-text-exact must fail on every frame
   ENDING_TEXT = 'you did it! you win';
 } else if (PLANT && PLANT !== 'none' && PLANT !== 'stats') {
-  console.warn(`Unknown plant "${PLANT}". Use dash, size, text or stats.`);
+  console.warn(`Unknown plant "${PLANT}". Use dash, neck, size, text or stats.`);
 }
 
 function boot() {

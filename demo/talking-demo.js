@@ -477,10 +477,19 @@ function selfTest() {
   const dd = scanMarkings(decoy, 'sprawl');
   add(
     'cats-distinguishable',
-    `dash ${bb.dash}/collar ${dd.collar}`,
-    'dash on Bobo only, collar on the decoy',
-    bb.dash > 0 && dd.dash === 0 && dd.collar > 0 && bb.collar === 0,
-    'the whole game is "is it Bobo?" at a glance',
+    `Bobo dash ${bb.dash} + bib ${bb.bib} + head white ${bb.headWhite} · decoy dash ${dd.dash}, bib ${dd.bib}, neck ${dd.neckWhite}, head ${dd.headWhite} · white feet ${bb.feet}/${dd.feet}`,
+    'dash + bib + white head markings on Bobo only; decoy black except his feet',
+    bb.dash > 0 &&
+      bb.bib > 0 &&
+      bb.headWhite > 0 &&
+      bb.neckWhite === 0 &&
+      dd.dash === 0 &&
+      dd.bib === 0 &&
+      dd.neckWhite === 0 &&
+      dd.headWhite === 0 &&
+      bb.feet > 0 &&
+      dd.feet > 0,
+    'the whole game is "is it Bobo?" at a glance (issue #34: the decoy keeps white on his feet only)',
   );
   const bbBox = new THREE.Box3().setFromObject(bobo.poses.sit).getSize(new THREE.Vector3());
   const ddBox = new THREE.Box3().setFromObject(decoy.poses.sit).getSize(new THREE.Vector3());

@@ -35,7 +35,7 @@ function boxSDF(p, c, h) {
   return Math.sqrt(ox * ox + oy * oy + oz * oz) + Math.min(Math.max(qx, qy, qz), 0);
 }
 
-/** Shared by both cats: the white muzzle. */
+/** BOBO ONLY: the white muzzle (issue #34 — the decoy has no white on his head). */
 function rulesMuzzle() {
   return [{ sdf: (p) => ellSDF(p, [0, -0.03, 0.052 + 0], [0.048, 0.036, 0.04]), name: 'muzzle', head: true }];
 }
@@ -75,17 +75,14 @@ function rulesBobo(pose) {
             ];
   return { head, body };
 }
-/** THE DECOY CAT — white feet (built as parts, not rules) and a white neck
- *  band. Explicitly no dash, no bib, no belly patch (docs/DECOY_CAT.md). */
-function rulesDecoy(pose) {
-  const head = rulesMuzzle();
-  const body =
-    pose === 'sprawl'
-      ? [{ sdf: (p) => ellSDF(p, [0, 0.185, 0.165], [0.155, 0.115, 0.04]), name: 'collar' }]
-      : pose === 'side'
-        ? [{ sdf: (p) => ellSDF(p, [0.02, 0.2, 0.165], [0.105, 0.015, 0.05]), name: 'collar' }] // band across the TOP of a side-lying cat's neck — the one neck region Bobo's side bib never reaches, so the two tells can't trade places in the scan
-        : [{ sdf: (p) => ellSDF(p, [0, 0.386, 0.045], [0.125, 0.034, 0.105]), name: 'collar' }];
-  return { head, body };
+/** THE DECOY CAT — nothing. Issue #34 (Brandon: "let's remove the white on his
+ *  neck. Just leave white on his feet"): the white feet are built as separate
+ *  white parts in src/cat.js, so no SDF rule paints anything on him. Explicitly
+ *  no neck band, no dash, no bib, no belly patch, no white muzzle
+ *  (docs/DECOY_CAT.md). The rules stay an empty set rather than deleting the
+ *  function, so the builder keeps one shape for "which rules are switched on". */
+function rulesDecoy(_pose) {
+  return { head: [], body: [] };
 }
 
 const _vRoot = new THREE.Vector3();
