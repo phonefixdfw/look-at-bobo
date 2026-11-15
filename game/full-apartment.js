@@ -433,6 +433,95 @@ export function buildFullApartment(scene) {
   mergedMesh(flat, hardware);
   mergedMesh(flat, panes.map((e) => ({ ...e, mat: glass })), { cast: false, receive: false });
 
+  // ── baseboards: 10 cm tall, 1.8 cm off the plaster, every interior room ──
+  // Generated from the same data instead of typed: a face gets a board when
+  // some pier's face lies on it; door-like openings (including the sealed
+  // front door and the slider) break the run where the door TRIM ends, since
+  // the trim frame is the trim there; windows do not break it — in every real
+  // flat the baseboard runs on under the window. Outdoor rooms get none.
+  // The 1.8 cm proud is comfortably inside the walk rectangles' 8 cm inset,
+  // so no board is ever a corner the camera-gap check can graze.
+  const boards = [];
+  for (const room of ROOMS) {
+    if (room.outdoor) continue;
+    for (const [axis, faceKey] of [
+      ['z', 'z0'],
+      ['z', 'z1'],
+      ['x', 'x0'],
+      ['x', 'x1'],
+    ]) {
+      const face = room[faceKey];
+      const [bandKeyLo, bandKeyHi] = axis === 'z' ? ['z0', 'z1'] : ['x0', 'x1'];
+      if (!WALL_DEFS.some((d) => d.axis === axis && (d[bandKeyLo] === face || d[bandKeyHi] === face))) continue;
+      const [rKey0, rKey1] = axis === 'z' ? ['x0', 'x1'] : ['z0', 'z1'];
+      const breaks = OPENINGS.filter((o) => {
+        if (o.kind === 'window') return false;
+        const b = openingBand(o);
+        return o.axis === axis && (b.b0 === face || b.b1 === face);
+      }).map((o) => {
+        const [a0, a1] = gapSpan(o);
+        return [a0 - 0.06, a1 + 0.06];
+      });
+      const inward = faceKey.endsWith('0') ? 1 : -1;
+      let cursor = room[rKey0];
+      const pieces = [];
+      for (const [g0, g1] of breaks.sort((p, q) => p[0] - q[0])) {
+        if (g0 > cursor + 0.02) pieces.push([cursor, Math.min(g0, room[rKey1])]);
+        cursor = Math.max(cursor, g1);
+      }
+      if (cursor < room[rKey1] - 0.02) pieces.push([cursor, room[rKey1]]);
+      for (const [p0, p1] of pieces) {
+        if (p1 - p0 < 0.05) continue;
+        boards.push(
+          axis === 'z'
+            ? { geo: box(p1 - p0, 0.1, 0.018), at: [(p0 + p1) / 2, 0.05, face + inward * 0.009] }
+            : { geo: box(0.018, 0.1, p1 - p0), at: [face + inward * 0.009, 0.05, (p0 + p1) / 2] },
+        );
+      }
+    }
+  }
+  mergedMesh(flat, boards.map((e) => ({ ...e, mat: trim })), { cast: false });
+
+  // ── the balcony railing: a collider-mesh, deliberately not plaster ───────
+  // full-shell.js explains why the railing lives outside wallBoxes (you see
+  // THROUGH a railing; the gap test must not be told it is a wall). Posts
+  // stand on the slab against the far parapet's inner face, inside the
+  // balcony-railing footprint in game/full-level.js, top at 1.13 m: a
+  // parapet-and-rail barrier you cannot step, and the VIEWS.balcony camera
+  // sees it from the chair end.
+  const rail = [];
+  const RZ = -4.365; // mid-plane of the posts, off the parapet's inner face
+  for (let x = 0.565; x <= 2.44; x += 0.374) {
+    rail.push({ geo: box(0.03, 1.08, 0.03), mat: metal, at: [x, 0.54, RZ] });
+  }
+  rail.push(
+    { geo: box(1.92, 0.05, 0.05), mat: metal, at: [1.5, 1.105, RZ] },
+    { geo: box(1.9, 0.03, 0.03), mat: metal, at: [1.5, 0.78, RZ] },
+    { geo: box(1.9, 0.03, 0.03), mat: metal, at: [1.5, 0.36, RZ] },
+  );
+  mergedMesh(flat, rail);
+
+  // ── the pen: the one prop with a script (game/full.js moves it) ──────────
+  // Built standing at the bedroom desk; the desk-pen moment re-places it
+  // every find frame, so where it rests is exactly where resetPen puts it.
+  const penRoot = new THREE.Group();
+  const penBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.16, 10),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(TOKENS.uiCoral), roughness: 0.45 }),
+  );
+  const penTip = new THREE.Mesh(
+    new THREE.ConeGeometry(0.011, 0.03, 10),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(TOKENS.uiInk), roughness: 0.5 }),
+  );
+  penTip.position.y = 0.095;
+  penBody.castShadow = true;
+  penTip.castShadow = true;
+  penBody.add(penTip);
+  penRoot.add(penBody);
+  penRoot.position.set(-1.85, 0.83, 5.67);
+  penRoot.rotation.x = Math.PI / 2; // build pose: lying down (resetPen rights it)
+  flat.add(penRoot);
+
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
   const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
@@ -481,6 +570,7 @@ export function buildFullApartment(scene) {
     living: { sun, WALL_Z, SUPPORTS: supports },
     supports,
     lights: { hemi, sun, fills },
+    pen: { root: penRoot, barrel: penBody },
     // every plaster slab (walls, parapets, ceilings) as an AABB, from the
     // definitions that were actually built (src/reach.js measures the walls
     // you can actually see — floors are not walls and are deliberately out)
