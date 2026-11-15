@@ -1704,21 +1704,45 @@ export function bootGame(cfg) {
     renderer.render(scene, camera);
     installContract();
     wireInput();
-    window.LC.ready = true;
+    // `LC.ready` is the tool's one signal that the page may be captured, and a
+    // capture is a screenshot of the WHOLE page — so ready means "the game is
+    // what is on screen", not "the scene is built". The loading overlay fades
+    // for 0.35 s before it leaves, and a frame taken during that fade is a
+    // crossfade of the loading card and the flat: different pixels on every
+    // boot, which is exactly what `--determinism` exists to catch. So ready is
+    // announced when the overlay is genuinely gone; the player keeps the fade.
+    const announceReady = () => {
+      window.LC.ready = true;
+      window.addEventListener('resize', () => {
+        lastWidth = 0;
+        resizeIfNeeded();
+      });
+      console.info(
+        `[look-at-bobo] ${cfg.bootName ?? 'game'} ready — ${window.LC.moments.length} stages, ${window.LC.views.length} views, win at ${TARGET}, voice engine ${voices.audioUnlocked() ? 'unlocked' : 'gated'}.`,
+      );
+    };
     // Loading screen off — the flat is genuinely ready (this is the real
     // signal, not a timer). Pages without the overlay (demo/slice) skip it.
     if (el.loading) {
-      el.loading.classList.add('gone');
       const node = el.loading;
-      setTimeout(() => node.remove(), 450);
+      node.classList.add('gone');
+      let retired = false;
+      const retire = () => {
+        if (retired) return;
+        retired = true;
+        node.remove();
+        announceReady();
+      };
+      // The fade ends on `transitionend`; the old 450 ms timer stays as the
+      // backstop, because transitions never run in a hidden tab and `ready`
+      // must never hang on a paint that will not come.
+      node.addEventListener('transitionend', (ev) => {
+        if (ev.target === node && ev.propertyName === 'opacity') retire();
+      });
+      setTimeout(retire, 450);
+    } else {
+      announceReady();
     }
-    window.addEventListener('resize', () => {
-      lastWidth = 0;
-      resizeIfNeeded();
-    });
-    console.info(
-      `[look-at-bobo] ${cfg.bootName ?? 'game'} ready — ${window.LC.moments.length} stages, ${window.LC.views.length} views, win at ${TARGET}, voice engine ${voices.audioUnlocked() ? 'unlocked' : 'gated'}.`,
-    );
   }
 
   try {
