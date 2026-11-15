@@ -101,6 +101,39 @@ function mergedMesh(parent, entries, { cast = true, receive = true } = {}) {
  *  merged box entry. The boxes the checks measure are the boxes drawn. */
 const slabEntry = (def, mat) => ({ geo: box(def.w, def.h, def.d), mat, at: [def.x, def.y, def.z] });
 
+/** An opening's wall band: which side of its `fixed` face the plaster sits on,
+ *  and the band's outer face. The side is whichever room face the opening sits
+ *  in (bands are always OUTSIDE the room's interior face); the thickness is
+ *  whatever the piers framing THIS opening are — the living room's east line
+ *  is 0.12 in front of the kitchen doorway and 0.20 where the window is, so
+ *  matching a pier has to overlap the opening's own span, not just its band. */
+function openingBand(o) {
+  const room = ROOM_BY_ID[o.room];
+  const [bandLoKey, bandHiKey] = o.axis === 'z' ? ['z0', 'z1'] : ['x0', 'x1'];
+  const [runLoKey, runHiKey] = o.axis === 'z' ? ['x0', 'x1'] : ['z0', 'z1'];
+  const sign = o.fixed === room[bandLoKey] ? -1 : 1;
+  const frame = WALL_DEFS.find(
+    (d) =>
+      d.axis === o.axis &&
+      (d[bandLoKey] === o.fixed || d[bandHiKey] === o.fixed) &&
+      d[runLoKey] < o.hi - 0.01 &&
+      d[runHiKey] > o.lo + 0.01,
+  );
+  const t = BAND_T[frame ? frame.kind : 'wall-ext'];
+  const b0 = sign < 0 ? o.fixed - t : o.fixed;
+  const b1 = sign < 0 ? o.fixed : o.fixed + t;
+  return { sign, t, b0, b1 };
+}
+
+/** The structural gap an opening punches through its band: the clear width
+ *  plus the casing inset each side for the door-like kinds (the casing is
+ *  what fills it visually — game/full-shell.js header), and the clear width
+ *  itself for windows (jambs flush) and the shut front door. */
+function gapSpan(o) {
+  const inset = o.kind === 'window' || o.kind === 'sealed' ? 0 : JAMB_INSET;
+  return [o.lo - inset, o.hi + inset];
+}
+
 /* -------------------------------------------------------------------------- *
  *  Materials. Floors and plaster carry a `uvTile` (metres per texture tile)
  *  so merged geometry gets world-scaled UVs; the baked `repeat` on the shared
@@ -197,6 +230,58 @@ export function buildFullApartment(scene) {
     cast: true,
     receive: true,
   });
+
+  // ── floors: one merged mesh per finish, top face exactly y 0 ─────────────
+  // full-shell.js says a room's floor is its walkable plane; a floor slab
+  // that poked above 0 would put every cat's contact probe under the boards.
+  // Kitchen tile and entry tile share one material — the two rooms are the
+  // same large-format porcelain — while the bathroom gets its small tile.
+  const floorFinish = new Map([
+    ['living', oak],
+    ['hall', oak],
+    ['bedroom', oak],
+    ['kitchen', kitchenTile],
+    ['entry', kitchenTile],
+    ['bathroom', bathTile],
+    ['balcony', concrete],
+  ]);
+  const byFinish = new Map();
+  for (const f of FLOORS) {
+    const mat = floorFinish.get(f.room);
+    if (!byFinish.has(mat)) byFinish.set(mat, []);
+    byFinish.get(mat).push({
+      geo: box(f.x1 - f.x0, 0.05, f.z1 - f.z0),
+      mat,
+      at: [(f.x0 + f.x1) / 2, -0.025, (f.z0 + f.z1) / 2],
+    });
+  }
+  for (const entries of byFinish.values()) mergedMesh(flat, entries, { cast: false, receive: true });
+
+  // ── the structural slab, and a stone saddle in every doorway band ────────
+  // The slab (STRUCTURE) closes the floor under the wall bands and the
+  // service void. Its drawn top sits 2 cm below the finish floor: exactly
+  // coplanar tops would z-fight along every room edge, and a hair of shade in
+  // a band you only ever see through a doorway is the honest fix. The saddles
+  // bring the walkable y 0 across each band (that is what the bridging walk
+  // rectangles stand on), so only the saddles reach y 0 over band footprints.
+  mergedMesh(
+    flat,
+    [
+      {
+        geo: box(STRUCTURE.x1 - STRUCTURE.x0, 0.18, STRUCTURE.z1 - STRUCTURE.z0),
+        mat: concrete,
+        at: [(STRUCTURE.x0 + STRUCTURE.x1) / 2, -0.11, (STRUCTURE.z0 + STRUCTURE.z1) / 2],
+      },
+      ...OPENINGS.filter((o) => o.kind !== 'window').map((o) => {
+        const b = openingBand(o);
+        const [a0, a1] = gapSpan(o);
+        return o.axis === 'z'
+          ? { geo: box(a1 - a0, 0.05, b.b1 - b.b0), mat: concrete, at: [(a0 + a1) / 2, -0.025, (b.b0 + b.b1) / 2] }
+          : { geo: box(b.b1 - b.b0, 0.05, a1 - a0), mat: concrete, at: [(b.b0 + b.b1) / 2, -0.025, (a0 + a1) / 2] };
+      }),
+    ],
+    { cast: false, receive: true },
+  );
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
   const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
