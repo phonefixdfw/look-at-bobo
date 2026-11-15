@@ -8,9 +8,10 @@ import * as THREE from 'three';
 import { TOKENS } from './tokens.js';
 import { std } from './materials.js';
 import { floorMap, floorRough, plasterMap, rugMap, couchMap, skyMap } from './textures.js';
+import { slabAABB } from './reach.js';
 
 /** Build the apartment slice and its lights into `scene`.
- *  Returns { room, SUPPORTS, hemi, sun, lampLight, WALL_Z }. */
+ *  Returns { room, SUPPORTS, hemi, sun, lampLight, WALL_Z, wallBoxes }. */
 export function buildRoom(scene) {
 
 const room = new THREE.Group();
@@ -81,16 +82,14 @@ const plasterMat = std(TOKENS.plaster, { roughness: 0.95, map: plasterMap });
 const WALL_Z = -2.6;
 // the far wall is four slabs around a window opening (x ±1.15, y 0.5..2.0):
 // it has to cast its own shadow, or the sunlight on the floor is a lie
-mergedMesh(
-  [
-    { geo: box(2.05, 2.6, 0.12), mat: plasterMat, at: [-2.175, 1.3, WALL_Z] },
-    { geo: box(2.05, 2.6, 0.12), mat: plasterMat, at: [2.175, 1.3, WALL_Z] },
-    { geo: box(2.3, 0.5, 0.12), mat: plasterMat, at: [0, 0.25, WALL_Z] },
-    { geo: box(2.3, 0.6, 0.12), mat: plasterMat, at: [0, 2.3, WALL_Z] },
-    { geo: box(0.12, 2.6, 5.2), mat: plasterMat, at: [-3.2, 1.3, 0] },
-  ],
-  { tag: 'wall' },
-);
+const shellWalls = [
+  { geo: box(2.05, 2.6, 0.12), mat: plasterMat, at: [-2.175, 1.3, WALL_Z] },
+  { geo: box(2.05, 2.6, 0.12), mat: plasterMat, at: [2.175, 1.3, WALL_Z] },
+  { geo: box(2.3, 0.5, 0.12), mat: plasterMat, at: [0, 0.25, WALL_Z] },
+  { geo: box(2.3, 0.6, 0.12), mat: plasterMat, at: [0, 2.3, WALL_Z] },
+  { geo: box(0.12, 2.6, 5.2), mat: plasterMat, at: [-3.2, 1.3, 0] },
+];
+mergedMesh(shellWalls, { tag: 'wall' });
 
 // what the window looks out on: the flat, tone-mapping-exempt sky (its texture
 // is built once in src/textures.js), so the sunlit opening stays bright without
@@ -248,5 +247,16 @@ lampLight.position.set(-2.0, 1.45, -2.05);
 lampLight.castShadow = false;
 scene.add(lampLight);
 
-  return { room, SUPPORTS, hemi, sun, lampLight, WALL_Z };
+  return {
+    room,
+    SUPPORTS,
+    hemi,
+    sun,
+    lampLight,
+    WALL_Z,
+    /** Every plaster slab as an AABB, for the reachability/wall checks in
+     *  src/reach.js (issue #27). Derived from the same definitions that got
+     *  built, so a wall can never be "fixed" in one place only. */
+    wallBoxes: shellWalls.map((d, i) => slabAABB(d, `living#${i}`)),
+  };
 }

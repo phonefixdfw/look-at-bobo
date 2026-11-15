@@ -14,14 +14,22 @@ import { MOVE } from './level.js';
 /** The bathroom is the pocket that was sealed behind the hall's west wall
  *  in the slice (x∈[−3.14,−1.46], z∈[2.66,4.14]). Step 8 cuts a doorway
  *  (z∈[3.36,3.94]) into that wall, so the door3 rect bridges it. */
+// Each rect is inset 0.08 m off the plaster's inner face, not 0.02 m (issue
+// #27, bug 3). The camera's near plane is 0.05 m and walls are NOT colliders —
+// the rect edge is the only thing keeping a body out of the plaster — so at
+// 0.02 m the near plane cut 3 cm of every wall face away and you could see the
+// next room through the hole. Furniture never did this because its COLLIDER
+// push pad keeps the body 0.30 m out. Doorway rects deliberately still cross
+// their own wall band: that is the opening. `wall-camera-clearance` in the
+// engine's selfTest measures these gaps off the slabs that were actually built.
 export const WALK_RECTS = [
-  { id: 'living', x0: -3.12, z0: -2.52, x1: 3.12, z1: 2.52, room: 'living' },
-  { id: 'door1', x0: -1.11, z0: 2.5, x1: -0.09, z1: 2.72, room: 'door' },
-  { id: 'hall', x0: -1.32, z0: 2.66, x1: 0.32, z1: 4.14, room: 'hall' },
-  { id: 'door2', x0: -1.11, z0: 4.08, x1: -0.09, z1: 4.3, room: 'door' },
-  { id: 'door3', x0: -1.48, z0: 3.38, x1: -1.3, z1: 3.92, room: 'door' },
-  { id: 'bathroom', x0: -3.12, z0: 2.66, x1: -1.46, z1: 4.14, room: 'bathroom' },
-  { id: 'bedroom', x0: -3.12, z0: 4.28, x1: 1.98, z1: 6.92, room: 'bedroom' },
+  { id: 'living', x0: -3.04, z0: -2.44, x1: 3.04, z1: 2.44, room: 'living' },
+  { id: 'door1', x0: -1.05, z0: 2.36, x1: -0.15, z1: 2.86, room: 'door' },
+  { id: 'hall', x0: -1.24, z0: 2.76, x1: 0.24, z1: 4.04, room: 'hall' },
+  { id: 'door2', x0: -1.05, z0: 3.96, x1: -0.15, z1: 4.46, room: 'door' },
+  { id: 'door3', x0: -1.66, z0: 3.46, x1: -1.14, z1: 3.84, room: 'door' },
+  { id: 'bathroom', x0: -3.04, z0: 2.76, x1: -1.56, z1: 4.04, room: 'bathroom' },
+  { id: 'bedroom', x0: -3.04, z0: 4.36, x1: 1.9, z1: 6.84, room: 'bedroom' },
 ];
 
 /** Walk-blocking furniture AABBs (walls are handled by the walk rects). */
@@ -32,12 +40,17 @@ export const COLLIDERS = [
   { id: 'plant-pot', x0: 2.45, z0: -2.22, x1: 2.79, z1: -1.88 },
   { id: 'box', x0: 1.44, z0: 0.53, x1: 2.06, z1: 0.97 },
   { id: 'counter', x0: 0.6, z0: 1.94, x1: 2.4, z1: 2.54 }, // kitchenette (Step 8)
-  { id: 'bed', x0: 0.45, z0: 4.95, x1: 1.95, z1: 6.65 },
-  { id: 'nightstand', x0: 0.03, z0: 4.93, x1: 0.47, z1: 5.37 },
+  { id: 'bed', x0: 0.45, z0: 4.26, x1: 1.95, z1: 5.96 }, // headboard flush to the wall (issue #27)
+  { id: 'nightstand', x0: 0.03, z0: 4.26, x1: 0.47, z1: 4.7 },
   { id: 'basket', x0: -0.76, z0: 5.97, x1: -0.14, z1: 6.43 }, // laundry basket (Step 8)
   { id: 'desk', x0: -3.14, z0: 5.2, x1: -2.54, z1: 6.2 }, // bedroom desk (Step 8)
   { id: 'vanity', x0: -3.09, z0: 2.66, x1: -2.36, z1: 2.98 }, // bathroom (Step 8)
-  { id: 'toilet', x0: -1.86, z0: 3.61, x1: -1.49, z1: 4.12 },
+  // The toilet used to sit in the corner BESIDE the bathroom door. Push pads
+  // are radius-expanded on every side, so its pad covered the whole width of
+  // door3 and the room a player could walk into was one they could not walk
+  // out of (issue #27, bug 2). Same wall, same look — moved to the far end so
+  // the door side stays a 0.9 m clear strip.
+  { id: 'toilet', x0: -3.14, z0: 3.61, x1: -2.77, z1: 4.12 },
   // Step 8 furniture round 2 (Brandon's list) — footprints as built in
   // game/full-apartment.js, chosen clear of every spawn, view camera, moment
   // spot and decoy pot (see the clearance probe in docs/LEVEL_LAYOUT.md).
@@ -47,7 +60,7 @@ export const COLLIDERS = [
   { id: 'kitchen-table', x0: 2.1, z0: 1.25, x1: 3.15, z1: 2.0 },
   { id: 'hall-console', x0: 0.06, z0: 3.14, x1: 0.34, z1: 3.86 },
   { id: 'big-plant', x0: -1.87, z0: -2.53, x1: -1.44, z1: -2.11 },
-  { id: 'bedroom-plant', x0: 1.52, z0: 4.32, x1: 1.88, z1: 4.68 }, // Step 9 plant by the bed head
+  { id: 'bedroom-plant', x0: 1.55, z0: 6.5, x1: 1.91, z1: 6.86 }, // moved to the SE corner when the bed went flush (issue #27)
 ];
 
 /** Surfaces the cats stand on that buildRoom does not measure itself. All of
@@ -73,8 +86,8 @@ export const MOMENTS = [
   { id: 'desk-pen', room: 'bedroom', pose: 'sit', spot: [-2.84, 'deskTop', 5.55], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-bed' },
   { id: 'keyboard-sit', room: 'bedroom', pose: 'sit', spot: [-2.84, 'kbTop', 5.87], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-bed' },
   { id: 'laundry-nap', room: 'bedroom', pose: 'loaf', spot: [-0.45, 'laundryTop', 6.2], faceYaw: 2.6, canonicalDecoy: 'd-hall' },
-  { id: 'bed-stretch', room: 'bedroom', pose: 'sit', spot: [1.2, 'bedTop', 5.9], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' },
-  { id: 'blanket-biscuits', room: 'bedroom', pose: 'sit', spot: [1.2, 'blanketTop', 6.3], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' },
+  { id: 'bed-stretch', room: 'bedroom', pose: 'sit', spot: [1.2, 'bedTop', 5.21], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' }, // follows the flush bed (issue #27): was 5.9, off the moved mattress
+  { id: 'blanket-biscuits', room: 'bedroom', pose: 'sit', spot: [1.2, 'blanketTop', 5.61], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' }, // on the moved blanket (issue #27)
   { id: 'hall-chase', room: 'hall', pose: 'loaf', spot: [-0.5, 'floor', 3.42], faceYaw: 0.6, canonicalDecoy: 'd-rug' },
 ];
 
@@ -111,7 +124,7 @@ export const SPAWNS = [
   { room: 'bathroom', pos: [-2.3, 3.3], yaw: 1.9 },
   { room: 'bedroom', pos: [-2.6, 6.55], yaw: -0.79 },
   { room: 'bedroom', pos: [-1.2, 4.7], yaw: -1.4 },
-  { room: 'bedroom', pos: [-0.2, 6.75], yaw: 0.85 },
+  { room: 'bedroom', pos: [-1.35, 6.6], yaw: 0.85 }, // was [-0.2,6.75]: on the laundry basket's push pad (issue #27)
 ];
 
 /** Capture views (docs/LEVEL_LAYOUT.md). pos + yaw/pitch + fov; `hand` says

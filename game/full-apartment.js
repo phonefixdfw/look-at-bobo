@@ -17,6 +17,7 @@ import { std } from '../src/materials.js';
 import { buildRoom } from '../src/room.js';
 import { floorMap, floorRough, skyMap } from '../src/textures.js';
 import { hash1 } from '../src/util.js';
+import { slabAABB } from '../src/reach.js';
 import { SURFACES, fabric, worldUV, tvScreenMaterial, glowMaterial, contactShadows, leafGeo, broadLeafGeo } from '../src/polish.js';
 
 // -- Step 9 (issue #19): the flat's surfaces come from src/polish.js — wood
@@ -123,7 +124,7 @@ export function buildFullApartment(scene) {
   // z∈[3.36,3.94] — the bathroom's door (door3 walk rect).
   const H = 2.6;
   const cy = H / 2;
-  mergedMesh(flat, [
+  const walls = [
     // living: east wall, south wall with the doorway at x∈[−1.13,−0.07]
     { geo: box(0.12, H, 5.32), mat: plaster, at: [3.2, cy, 0] },
     { geo: box(2.13, H, 0.12), mat: plaster, at: [-2.195, cy, 2.6] },
@@ -145,7 +146,8 @@ export function buildFullApartment(scene) {
     // kitchenette carcass + bathroom vanity body share the plaster walls
     { geo: box(1.8, 0.9, 0.6), mat: paintedBoard, at: [1.5, 0.45, 2.24] },
     { geo: box(0.73, 0.8, 0.32), mat: paintedBoard, at: [-2.725, 0.4, 2.82] },
-  ], { receive: true });
+  ];
+  mergedMesh(flat, walls, { receive: true });
 
   // ---- bedroom window: the same flat sky + the same frame bars ----
   // (the plane's default face is +z, i.e. away from the room — turned to face in)
@@ -197,11 +199,14 @@ export function buildFullApartment(scene) {
   flat.add(bathFloor);
 
   // ---- the bedroom: bed, nightstand, desk (docs/LEVEL_LAYOUT.md) ----
+  // The headboard and the nightstand are FLUSH to the north wall's inner face
+  // (z = 4.26): they used to sit 0.69 m off it, so you could walk behind them
+  // and the room read as furniture floating in a gap (issue #27, bug 1).
   mergedMesh(flat, [
     // bed frame + headboard + nightstand + desk legs share walnut
-    { geo: box(1.5, 0.26, 1.7), mat: walnut, at: [1.2, 0.13, 5.8] },
-    { geo: box(1.5, 0.7, 0.1), mat: walnut, at: [1.2, 0.35, 5.0] },
-    { geo: box(0.44, 0.42, 0.44), mat: walnut, at: [0.25, 0.23, 5.15] },
+    { geo: box(1.5, 0.26, 1.7), mat: walnut, at: [1.2, 0.13, 5.11] },
+    { geo: box(1.5, 0.7, 0.1), mat: walnut, at: [1.2, 0.35, 4.31] },
+    { geo: box(0.44, 0.42, 0.44), mat: walnut, at: [0.25, 0.23, 4.48] },
     { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-3.08, 0.36, 5.26] },
     { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-3.08, 0.36, 6.14] },
     { geo: cyl(0.02, 0.02, 0.72, 10), mat: walnut, at: [-2.6, 0.36, 5.26] },
@@ -210,13 +215,13 @@ export function buildFullApartment(scene) {
   // desk top — its own mesh so deskTop is MEASURED (0.76)
   const [deskTopMesh] = mergedMesh(flat, [{ geo: box(0.6, 0.04, 1.0), mat: walnut, at: [-2.84, 0.74, 5.7] }]);
   const bedding = weaved(TOKENS.uiPaper, 0.92);
-  mergedMesh(flat, [{ geo: box(1.4, 0.18, 1.6), mat: bedding, at: [1.2, 0.35, 5.8] }]);
+  mergedMesh(flat, [{ geo: box(1.4, 0.18, 1.6), mat: bedding, at: [1.2, 0.35, 5.11] }]);
   const duvetMat = weaved(TOKENS.couch, 0.92);
-  mergedMesh(flat, [{ geo: box(1.44, 0.1, 1.12), mat: duvetMat, at: [1.2, 0.45, 6.06] }]);
+  mergedMesh(flat, [{ geo: box(1.44, 0.1, 1.12), mat: duvetMat, at: [1.2, 0.45, 5.37] }]);
   const pillowMat = weaved(TOKENS.pillow, 0.9);
   // blanket over the foot of the bed — its own mesh, blanketTop measured (0.58)
-  const [blanketMesh] = mergedMesh(flat, [{ geo: box(1.4, 0.06, 0.56), mat: pillowMat, at: [1.2, 0.55, 6.32] }]);
-  mergedMesh(flat, [{ geo: box(0.6, 0.1, 0.4), mat: pillowMat, at: [1.2, 0.51, 5.28] }]);
+  const [blanketMesh] = mergedMesh(flat, [{ geo: box(1.4, 0.06, 0.56), mat: pillowMat, at: [1.2, 0.55, 5.63] }]);
+  mergedMesh(flat, [{ geo: box(0.6, 0.1, 0.4), mat: pillowMat, at: [1.2, 0.51, 4.59] }]);
 
   // ---- the laundry basket (replaces the slice's floor pile) ----
   const basketMat = std(TOKENS.lampShade, { roughness: 0.8 });
@@ -233,13 +238,17 @@ export function buildFullApartment(scene) {
   mergedMesh(flat, [{ geo: cyl(0.16, 0.14, 0.04, 12), mat: laundry2, at: [-0.4, 0.16, 6.18], rot: [0, 0.6, 0] }], { cast: true });
 
   // ---- bathroom furniture: ceramics + a towel + a mat ----
+  // The toilet moved from the doorway corner to the far (west) end of the same
+  // wall: its push pad used to lie across the bathroom's ONLY door and cut the
+  // room off from the flat (issue #27, bug 2). A 0.30 m body now has a 0.9 m
+  // clear strip from the door to the bowl.
   mergedMesh(flat, [
-    { geo: box(0.35, 0.42, 0.5), mat: ceramic, at: [-1.675, 0.21, 3.87] }, // toilet bowl
-    { geo: box(0.36, 0.04, 0.5), mat: ceramic, at: [-1.675, 0.44, 3.85] }, // seat
-    { geo: box(0.35, 0.4, 0.16), mat: ceramic, at: [-1.675, 0.62, 4.04] }, // cistern
+    { geo: box(0.35, 0.42, 0.5), mat: ceramic, at: [-2.955, 0.21, 3.87] }, // toilet bowl
+    { geo: box(0.36, 0.04, 0.5), mat: ceramic, at: [-2.955, 0.44, 3.85] }, // seat
+    { geo: box(0.35, 0.4, 0.16), mat: ceramic, at: [-2.955, 0.62, 4.04] }, // cistern
   ]);
   mergedMesh(flat, [{ geo: box(0.03, 0.5, 0.3), mat: weaved(TOKENS.uiCoral, 0.95), at: [-3.125, 1.25, 3.7] }], { cast: true });
-  mergedMesh(flat, [{ geo: box(0.62, 0.012, 0.42), mat: fabric(TOKENS.rug, { roughness: 0.98, uvTile: 0.4 }), at: [-2.55, 0.006, 3.58] }], { cast: false });
+  mergedMesh(flat, [{ geo: box(0.62, 0.012, 0.42), mat: fabric(TOKENS.rug, { roughness: 0.98, uvTile: 0.4 }), at: [-2.42, 0.006, 3.52] }], { cast: false });
 
   // ---- the pen: Bobo's target on the desk, and the game's little trickster.
   // Its own tiny mesh (one draw) because its pose is WRITTEN EVERY FRAME by
@@ -386,12 +395,14 @@ export function buildFullApartment(scene) {
 
   // bedroom: a lamp on the nightstand, a rug along the bed, curtains at the window
   fur.push(
-    { geo: cyl(0.05, 0.07, 0.02, 12), mat: metal, at: [0.25, 0.45, 5.15] }, // bedside lamp
-    { geo: cyl(0.012, 0.012, 0.2, 8), mat: metal, at: [0.25, 0.55, 5.15] },
-    { geo: cyl(0.1, 0.13, 0.15, 12, true), mat: shade, at: [0.25, 0.68, 5.15] },
+    { geo: cyl(0.05, 0.07, 0.02, 12), mat: metal, at: [0.25, 0.45, 4.48] }, // bedside lamp
+    { geo: cyl(0.012, 0.012, 0.2, 8), mat: metal, at: [0.25, 0.55, 4.48] },
+    { geo: cyl(0.1, 0.13, 0.15, 12, true), mat: shade, at: [0.25, 0.68, 4.48] },
+    // the bed is flush to the wall now, so its runner moved to the side you
+    // actually step out onto (it used to lie in the gap behind the headboard)
+    { geo: box(0.5, 0.012, 1.3), mat: bedRug, at: [0.19, 0.006, 5.4] },
   );
   furSoft.push(
-    { geo: box(1.3, 0.012, 0.5), mat: bedRug, at: [1.2, 0.006, 4.72] },
     { geo: box(0.24, 2.0, 0.05), mat: curtainBedroom, at: [-1.32, 1.25, 6.94] },
     { geo: box(0.24, 2.0, 0.05), mat: curtainBedroom, at: [1.32, 1.25, 6.94] },
   );
@@ -612,7 +623,7 @@ export function buildFullApartment(scene) {
   // ---- fill light for the rooms the style-test rig never lit ----
   // Budget: sun stays the only shadow light; 3 more real lights, 5 total.
   const bedLight = new THREE.PointLight(0xffd9b0, 3.2, 6, 2);
-  bedLight.position.set(0.9, 2.35, 5.7);
+  bedLight.position.set(0.9, 2.35, 5.11); // over the flush bed's centre (issue #27)
   bedLight.castShadow = false;
   const bathLight = new THREE.PointLight(0xdfeaf2, 2.2, 4.5, 2);
   bathLight.position.set(-2.3, 2.3, 3.4);
@@ -636,5 +647,8 @@ export function buildFullApartment(scene) {
     },
     lights: { bedLight, bathLight, kitchenLight },
     pen: { root: pen, barrel: penMesh },
+    // every plaster slab as an AABB, from the definitions that got built
+    // (src/reach.js measures the walls you can actually see)
+    wallBoxes: [...living.wallBoxes, ...walls.map((d, i) => slabAABB(d, `full#${i}`))],
   };
 }
