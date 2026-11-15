@@ -39,7 +39,7 @@ const { chromium } = require('playwright-core');
 const exe = ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync);
 
 // Which page to stress: the Step 6 slice by default, or the full game
-// (`--page game/full.html --checks 46`). Every scenario's own scripts use
+// (`--page game/full.html --checks 47`). Every scenario's own scripts use
 // ?win=3, so they stay short on either page.
 const argv = process.argv.slice(2);
 const arg = (name, dflt) => {
@@ -47,7 +47,7 @@ const arg = (name, dflt) => {
   return i >= 0 ? argv[i + 1] : dflt;
 };
 const PAGE = arg('page', 'game/slice.html');
-const CHECKS = Number(arg('checks', 42));
+const CHECKS = Number(arg('checks', 43));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
 const browser = await chromium.launch({
