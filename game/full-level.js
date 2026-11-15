@@ -20,6 +20,7 @@
 // where a body may stand, what it cannot walk through, and where the cats are.
 
 import { MOVE } from './level.js';
+import { KITCHEN_COLLIDERS } from './full-kitchen.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
  *  so yaw = atan2(−dx, −dz) means "look towards (dx, dz)", and 0 looks north
@@ -83,14 +84,16 @@ export const COLLIDERS = [
   { id: 'dining-table', x0: 0.75, z0: 1.1, x1: 2.35, z1: 1.9 }, // the long bench side towards the east wall
   { id: 'chair-a', x0: 0.22, z0: 1.42, x1: 0.69, z1: 1.89 },
   { id: 'chair-b', x0: 1.35, z0: 0.62, x1: 1.82, z1: 1.09 },
-  // ── kitchen: an L of 0.60 m counters in the north-west corner (sink under
-  //    the window, range beside it, dishwasher at the run's west end), the
-  //    fridge in the north-east corner, and a breakfast bar on the south wall.
-  //    The aisle in front of the run is 1.7 m — issue #33 asks for ~1 m — and
-  //    nothing crosses the doorway's own route. ──
-  { id: 'counter-n', x0: 2.52, z0: -2.9, x1: 4.95, z1: -2.3 },
-  { id: 'counter-w', x0: 2.52, z0: -2.3, x1: 3.12, z1: -1.05 },
-  { id: 'fridge', x0: 4.95, z0: -2.9, x1: 5.52, z1: -2.2 },
+  // ── kitchen: the run game/full-kitchen.js draws, footprints and all. The
+  //    four boxes below ARE the drawn pieces (KITCHEN_COLLIDERS is spliced in,
+  //    so there is no second copy of these numbers to drift): 0.60 m counters
+  //    along the north wall and back down the west, the range in the break of
+  //    the east run, the fridge in the north-east corner. The aisle in front of
+  //    the run is 1.80 m (issue #33 asks for ~1 m); in front of the fridge it is
+  //    the 0.85 m pocket between its door and the range, which the fridge-floor
+  //    spot needs and a 0.30 m body fits. The breakfast bar and its stools are
+  //    the old placeholders — the bar is a later issue. ──
+  ...KITCHEN_COLLIDERS,
   { id: 'kitchen-bar', x0: 3.3, z0: 0.2, x1: 4.9, z1: 0.6 },
   { id: 'bar-stool-a', x0: 3.55, z0: -0.15, x1: 3.91, z1: 0.21 },
   { id: 'bar-stool-b', x0: 4.29, z0: -0.15, x1: 4.65, z1: 0.21 },
@@ -445,15 +448,25 @@ export const SCALE_RANGES = {
   'tv-screen': { w: [1.0, 1.3], h: [0.55, 0.75], bottom: [0.5, 0.7], note: '55" TV on the stand' },
   bookshelf: { w: [0.8, 1.0], d: [0.28, 0.4], h: [1.7, 2.1], note: 'bookcase 0.90 × 0.35 × 1.90' },
   'floor-lamp': { h: [1.4, 1.7], note: 'floor lamp 1.5–1.6 m' },
-  'counter-height': { top: [0.85, 0.95], note: 'counter top 0.90' },
-  'counter-depth': { d: [0.58, 0.66], note: 'counter depth 0.60' },
-  'upper-cabinet': { t: [0.3, 0.38], h: [0.65, 0.8], note: 'uppers 0.35 deep, 0.7 tall' },
-  'upper-mounted': { bottom: [1.42, 1.48], note: 'uppers start 1.45 off the floor' },
-  hood: { w: [0.55, 0.7], d: [0.45, 0.55], bottom: [1.55, 1.7], note: 'hood over the range' },
-  sink: { w: [0.5, 0.62], note: 'sink 0.55 wide' },
-  range: { w: [0.55, 0.65], d: [0.58, 0.66], top: [0.85, 0.95], note: 'range 0.60 × 0.62' },
-  fridge: { w: [0.55, 0.62], d: [0.65, 0.75], h: [1.7, 1.9], note: 'fridge 0.57 × 0.70 × 1.80' },
-  dishwasher: { w: [0.55, 0.65], d: [0.58, 0.66], top: [0.85, 0.92], note: 'dishwasher 0.60 × 0.60 × 0.89' },
+  // the kitchen (ruler rows 11-22), retuned in issue #41 to what each row
+  // ALLOWS rather than what one placeholder box happened to be. `w` is the long
+  // horizontal extent and `d` the short one (see the note above), so a run reads
+  // the same whichever way its wall runs: the fridge's 0.70 is its front, the
+  // counters' 0.58-0.60 is their depth, and the north-east corner's window
+  // jamb, not the ruler, is what keeps that front at 0.60 wide.
+  'counter-height': { top: [0.85, 0.95], note: 'row 11: worktop at 0.90' },
+  'counter-depth': { d: [0.55, 0.68], note: 'row 12: counters 0.60 deep' },
+  'worktop-thickness': { h: [0.025, 0.06], note: 'row 13: the slab is 0.04' },
+  backsplash: { top: [1.2, 1.5], note: 'row 14: tile stops at 1.35, 0.45 above the worktop' },
+  'upper-cabinet': { t: [0.28, 0.4], h: [0.55, 0.85], note: 'row 15: uppers 0.35 deep × 0.70 tall' },
+  'upper-mounted': { bottom: [1.35, 1.55], note: 'row 15: upper bottoms 1.45 off the floor' },
+  'cab-door': { h: [0.5, 0.7], note: 'row 16: a hinged front, 0.58 tall' },
+  sink: { w: [0.4, 0.62], d: [0.32, 0.5], top: [0.85, 0.95], note: 'row 17: bowl 0.50 × 0.42, rim at the worktop' },
+  faucet: { h: [0.2, 0.4], note: 'row 18: 0.28 over the worktop, 0.22 reach' },
+  range: { w: [0.55, 0.68], d: [0.55, 0.68], top: [0.85, 0.95], note: 'row 19: 0.60 × 0.60, top flush with the worktop' },
+  hood: { w: [0.5, 0.75], d: [0.5, 0.75], note: 'row 20: 0.60 wide × 0.50 deep over the range' },
+  fridge: { w: [0.6, 0.85], h: [1.65, 1.95], note: 'row 21: 1.80 tall, 0.70 across' },
+  dishwasher: { w: [0.55, 0.65], d: [0.58, 0.66], top: [0.85, 0.92], note: 'row 22: 0.60 front under the counter' },
   'bar-height': { top: [1.0, 1.1], note: 'breakfast bar top 1.05' },
   'bar-stool': { w: [0.3, 0.4], d: [0.3, 0.4], h: [0.6, 0.7], note: 'stool 0.36 × 0.36 × 0.65' },
   'bed-queen': { w: [1.95, 2.1], d: [1.45, 1.65], note: 'queen 2.03 long × 1.53 wide' },

@@ -44,6 +44,7 @@ import {
   CEILINGS,
   SUPPORT_DEFS,
 } from './full-shell.js';
+import { buildFullKitchen } from './full-kitchen-mesh.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -54,7 +55,7 @@ const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
  *  UVs are RE-BAKED from world position at the density each material asks for
  *  (src/polish.js `worldUV`) — that is what lets a merged wall show plaster
  *  grain at a constant scale instead of one stretched texel. */
-function mergedMesh(parent, entries, { cast = true, receive = true } = {}) {
+export function mergedMesh(parent, entries, { cast = true, receive = true } = {}) {
   const _x = new THREE.Object3D();
   const byMat = new Map();
   for (const e of entries) {
@@ -521,6 +522,12 @@ export function buildFullApartment(scene) {
   penRoot.position.set(-1.85, 0.83, 5.67);
   penRoot.rotation.x = Math.PI / 2; // build pose: lying down (resetPen rights it)
   flat.add(penRoot);
+
+  // ── the kitchen (issue #41) ───────────────────────────────────────────────
+  // Every number in it lives in game/full-kitchen.js; this is the one call that
+  // puts it on screen, so the flat still draws its shell from full-shell.js and
+  // its kitchen from one data module and nowhere else.
+  buildFullKitchen(flat);
 
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
