@@ -594,3 +594,40 @@ in its notes.
 **Caveats.** Nobody has hand-played the game yet (item 15 stands); the fade
 still hands over to an already-interactive title card, which is 0.35 s of
 crossfade, not a bug. Machine ears and pixels only, as ever.
+
+## 14. Issue #25 — phone support (headless mobile emulation, `npm run check:mobile`)
+
+The VISION's "Phones, touch controls" not-goal retired: `game/full.html` now plays on a
+phone. Nobody held a phone for this — `tools/mobile-check.mjs` drives real Chrome at phone
+viewports (844×390 @3x and @2x, 390×844, iPhone UA, `hasTouch`), and every touch lands as a
+**CDP-dispatched trusted touch event** so the page's own pointer/touch handlers run — the
+game cannot tell this from a phone, and neither can the checks. **36/36 PASS.**
+
+- **Desktop stays desktop (the capture contract):** control page boots with touch off,
+  ratio 1, quality full, all touch DOM `display:none`; `capture:full:determinism` re-run at
+  this HEAD is 8/8 byte-identical. `?touch=on` reproduces the phone layout at a desk.
+- **Detection and posture:** phone page has `.touch` classes, `touchDebug().autoLow`,
+  quality `low` + ratio cap 1.5 (backing store measured 1266×585 at @3x), shadows off;
+  `?quality=high` flips to full + ratio 2 + shadows; `?touch=off` on the phone gives
+  keyboard controls at ratio 1 while keeping the phone quality default.
+- **The controls themselves (all through real handlers):** the gate tap starts the game with
+  **no pointer lock** (`pointerLockElement === null`); the stick holds forward+run and walks
+  the player 2.04 m in 0.7 s, releasing clears every virtual key; a right-side drag turns
+  yaw then pitch (Δyaw 0.436 — sensitivity honoured through `?sens`); a stick finger and a
+  look finger are live **at the same time** (walk + turn measured together); a tap of the
+  shout button scores a real centre-ray find; the page never scrolls or zooms
+  (`touch-action: none`, `overscroll-behavior: none`, viewport meta with
+  `maximum-scale=1, user-scalable=no, viewport-fit=cover`).
+- **Life on a phone:** starting upright waits behind the rotate hint and turns landscape →
+  resumes by itself; hiding the tab pauses behind the card and a tap resumes without any
+  lock; the shout button is ≥100 px and fully inside the safe-area-inset landscape layout.
+- **The full run, mobile path only:** seed 11 at @2x, gate tapped, **won at 10/10** driven
+  solely by shout-button taps (plus one deliberate DAG! at 2 points — score dipped 2→1),
+  exact `your did it! you wind`, the play-again line reads for thumbs, and the restart tap
+  respects the 0.6 s cooldown (tap early → still win; tap after → find at 0). Console clean
+  on every phone page.
+
+**Machine-only caveats (a phone pass with Brandon's hands is the real sign-off):** iOS
+Safari's missing Fullscreen/orientation-lock APIs, real thumb feel, and SwiftShader-vs-real-GPU
+framerate are not verifiable headlessly; see `docs/DEPLOY.md` "Testing on a phone". Mic
+shouting stays out of scope.

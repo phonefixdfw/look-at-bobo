@@ -59,6 +59,30 @@ suspect when a static-deploy game is a black screen. Any `404` on these six
 lines means the build didn't ship that file — run `npm run build` locally and
 compare against the printed manifest.
 
+## Testing on a phone (issue #25)
+
+Point a phone at `https://lookatbobo.getluckysocial.com/game/full.html` — the
+game detects the phone by itself: a virtual stick under the left thumb, drag
+the right side of the screen to look, the big yellow button shouts (it also
+restarts after a win). The tap that starts the game also asks for fullscreen
+and landscape lock: **Android Chrome grants both; iOS Safari has neither API
+for a page** and just plays inside the browser chrome — that is expected, not
+a bug. Upright, the game waits behind a "turn your phone sideways" card.
+
+Useful parameters while phone-testing (append to the URL with `?`/`&`):
+
+| Parameter | What it does |
+|---|---|
+| `?quality=high` | the full look back on a phone (auto-low is the default there) |
+| `?quality=low` | force the weak-GPU look on a desktop |
+| `?touch=on` | force the touch controls on a desktop (test the layout with a mouse attached) |
+| `?touch=off` | force keyboard/mouse on a phone (QA) |
+| `?label=on` | the tool's moment chip, if you want it while testing |
+
+If a phone run feels wrong, note the URL params — `npm run check:mobile`
+replays the whole phone path headlessly (touch events, rotate, auto-low, win
+at ten) and `?touch=on` at a desk reproduces most layouts.
+
 ## Checking the build locally before pushing
 
 ```bash
