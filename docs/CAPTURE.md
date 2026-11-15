@@ -66,7 +66,9 @@ the reference implementation.
 
 ```js
 window.LC = {
-  ready: false,          // true once the scene is built (the tool waits for it)
+  ready: false,          // true once the scene is built AND nothing is painted over
+                         // the canvas — the tool waits for it, then screenshots the
+                         // whole page, so an overlay still mid-fade would be in frame
   duration: 6,           // loop length in seconds (0 if the page does not animate)
   views: ['overview', 'contact', 'top', 'first-person'],
   setView(name) {},      // switch camera; unknown name => throw
@@ -190,3 +192,12 @@ name of what caught it. A tool that only ever says PASS proves nothing.
 - The tool needs Chrome or Edge already installed; `playwright-core` drives it, and no
   browser is downloaded. Override the path with `LC_CHROME=/path/to/chrome` if needed.
 - **Step 7 (stress suite)** added loop-inspection hooks to the slice (all additive, contract unchanged): `LC.loopTick(dt)` steps the sim by hand, `LC.loopDebug()` reports the measured frame deltas (dtIn/dtClamped/steps/simDt/camPos), `LC.loopDebugReset()` clears them, and `LC.catsDebug()` / `LC.aimProbe()` expose cat transforms and a strict aim hit for spawn and aim audits. The live loop now consumes rAF frame deltas (clamped 0.25 s / 16 steps) — capture is unaffected because it never enters the live view. Scenarios: `npm run playtest:stress`, `docs/PLAYTEST_NOTES.md` §10.
+- **Step 9 part 3 lesson (fixed in #23): a DOM overlay is part of a capture.** A capture is
+  a screenshot of the whole page, not of the canvas, so anything painted above the canvas at
+  `ready` time is in the frame — and a fading one changes pixels between the two screenshots
+  `--determinism` takes. `game/full.html`'s loading screen did exactly that: `LC.ready` was set
+  before the 0.35 s fade began, and `capture:full:determinism` failed on the first full-page
+  frame of every boot. The rule now: **retire an overlay (removed from the DOM, not just
+  transparent) before setting `ready`**; take the cue from `transitionend` with a timer as the
+  backstop, so a hidden tab can never hang the contract. The player keeps the fade.
+  Record: `docs/PLAYTEST_NOTES.md` §13.

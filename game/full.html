@@ -484,10 +484,12 @@
         pointer-events: none;
       }
 
-      /* Step 9: loading screen. Static from the first byte, removed the
-         moment the game is actually ready (no fake progress bars). The
-         gentle bob is its only motion and it is gone once the flat loads —
-         it never appears in a captured frame. */
+      /* Step 9: loading screen. Static from the first byte, retired the moment
+         the game is actually ready (no fake progress bars). The gentle bob is
+         its only motion. It fades out over 0.35 s, so `LC.ready` is announced
+         only when this element is actually removed (see boot() in engine.js):
+         a capture is a screenshot of the whole page, and a frame taken
+         mid-fade would be a crossfade of this card and the flat. */
       #loading {
         position: fixed;
         inset: 0;
