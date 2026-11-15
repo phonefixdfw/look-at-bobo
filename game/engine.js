@@ -41,6 +41,25 @@ import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
 
+/**
+ * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
+ * that way (issue #27, bug 4 — he was rendering backwards).
+ *
+ * The angle convention, shared by cameras and cats and documented in
+ * docs/LEVEL_LAYOUT.md: a yaw a faces (−sin a, −cos a). That is what the
+ * camera does with its yaw, because a Three.js camera looks down its own −z.
+ * The cat rig faces the other way: its head, nose and whiskers are at local
+ * +z (docs/CHARACTERS.md), so a bare `rotation.y = a` aims a cat at
+ * (sin a, cos a) — 180° from the number the level declared, which is why
+ * spots authored against the doc appeared to stare at walls.
+ *
+ * One function, one conversion: every place a cat's root gets turned goes
+ * through here, so the rig and the convention can never drift apart again.
+ */
+export function catRootYaw(faceYaw) {
+  return faceYaw + Math.PI;
+}
+
 export function bootGame(cfg) {
   const {
     WALK_RECTS, COLLIDERS, MOMENTS, MOMENT_IDS, EVENT_PHASES, ALL_STAGE_IDS,
@@ -404,15 +423,15 @@ export function bootGame(cfg) {
   function placeBoboAt(moment) {
     const [x, support, z] = moment.spot;
     bobo.root.position.set(x, supports[support] ?? 0, z);
-    bobo.root.rotation.y = moment.faceYaw;
+    bobo.root.rotation.y = catRootYaw(moment.faceYaw); // see catRootYaw
     setCatPose(bobo, moment.pose);
     game.boboSupport = support;
   }
   function placeDecoyAt(spot) {
     const [x, support, z] = spot.pos;
     decoy.root.position.set(x, supports[support] ?? 0, z);
-    decoy.root.rotation.y = spot.faceYaw;
-    setCatPose(decoy, 'sprawl');
+    decoy.root.rotation.y = catRootYaw(spot.faceYaw);
+    setCatPose(decoy, spot.pose ?? 'sprawl'); // spots may ask for a lying pose (issue #27)
     game.decoyId = spot.id;
     game.decoySupport = support;
   }
@@ -580,9 +599,17 @@ export function bootGame(cfg) {
       bp.tailPivot.rotation.x = Math.sin(t * 0.71 + 1.2) * 0.045; // slow secondary drift
       bp.head.rotation.y = Math.sin(t * 0.85 + 0.4) * 0.09;
       bp.head.rotation.x = bp.baseHeadX + Math.sin(t * 0.6) * 0.025;
-      bp.head.rotation.z = Math.sin(t * 0.47 + 2.1) * 0.02; // a cat never holds still
+      bp.head.rotation.z = bp.baseHeadZ + Math.sin(t * 0.47 + 2.1) * 0.02; // a cat never holds still
       const breathe = Math.sin(t * 1.9); // Step 9: the whole cat breathes
-      bp.body.scale.set(base.x * (1 + 0.016 * breathe), base.y * (1 + 0.009 * breathe), base.z * (1 + 0.012 * breathe));
+      // A rolled lying pose (side/back, issue #27) has its local x pointing
+      // world-up — breathe the horizontal pair there so the contact never
+      // rocks. Upright poses take the original path, byte for byte.
+      const rolled = Math.abs(bp.body.rotation.z) > 0.5;
+      bp.body.scale.set(
+        rolled ? base.x : base.x * (1 + 0.016 * breathe),
+        rolled ? base.y * (1 + 0.016 * breathe) : base.y * (1 + 0.009 * breathe),
+        base.z * (1 + 0.012 * breathe),
+      );
       bp.shells[0].scale.copy(bp.body.scale).multiplyScalar(1.045); // the fuzz rides along
       faceLife(bp, t, 0);
       // The moment's own set piece (the slice's if-chain lives in the boot
@@ -596,7 +623,14 @@ export function bootGame(cfg) {
     if (dp) {
       const base = dp.body.userData.baseScale ?? (dp.body.userData.baseScale = dp.body.scale.clone());
       const s = Math.sin(t * 1.1);
-      dp.body.scale.set(base.x * (1 + 0.03 * s), base.y, base.z * (1 + 0.022 * s));
+      // same rolled rule as Bobo's idle (issue #27): a lying side-pose decoy
+      // must not sink 4 mm per breath
+      const rolledD = Math.abs(dp.body.rotation.z) > 0.5;
+      dp.body.scale.set(
+        rolledD ? base.x : base.x * (1 + 0.03 * s),
+        rolledD ? base.y * (1 + 0.03 * s) : base.y,
+        base.z * (1 + 0.022 * s),
+      );
       dp.shells[0].scale.copy(dp.body.scale).multiplyScalar(1.045);
       dp.tailPivot.rotation.y = Math.sin(t * 0.9 + 2) * 0.07; // a lazy heavy sway
       dp.tailPivot.rotation.x = Math.sin(t * 0.41) * 0.03;
@@ -1081,7 +1115,7 @@ export function bootGame(cfg) {
         z: d.pos[2],
         y: supports[d.pos[1]] ?? 0,
         yaw: d.faceYaw,
-        pose: 'sprawl',
+        pose: d.pose ?? 'sprawl', // a decoy spot may lie down too (issue #27)
       })),
     ];
     const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
@@ -1145,6 +1179,62 @@ export function bootGame(cfg) {
         'a body (r 0.30), not a point: every spawn reaches every room, spawn and cat',
         bad.length === 0,
         'furniture push pads subtracted — the trap in issue #27 was invisible to a point walk',
+      );
+    }
+
+    // --- issue #27 (bug 4): a cat facing a wall reads as a prop, not a pet.
+    // The front of the rig is measured, not assumed: head minus tail pivot,
+    // in world space, on a real cat turned to the declared faceYaw. It must be
+    // within 90° of the direction of the nearest place a player can stand and
+    // see it — Bobo looks out at the room, never at plaster.
+    {
+      const probes = { Bobo: buildCat('bobo'), decoy: buildCat('decoy') };
+      const bad = [];
+      const rendered = [];
+      const vTmp = new THREE.Vector3();
+      const tTmp = new THREE.Vector3();
+      for (const sp of catSpots) {
+        // Approach area = the body-sized cells this cat is actually cut off
+        // to, seen from beside the cat itself. `walk-reachable` is the check
+        // that says a player can GET to that component; here the question is
+        // only which way the cat is pointing relative to the players it can
+        // plausibly have.
+        const near = nearestStandable(bodyGrid, sp.x, sp.z);
+        const a = bestApproach(bodyGrid, bodyGrid.flood(near.idx), { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
+        if (!a) {
+          bad.push(`${sp.id}: no standable sight line`);
+          continue;
+        }
+        const probe = probes[sp.kind];
+        // Reset to a pose both rigs have, so a spot asking for a pose its cat
+        // does not build (a lying spot on a cat without that pose) measures
+        // the same way in any iteration order — as what it renders.
+        setCatPose(probe, 'sit');
+        setCatPose(probe, sp.pose);
+        if (probe.current !== sp.pose) rendered.push(`${sp.id}→${probe.current}`);
+        probe.root.position.set(sp.x, sp.y, sp.z);
+        probe.root.rotation.y = catRootYaw(sp.yaw);
+        probe.root.updateMatrixWorld(true);
+        const pv = probe.pivots[probe.current];
+        pv.head.getWorldPosition(vTmp);
+        pv.tailPivot.getWorldPosition(tTmp);
+        const fx = vTmp.x - tTmp.x;
+        const fz = vTmp.z - tTmp.z;
+        const fl = Math.hypot(fx, fz) || 1;
+        // (a.dx, a.dz) points from the cat to its vantage; the face must be
+        // turned toward it, so the front·cat→vantage dot is the test.
+        const dot = (fx * a.dx + fz * a.dz) / (fl * a.dist);
+        const deg = (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
+        if (deg > 90) bad.push(`${sp.id} ${deg.toFixed(0)}° off its approach`);
+      }
+      add(
+        'cats-face-the-room',
+        bad.length
+          ? bad.slice(0, 3).join(', ')
+          : `${catSpots.length}/${catSpots.length} face an approach${rendered.length ? ` (${rendered.join(', ')} render as built)` : ''}`,
+        'front within 90° of the nearest place a player can stand and see them',
+        bad.length === 0,
+        'head−tail of the rendered rig, measured, not the yaw number',
       );
     }
 
@@ -1401,7 +1491,7 @@ export function bootGame(cfg) {
     // Step 8: the full game appends its own checks (moment count, every
     // moment's contact band, room coverage). The slice adds none.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS });
+      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes: apt.wallBoxes ?? [] });
     }
 
     game.score = savedScore;

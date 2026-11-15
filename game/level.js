@@ -42,10 +42,10 @@ export const EXTRA_SUPPORTS = { boxFloor: 0.02, bedTop: 0.5 };
  *  is the decoy spot the staged (capturable) version of this moment uses. */
 export const MOMENTS = [
   { id: 'loaf-couch', room: 'living', pose: 'loaf', spot: [-2.55, 'cushion', 0.46], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-plant' },
-  { id: 'window-bird', room: 'living', pose: 'sit', spot: [-0.6, 'floor', -2.2], faceYaw: -0.98, canonicalDecoy: 'd-rug' },
+  { id: 'window-bird', room: 'living', pose: 'sit', spot: [-0.6, 'floor', -2.2], faceYaw: 2.36, canonicalDecoy: 'd-rug' }, // half-turned from the glass (issue #27: cats faced away); 45° off the nearest approach in both slice and full grids
   { id: 'cardboard-box', room: 'living', pose: 'sit', spot: [1.75, 'boxFloor', 0.75], faceYaw: Math.PI / 2, canonicalDecoy: 'd-rug' },
   { id: 'tail-chase', room: 'hall', pose: 'loaf', spot: [-0.5, 'floor', 3.42], faceYaw: 0.6, canonicalDecoy: 'd-rug' },
-  { id: 'bed-sprawl', room: 'bedroom', pose: 'sprawl', spot: [1.2, 'bedTop', 5.9], faceYaw: Math.PI / 2, canonicalDecoy: 'd-hall' },
+  { id: 'bed-sprawl', room: 'bedroom', pose: 'sprawl', spot: [1.2, 'bedTop', 5.9], faceYaw: 0.785, canonicalDecoy: 'd-hall' }, // was π/2 (exactly 90° off the north approach along the bed's side); now NW, 45° off (issue #27)
 ];
 
 export const MOMENT_IDS = MOMENTS.map((m) => m.id);
@@ -61,7 +61,7 @@ export const DECOY_SPOTS = [
   { id: 'd-rug', room: 'living', pos: [0.15, 'rug', 0.55], faceYaw: 0.9 },
   { id: 'd-plant', room: 'living', pos: [2.55, 'floor', -1.6], faceYaw: 2.4 },
   { id: 'd-hall', room: 'hall', pos: [-0.5, 'floor', 3.45], faceYaw: 0 },
-  { id: 'd-bed', room: 'bedroom', pos: [-1.8, 'floor', 5.7], faceYaw: -1.2 },
+  { id: 'd-bed', room: 'bedroom', pos: [-1.8, 'floor', 5.7], faceYaw: Math.PI / 2 }, // was −1.2 (159° off — stared at the corner); faces west across the bedroom (issue #27)
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
 export const DECOY_MIN_DIST = 1.2;

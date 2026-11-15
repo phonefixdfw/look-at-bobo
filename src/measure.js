@@ -11,10 +11,13 @@ const DASH_EXPECT = { c: [0, 0.036, 0.058], h: [0.0095, 0.036, 0.032] }; // wher
 const BIB_EXPECT = {
   sit: { c: [0, 0.245, 0.122], h: [0.098, 0.095, 0.105] },
   loaf: { c: [0, 0.1, 0.145], h: [0.075, 0.07, 0.075] },
+  side: { c: [0.062, 0.095, 0.135], h: [0.05, 0.075, 0.085] },
+  back: { c: [0, 0.21, 0.115], h: [0.085, 0.055, 0.09] },
 };
 const COLLAR_EXPECT = {
   sit: { c: [0, 0.386, 0.045], h: [0.125, 0.034, 0.105] },
   sprawl: { c: [0, 0.185, 0.165], h: [0.155, 0.115, 0.04] },
+  side: { c: [0.02, 0.2, 0.165], h: [0.105, 0.015, 0.05] },
 };
 const LIN_WHITE = new THREE.Color(TOKENS.furWhite).r;
 const LIN_BLACK = new THREE.Color(TOKENS.furBlack).r;

@@ -48,24 +48,43 @@ function rulesBobo(pose) {
     // (docs/ART_STYLE.md §5), still unmistakably the same marking.
     { sdf: (p) => boxSDF(p, [0, 0.036, 0.058], [0.0095, 0.036, 0.032]), name: 'dash', head: true },
   ];
-  const body = pose === 'loaf'
-    ? [
-        { sdf: (p) => ellSDF(p, [0, 0.1, 0.145], [0.075, 0.07, 0.075]), name: 'bib' },
-        { sdf: (p) => ellSDF(p, [0.086, 0.06, 0.02], [0.04, 0.03, 0.04]), name: 'belly-patch' },
-      ]
-    : [
-        { sdf: (p) => ellSDF(p, [0, 0.245, 0.122], [0.098, 0.095, 0.105]), name: 'bib' },
-        { sdf: (p) => ellSDF(p, [0.086, 0.09, 0.02], [0.04, 0.03, 0.04]), name: 'belly-patch' },
-      ];
+  const body =
+    pose === 'loaf'
+      ? [
+          { sdf: (p) => ellSDF(p, [0, 0.1, 0.145], [0.075, 0.07, 0.075]), name: 'bib' },
+          { sdf: (p) => ellSDF(p, [0.086, 0.06, 0.02], [0.04, 0.03, 0.04]), name: 'belly-patch' },
+        ]
+      : pose === 'side'
+        ? [
+            // lying on the side (belly to +x): the bib rides up the chest
+            // flank and the belly patch sits on the belly line — both still
+            // read from the doorway, which is the whole point of the tells.
+            { sdf: (p) => ellSDF(p, [0.062, 0.095, 0.135], [0.05, 0.075, 0.085]), name: 'bib' },
+            { sdf: (p) => ellSDF(p, [0.09, 0.045, 0.015], [0.035, 0.03, 0.045]), name: 'belly-patch' },
+          ]
+        : pose === 'back'
+          ? [
+              // belly-up: the bib is the white chest facing the ceiling, the
+              // belly patch just behind it on the upturned belly.
+              { sdf: (p) => ellSDF(p, [0, 0.21, 0.115], [0.085, 0.055, 0.09]), name: 'bib' },
+              { sdf: (p) => ellSDF(p, [0.055, 0.215, -0.01], [0.04, 0.03, 0.045]), name: 'belly-patch' },
+            ]
+          : [
+              { sdf: (p) => ellSDF(p, [0, 0.245, 0.122], [0.098, 0.095, 0.105]), name: 'bib' },
+              { sdf: (p) => ellSDF(p, [0.086, 0.09, 0.02], [0.04, 0.03, 0.04]), name: 'belly-patch' },
+            ];
   return { head, body };
 }
 /** THE DECOY CAT — white feet (built as parts, not rules) and a white neck
  *  band. Explicitly no dash, no bib, no belly patch (docs/DECOY_CAT.md). */
 function rulesDecoy(pose) {
   const head = rulesMuzzle();
-  const body = pose === 'sprawl'
-    ? [{ sdf: (p) => ellSDF(p, [0, 0.185, 0.165], [0.155, 0.115, 0.04]), name: 'collar' }]
-    : [{ sdf: (p) => ellSDF(p, [0, 0.386, 0.045], [0.125, 0.034, 0.105]), name: 'collar' }];
+  const body =
+    pose === 'sprawl'
+      ? [{ sdf: (p) => ellSDF(p, [0, 0.185, 0.165], [0.155, 0.115, 0.04]), name: 'collar' }]
+      : pose === 'side'
+        ? [{ sdf: (p) => ellSDF(p, [0.02, 0.2, 0.165], [0.105, 0.015, 0.05]), name: 'collar' }] // band across the TOP of a side-lying cat's neck — the one neck region Bobo's side bib never reaches, so the two tells can't trade places in the scan
+        : [{ sdf: (p) => ellSDF(p, [0, 0.386, 0.045], [0.125, 0.034, 0.105]), name: 'collar' }];
   return { head, body };
 }
 

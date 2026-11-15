@@ -47,7 +47,8 @@ const arg = (name, dflt) => {
   return i >= 0 ? argv[i + 1] : dflt;
 };
 const PAGE = arg('page', 'game/slice.html');
-const CHECKS = Number(arg("checks", 45));
+// issue #27: slice gained cats-face-the-room (45 → 46); full passes --checks 51 (49 + facing + lying-poses)
+const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
 const browser = await chromium.launch({
