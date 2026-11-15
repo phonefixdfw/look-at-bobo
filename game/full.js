@@ -11,6 +11,7 @@
  *   Capture it:  npm run capture:full
  */
 import * as LEVEL from './full-level.js';
+import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 
@@ -31,8 +32,13 @@ function fullMomentAnim({ bp, base, t, bobo, game, momentById, apt, supports }) 
   if (pen) resetPen(pen, supports); // at rest for every moment that isn't desk-pen
 
   if (m === 'couch-loaf') {
-    const s = Math.sin(t * 0.9); // the loaf breathes
-    bp.body.scale.set(base.x * (1 + 0.018 * s), base.y, base.z * (1 + 0.014 * s));
+    // side-sleeping on the couch (pose 'side', issue #27): flank breathing in
+    // the world-horizontal plane — the body egg is rolled, so local y/z are
+    // horizontal here; scaling local x (idle's choice) would rock him off the
+    // cushion contact.
+    const s = Math.sin(t * 0.9);
+    bp.body.scale.set(base.x, base.y * (1 + 0.02 * s), base.z * (1 + 0.014 * s));
+    bp.tailPivot.rotation.y = Math.sin(t * 0.55) * 0.08; // a dreaming flick
   } else if (m === 'window-bird') {
     bp.head.rotation.y = Math.sin(t * 0.55) * 0.5; // sweeping the glass
     bp.head.rotation.x = bp.baseHeadX + Math.sin(t * 2.6) * 0.04; // chattering
@@ -60,15 +66,21 @@ function fullMomentAnim({ bp, base, t, bobo, game, momentById, apt, supports }) 
     bp.head.rotation.y = Math.sin(t * 0.3) * 0.15;
     bp.tailPivot.rotation.y = Math.sin(t * 1.05) * 0.14;
   } else if (m === 'laundry-nap') {
-    // deep sleep in the laundry basket: slow whole-body breathing
+    // deep sleep curled on its side in the laundry basket (pose 'side',
+    // issue #27): slow whole-body breathing in the world-horizontal plane,
+    // cheek settled into the laundry (baseHeadX is the lying tilt already)
     const s = Math.sin(t * 0.62);
-    bp.body.scale.set(base.x * (1 + 0.024 * s), base.y, base.z * (1 + 0.018 * s));
-    bp.head.rotation.x = bp.baseHeadX + 0.1 + Math.sin(t * 0.62) * 0.02; // head down, asleep
+    bp.body.scale.set(base.x, base.y * (1 + 0.024 * s), base.z * (1 + 0.018 * s));
+    bp.head.rotation.x = bp.baseHeadX + Math.sin(t * 0.62) * 0.02;
+    bp.tailPivot.rotation.y = Math.sin(t * 0.31) * 0.05; // one slow ear-flick worth of tail
   } else if (m === 'bed-stretch') {
-    // the long stretch along the bed: spine extends, head leads, tail straight
+    // belly-up roll-stretch on the bed (pose 'back', issue #27): the spine
+    // extends along the bed and the belly flattens into the mattress; the
+    // chin reaches further to the ceiling. Local x is world-up on this pose,
+    // so the stretch rides y/z only — the contact never leaves the bed.
     const s = Math.sin(t * 0.55);
-    bp.body.scale.set(base.x * (1 - 0.02 * s), base.y, base.z * (1 + 0.06 * s));
-    bp.head.rotation.x = bp.baseHeadX + 0.16 - s * 0.1; // reaching forward
+    bp.body.scale.set(base.x, base.y * (1 - 0.02 * s), base.z * (1 + 0.06 * s));
+    bp.head.rotation.x = bp.baseHeadX - s * 0.08;
     bp.tailPivot.rotation.y = Math.sin(t * 2.4) * 0.06;
   } else if (m === 'blanket-biscuits') {
     // biscuits at ~2.2 Hz: the head nods with each press, the body rocks
@@ -137,7 +149,7 @@ function batThePen(pen, supports, t) {
 
 /* ---- full-game checks the engine can't know on its own ----
  * Appended after the engine's own 42, so the full page reports 46. */
-function fullExtraChecks({ add, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS }) {
+function fullExtraChecks({ add, THREE, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every moment must be findable AND shoutable: measured paw contact on its
@@ -152,6 +164,60 @@ function fullExtraChecks({ add, supports, buildCat, setCatPose, contactGap, MOME
     if (!(g.gap >= -0.001 && g.gap <= 0.002)) bad.push(`${m.id} ${g.gap.toFixed(4)}`);
   }
   add('every-moment-contact', bad.length ? bad.join(', ') : '10/10 seated', 'gap -0.001..+0.002 m', bad.length === 0, 'paws touch their own support at every spot');
+
+  // Issue #27: lying variety must be real AND remain a game. At least three
+  // moments lie (side/back) and at least one decoy spot does; and from the
+  // nearest place a player can stand and see each lying cat, an eye-high ray
+  // to BOTH head and body lands on the cat — the pointing hit-test walks the
+  // whole root (catUnderCrosshair), so this pins that a sleeping-on-his-side
+  // Bobo is still a hittable animal, not a bug-wide silhouette.
+  {
+    const lying = MOMENTS.filter((m) => m.pose === 'side' || m.pose === 'back');
+    const lyingDecoy = DECOY_SPOTS.filter((s) => s.pose === 'side' || s.pose === 'back');
+    const lbad = [];
+    const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: LEVEL.MOVE.playerRadius });
+    const los = [
+      ...wallBoxes,
+      ...LEVEL.COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: 1.05 })),
+    ];
+    const rc = new THREE.Raycaster();
+    const from = new THREE.Vector3();
+    const to = new THREE.Vector3();
+    for (const m of lying) {
+      const y = supports[m.spot[1]] ?? 0;
+      const probe = buildCat('bobo');
+      setCatPose(probe, m.pose);
+      probe.root.position.set(m.spot[0], y, m.spot[2]);
+      probe.root.rotation.y = catRootYaw(m.faceYaw);
+      probe.root.updateMatrixWorld(true);
+      const near = nearestStandable(grid, m.spot[0], m.spot[2]);
+      const a = bestApproach(grid, grid.flood(near.idx), { x: m.spot[0], z: m.spot[2], y, los, eye: LEVEL.MOVE.eye });
+      if (!a) {
+        lbad.push(`${m.id}: no approach`);
+        continue;
+      }
+      from.set(a.x, LEVEL.MOVE.eye, a.z);
+      for (const [part, node] of [
+        ['head', probe.pivots[m.pose].head],
+        ['body', probe.pivots[m.pose].body],
+      ]) {
+        node.getWorldPosition(to);
+        rc.set(from, to.clone().sub(from).normalize());
+        if (!rc.intersectObjects([probe.root], true).some((h) => h.object.isMesh)) {
+          lbad.push(`${m.id}: ${part} misses from its approach`);
+        }
+      }
+    }
+    add(
+      'lying-poses',
+      lying.length >= 3 && lyingDecoy.length >= 1 && lbad.length === 0
+        ? `${lying.map((m) => `${m.id}(${m.pose})`).join(' ')} + ${lyingDecoy.map((d) => d.id).join(' ')} aimable`
+        : lbad.length ? lbad.join(', ') : `${lying.length} lying moments, ${lyingDecoy.length} lying decoys`,
+      '≥3 side/back moments + ≥1 lying decoy, head+body ray-hit from an approach',
+      lying.length >= 3 && lyingDecoy.length >= 1 && lbad.length === 0,
+      'pointing still works on a lying cat (issue #27)',
+    );
+  }
 
   // the whole flat is in play: every room is visitable as a moment, a decoy
   // spot, or a spawn — and any room Bobo can be found in can hold a decoy

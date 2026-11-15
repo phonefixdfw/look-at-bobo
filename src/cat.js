@@ -98,8 +98,11 @@ function buildHead(mats) {
 }
 
 const CAT_SPECS = {
-  bobo: { scale: [1, 1, 1], poses: ['sit', 'loaf'], rules: rulesBobo },
-  decoy: { scale: [1.3, 1.13, 1.12], poses: ['sit', 'sprawl'], rules: rulesDecoy },
+  // issue #27: lying variety — Bobo sleeps on his side and rolls belly-up;
+  // the decoy gets the side lie (the one lying pose that reads on a 22 lb
+  // cat sprawled anywhere). Order matters: poses[0] is the built default.
+  bobo: { scale: [1, 1, 1], poses: ['sit', 'loaf', 'side', 'back'], rules: rulesBobo },
+  decoy: { scale: [1.3, 1.13, 1.12], poses: ['sit', 'sprawl', 'side'], rules: rulesDecoy },
 };
 
 function buildCat(kind) {
@@ -165,6 +168,36 @@ function buildPose(kind, pose, grp, mats, contacts) {
       const paw = addMesh(grp, ellGeo(0.032, 0.021, 0.05, 24, 16), white, [s * 0.052, 0.021, 0.19], 'fore-paw', { contact: true, cast: false });
       contacts.push(paw);
     }
+  } else if (pose === 'side') {
+    // asleep on the side, belly to +x, head end at +z (issue #27 — "Bobo is
+    // never lying on his side"). The loaf loafed over: the same egg rolled
+    // 90° about z rests on its flank, so the contact box bottoms out at y 0
+    // exactly like every other pose. The near-side legs are hidden under the
+    // body (as in the loaf); the far-side paw and hindfoot poke out along the
+    // floor so the silhouette reads "lying", not "fallen loaf".
+    const w = isDecoy ? 1.16 : 1; // the decoy egg is a little bigger, as elsewhere
+    const body = addMesh(grp, ellGeo(0.125 * w, 0.098 * w, 0.2 * w, 56, 40), fur, [0, 0.125 * w, 0], 'torso', {
+      contact: true,
+      rot: [0, 0, Math.PI / 2],
+    });
+    contacts.push(body);
+    const paw = addMesh(grp, ellGeo(0.032, 0.022, 0.062 * w, 24, 16), white, [0.015, 0.022, 0.21 * w], 'fore-paw', { contact: true, cast: false });
+    contacts.push(paw);
+    const hind = addMesh(grp, ellGeo(0.036, 0.023, 0.058 * w, 24, 16), white, [0.02, 0.023, -0.16 * w], 'hind-foot', { contact: true, cast: false });
+    hind.rotation.y = 0.45; // kicked-out hind leg
+    contacts.push(hind);
+  } else if (pose === 'back') {
+    // belly-up, mid-roll (issue #27). Same egg rolled the other way so the
+    // chest side faces +y; paws fly up and only the torso touches the bed.
+    // A back lie is deliberately lighter on geometry than the side lie: it
+    // is only ever staged on the big soft bed, seen from the doorway.
+    const body = addMesh(grp, ellGeo(0.13, 0.105, 0.21, 56, 40), fur, [0, 0.13, 0], 'torso', { contact: true });
+    body.rotation.z = -Math.PI / 2;
+    contacts.push(body);
+    for (const s of [-1, 1]) {
+      addMesh(grp, ellGeo(0.03, 0.022, 0.048, 24, 16), white, [s * 0.052, 0.245, 0.1], 'fore-paw', { cast: false, rot: [0, 0, s * 0.35] });
+      addMesh(grp, ellGeo(0.034, 0.024, 0.058, 24, 16), white, [s * 0.062, 0.22, -0.115], 'hind-foot', { cast: false, rot: [0, 0, s * 0.5] });
+    }
   } else {
     // sprawl: the 22 lb cat belly-down with the hips out — reads as heavy and wide
     const body = addMesh(grp, ellGeo(0.175, 0.135, 0.25, 56, 40), fur, [0, 0.135, -0.05], 'torso', { contact: true });
@@ -179,13 +212,27 @@ function buildPose(kind, pose, grp, mats, contacts) {
     }
   }
 
-  const headAt = pose === 'sit' ? [0, 0.445, 0.04] : pose === 'loaf' ? [0, 0.165, 0.155] : [0, 0.17, 0.245];
+  const headAt =
+    pose === 'sit' ? [0, 0.445, 0.04]
+    : pose === 'loaf' ? [0, 0.165, 0.155]
+    : pose === 'side' ? [0.02, isDecoy ? 0.148 : 0.128, isDecoy ? 0.195 : 0.172]
+    : pose === 'back' ? [0, 0.15, 0.185]
+    : [0, 0.17, 0.245];
   const head = buildHead(mats);
   head.position.set(headAt[0], headAt[1], headAt[2]);
-  if (pose !== 'sit') head.rotation.x = 0.12;
+  // Head tilt per pose. These become the animation base (engine idle and the
+  // moment anims add their drifts onto baseHeadX/baseHeadZ, never replacing).
+  if (pose === 'side') head.rotation.set(-0.5, 0, -0.5); // cheek on the floor, face tipped up toward the viewer
+  else if (pose === 'back') head.rotation.x = -0.7; // chin to the ceiling, belly-up
+  else if (pose !== 'sit') head.rotation.x = 0.12;
   grp.add(head);
 
-  const tailAt = pose === 'sit' ? [0, 0.135, -0.175] : pose === 'loaf' ? [0.09, 0.02, -0.12] : [0, 0.03, -0.285];
+  const tailAt =
+    pose === 'sit' ? [0, 0.135, -0.175]
+    : pose === 'loaf' ? [0.09, 0.02, -0.12]
+    : pose === 'side' ? [-0.01, 0.02, isDecoy ? -0.19 : -0.16]
+    : pose === 'back' ? [0.05, 0.02, -0.185]
+    : [0, 0.03, -0.285];
   const pivot = new THREE.Group();
   pivot.position.set(tailAt[0], tailAt[1], tailAt[2]);
   const pts =
@@ -193,7 +240,9 @@ function buildPose(kind, pose, grp, mats, contacts) {
       ? [[0, 0, 0], [0.02, -0.05, -0.07], [0.09, -0.02, -0.13], [0.14, 0.05, -0.1]]
       : pose === 'loaf'
         ? [[0, 0, 0], [0.07, 0.005, -0.04], [0.14, 0.01, 0.02], [0.13, 0.02, 0.09]]
-        : [[0, 0, 0], [0.02, 0, -0.09], [0.05, 0.005, -0.17], [0.02, 0.01, -0.23]];
+        : pose === 'side' || pose === 'back'
+          ? [[0, 0, 0], [0.06, 0.004, -0.05], [0.125, 0.008, 0.01], [0.145, 0.014, 0.08]] // trailing along the floor/sheet
+          : [[0, 0, 0], [0.02, 0, -0.09], [0.05, 0.005, -0.17], [0.02, 0.01, -0.23]];
   const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)));
   const tail = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, isDecoy ? 0.021 : 0.016, 10, false), fur);
   tail.castShadow = true;
@@ -205,6 +254,7 @@ function buildPose(kind, pose, grp, mats, contacts) {
   const bodyMesh = grp.children.find((c) => c.isMesh && c.userData.tag === 'torso');
   const shellBody = fuzzShell(bodyMesh, mats.fuzz);
   shellBody.position.copy(bodyMesh.position);
+  shellBody.rotation.copy(bodyMesh.rotation); // lying poses roll the body; the fuzz rolls with it
   shellBody.scale.copy(bodyMesh.scale).multiplyScalar(1.045);
   shellBody.castShadow = false;
   grp.add(shellBody);
@@ -212,7 +262,7 @@ function buildPose(kind, pose, grp, mats, contacts) {
   shellHead.scale.copy(head.children[0].scale).multiplyScalar(1.05);
   shellHead.castShadow = false;
   head.add(shellHead);
-  return { head, tailPivot: pivot, body: bodyMesh, shells: [shellBody, shellHead], baseHeadX: head.rotation.x };
+  return { head, tailPivot: pivot, body: bodyMesh, shells: [shellBody, shellHead], baseHeadX: head.rotation.x, baseHeadZ: head.rotation.z };
 }
 
 export { ellGeo, addMesh, cylinderBetween, whiskers, buildHead, CAT_SPECS, buildCat, setCatPose, buildPose };

@@ -79,14 +79,14 @@ export const EXTRA_SUPPORTS = {
  *  `canonicalDecoy` is the decoy spot the staged (capturable) tableau uses —
  *  always ≥ DECOY_MIN_DIST from Bobo (selfTest proves it for every seed). */
 export const MOMENTS = [
-  { id: 'couch-loaf', room: 'living', pose: 'loaf', spot: [-2.55, 'cushion', 0.46], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-plant' },
+  { id: 'couch-loaf', room: 'living', pose: 'side', spot: [-2.55, 'cushion', 0.46], faceYaw: -Math.PI / 2, canonicalDecoy: 'd-plant' }, // id keeps its name; pose moved loaf→side per issue #27 ("couch on his side")
   { id: 'window-bird', room: 'living', pose: 'sit', spot: [-0.6, 'floor', -2.2], faceYaw: 2.36, canonicalDecoy: 'd-rug' }, // half-turned from the glass to the room (issue #27: cats faced away); 45° off the nearest approach in BOTH slice and full grids
   { id: 'box-sit', room: 'living', pose: 'sit', spot: [1.75, 'boxFloor', 0.75], faceYaw: Math.PI / 2, canonicalDecoy: 'd-rug' },
   { id: 'sink-sit', room: 'living', pose: 'sit', spot: [2.05, 'counterTop', 2.2], faceYaw: Math.PI / 2, canonicalDecoy: 'd-rug' },
   { id: 'desk-pen', room: 'bedroom', pose: 'sit', spot: [-2.84, 'deskTop', 5.55], faceYaw: -0.7, canonicalDecoy: 'd-bed' }, // was −π/2 (exactly 90° off its approach — knife-edge); now ENE into the room, 40° off
   { id: 'keyboard-sit', room: 'bedroom', pose: 'sit', spot: [-2.84, 'kbTop', 5.87], faceYaw: -2.36, canonicalDecoy: 'd-bed' }, // was −π/2 (exactly 90°); ESE, 45° off its southern approach
-  { id: 'laundry-nap', room: 'bedroom', pose: 'loaf', spot: [-0.45, 'laundryTop', 6.2], faceYaw: 2.6, canonicalDecoy: 'd-hall' },
-  { id: 'bed-stretch', room: 'bedroom', pose: 'sit', spot: [1.2, 'bedTop', 5.21], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' }, // follows the flush bed (issue #27): was 5.9, off the moved mattress
+  { id: 'laundry-nap', room: 'bedroom', pose: 'side', spot: [-0.45, 'laundryTop', 6.2], faceYaw: 2.6, canonicalDecoy: 'd-hall' }, // curled on its side in the basket (issue #27)
+  { id: 'bed-stretch', room: 'bedroom', pose: 'back', spot: [1.2, 'bedTop', 5.21], faceYaw: Math.PI / 2, canonicalDecoy: 'd-bed' }, // follows the flush bed (issue #27): was 5.9, off the moved mattress; pose sit→back per issue #27 ("stretching on the bed on his back")
   { id: 'blanket-biscuits', room: 'bedroom', pose: 'sit', spot: [1.2, 'blanketTop', 5.61], faceYaw: 2.64, canonicalDecoy: 'd-bed' }, // on the moved blanket (issue #27); was π/2 (exactly 90° off the foot-of-bed approach), now SSW at it, 29° off
   { id: 'hall-chase', room: 'hall', pose: 'loaf', spot: [-0.5, 'floor', 3.42], faceYaw: 0.6, canonicalDecoy: 'd-rug' },
 ];
@@ -108,7 +108,7 @@ export const DECOY_SPOTS = [
   { id: 'd-rug', room: 'living', pos: [0.15, 'rug', 0.55], faceYaw: 0.9 },
   { id: 'd-plant', room: 'living', pos: [2.55, 'floor', -1.6], faceYaw: 2.4 },
   { id: 'd-hall', room: 'hall', pos: [-0.5, 'floor', 3.45], faceYaw: 0 },
-  { id: 'd-bath', room: 'bathroom', pos: [-2.4, 'floor', 3.4], faceYaw: -1.68 }, // was 1.6 (172° off — stared at the tub wall); now faces the doorway strip it can be seen from (issue #27)
+  { id: 'd-bath', room: 'bathroom', pos: [-2.4, 'floor', 3.4], faceYaw: -1.68, pose: 'side' }, // was 1.6 (172° off — stared at the tub wall); now faces the doorway strip it can be seen from, and lies on its side by the mat (issue #27: decoy lying pose "where it fits")
   { id: 'd-bed', room: 'bedroom', pos: [-1.7, 'floor', 6.8], faceYaw: Math.PI / 2 }, // was −1.2 (159° off into the corner); faces west across the bedroom from the door side (issue #27)
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */

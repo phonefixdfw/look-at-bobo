@@ -431,7 +431,7 @@ export function bootGame(cfg) {
     const [x, support, z] = spot.pos;
     decoy.root.position.set(x, supports[support] ?? 0, z);
     decoy.root.rotation.y = catRootYaw(spot.faceYaw);
-    setCatPose(decoy, 'sprawl');
+    setCatPose(decoy, spot.pose ?? 'sprawl'); // spots may ask for a lying pose (issue #27)
     game.decoyId = spot.id;
     game.decoySupport = support;
   }
@@ -599,9 +599,17 @@ export function bootGame(cfg) {
       bp.tailPivot.rotation.x = Math.sin(t * 0.71 + 1.2) * 0.045; // slow secondary drift
       bp.head.rotation.y = Math.sin(t * 0.85 + 0.4) * 0.09;
       bp.head.rotation.x = bp.baseHeadX + Math.sin(t * 0.6) * 0.025;
-      bp.head.rotation.z = Math.sin(t * 0.47 + 2.1) * 0.02; // a cat never holds still
+      bp.head.rotation.z = bp.baseHeadZ + Math.sin(t * 0.47 + 2.1) * 0.02; // a cat never holds still
       const breathe = Math.sin(t * 1.9); // Step 9: the whole cat breathes
-      bp.body.scale.set(base.x * (1 + 0.016 * breathe), base.y * (1 + 0.009 * breathe), base.z * (1 + 0.012 * breathe));
+      // A rolled lying pose (side/back, issue #27) has its local x pointing
+      // world-up — breathe the horizontal pair there so the contact never
+      // rocks. Upright poses take the original path, byte for byte.
+      const rolled = Math.abs(bp.body.rotation.z) > 0.5;
+      bp.body.scale.set(
+        rolled ? base.x : base.x * (1 + 0.016 * breathe),
+        rolled ? base.y * (1 + 0.016 * breathe) : base.y * (1 + 0.009 * breathe),
+        base.z * (1 + 0.012 * breathe),
+      );
       bp.shells[0].scale.copy(bp.body.scale).multiplyScalar(1.045); // the fuzz rides along
       faceLife(bp, t, 0);
       // The moment's own set piece (the slice's if-chain lives in the boot
@@ -615,7 +623,14 @@ export function bootGame(cfg) {
     if (dp) {
       const base = dp.body.userData.baseScale ?? (dp.body.userData.baseScale = dp.body.scale.clone());
       const s = Math.sin(t * 1.1);
-      dp.body.scale.set(base.x * (1 + 0.03 * s), base.y, base.z * (1 + 0.022 * s));
+      // same rolled rule as Bobo's idle (issue #27): a lying side-pose decoy
+      // must not sink 4 mm per breath
+      const rolledD = Math.abs(dp.body.rotation.z) > 0.5;
+      dp.body.scale.set(
+        rolledD ? base.x : base.x * (1 + 0.03 * s),
+        rolledD ? base.y * (1 + 0.03 * s) : base.y,
+        base.z * (1 + 0.022 * s),
+      );
       dp.shells[0].scale.copy(dp.body.scale).multiplyScalar(1.045);
       dp.tailPivot.rotation.y = Math.sin(t * 0.9 + 2) * 0.07; // a lazy heavy sway
       dp.tailPivot.rotation.x = Math.sin(t * 0.41) * 0.03;
@@ -1100,7 +1115,7 @@ export function bootGame(cfg) {
         z: d.pos[2],
         y: supports[d.pos[1]] ?? 0,
         yaw: d.faceYaw,
-        pose: 'sprawl',
+        pose: d.pose ?? 'sprawl', // a decoy spot may lie down too (issue #27)
       })),
     ];
     const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
@@ -1476,7 +1491,7 @@ export function bootGame(cfg) {
     // Step 8: the full game appends its own checks (moment count, every
     // moment's contact band, room coverage). The slice adds none.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS });
+      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes: apt.wallBoxes ?? [] });
     }
 
     game.score = savedScore;
