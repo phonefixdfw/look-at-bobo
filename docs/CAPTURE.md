@@ -189,3 +189,4 @@ name of what caught it. A tool that only ever says PASS proves nothing.
   permanent (or attached to a PR).
 - The tool needs Chrome or Edge already installed; `playwright-core` drives it, and no
   browser is downloaded. Override the path with `LC_CHROME=/path/to/chrome` if needed.
+- **Step 7 (stress suite)** added loop-inspection hooks to the slice (all additive, contract unchanged): `LC.loopTick(dt)` steps the sim by hand, `LC.loopDebug()` reports the measured frame deltas (dtIn/dtClamped/steps/simDt/camPos), `LC.loopDebugReset()` clears them, and `LC.catsDebug()` / `LC.aimProbe()` expose cat transforms and a strict aim hit for spawn and aim audits. The live loop now consumes rAF frame deltas (clamped 0.25 s / 16 steps) — capture is unaffected because it never enters the live view. Scenarios: `npm run playtest:stress`, `docs/PLAYTEST_NOTES.md` §10.
