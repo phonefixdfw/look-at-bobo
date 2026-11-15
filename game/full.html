@@ -216,6 +216,16 @@
         text-shadow: 0 3px 0 rgba(16, 21, 28, 0.45), 0 10px 30px rgba(0, 0, 0, 0.35);
       }
 
+      /* Step 9 juice: one soft coral breath when DAG! lands (opacity driven
+         in JS as a pure function of t — never a CSS keyframe, never a strobe). */
+      #wrong-flash {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(120% 95% at 50% 46%, rgba(255, 143, 125, 0.0) 42%, rgba(255, 143, 125, 0.55) 100%);
+      }
+
       /* Win: the exact ending text on a warm veil. Never "fixed". */
       #ending-veil {
         position: fixed;
@@ -404,6 +414,7 @@
         </svg>
         <div id="dag-label">DAG!</div>
       </div>
+      <div id="wrong-flash"></div>
       <div id="ending-veil"></div>
       <div id="ending">your did it! you wind</div>
       <div id="ending-again">click or press space to play again</div>

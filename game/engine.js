@@ -32,6 +32,7 @@ import { TOKENS } from '../src/tokens.js';
 import { clamp, easeOutCubic, easeOutBack, seededShuffle, srgbLuma, contrast, round } from '../src/util.js';
 import { buildCat, setCatPose } from '../src/cat.js';
 import { createCelebration } from '../src/celebrate.js';
+import { createConfetti, juiceFrame } from '../src/juice.js';
 import { scanMarkings, contactGap } from '../src/measure.js';
 import { buildHand } from '../src/hand.js';
 import { VOICE_LINES, audioPlanFor, createVoiceEngine } from '../src/audio.js';
@@ -92,7 +93,8 @@ export function bootGame(cfg) {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  const BASE_EXPOSURE = 1.05; // the look's reference exposure; juice blinks ride it
+  renderer.toneMappingExposure = BASE_EXPOSURE;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -120,6 +122,7 @@ export function bootGame(cfg) {
   scene.add(bobo.root, decoy.root);
 
   const { rainHeads, rainMuzzles, rainDashes, bursts, updateRain, updateFireworks } = createCelebration(scene);
+  const confetti = createConfetti(scene); // Step 9 juice, win-only (src/juice.js)
 
   const hand = buildHand();
   const handRig = new THREE.Group();
@@ -168,6 +171,7 @@ export function bootGame(cfg) {
     reticle: document.getElementById('reticle'),
     dag: document.getElementById('dag-burst'),
     dagLabel: document.getElementById('dag-label'),
+    wrongFlash: document.getElementById('wrong-flash'),
     ending: document.getElementById('ending'),
     veil: document.getElementById('ending-veil'),
     prompt: document.getElementById('prompt'),
@@ -487,6 +491,7 @@ export function bootGame(cfg) {
     }
     if (game.phase === 'win') updateRain(t);
     if (game.phase === 'win' || game.phase === 'catch') updateFireworks(t);
+    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE });
     // The pointing hand (the demo's choreography, tuned copy): rises with the
     // shout, points, pulls back when the DAG! lands. In `find` it rests in the
     // lower frame — this is a body, not a prop.
