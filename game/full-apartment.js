@@ -283,6 +283,157 @@ export function buildFullApartment(scene) {
     { cast: false, receive: true },
   );
 
+  // ── the openings: casings, leaves, glass, sills, and the sky beyond ──────
+  // Every piece here is relief modelling derived from OPENINGS — the plaster
+  // gap is already exactly right, so casings merely fill the 0.08 m casing
+  // inset (2 cm shy of the walk rectangle's edge: trim the camera could
+  // graze is trim the camera-gap check can't see) and frame the hole.
+  const casings = [];
+  const trimBoards = [];
+  const leafBoards = []; // walnut: door leaves
+  const hardware = []; // metal: knobs, slider frames
+  const frameBoards = []; // trim-painted: window frames
+  const sillBoards = [];
+  const panes = [];
+  const skyPlanes = [];
+
+  /** A world-aligned box from a run interval, a band interval and a y span,
+   *  laid out for which axis the band's thickness runs along. */
+  const bb = (axis, r0, r1, b0, b1, y0, y1) =>
+    axis === 'z'
+      ? { geo: box(r1 - r0, y1 - y0, b1 - b0), at: [(r0 + r1) / 2, (y0 + y1) / 2, (b0 + b1) / 2] }
+      : { geo: box(b1 - b0, y1 - y0, r1 - r0), at: [(b0 + b1) / 2, (y0 + y1) / 2, (r0 + r1) / 2] };
+
+  for (const o of OPENINGS) {
+    const b = openingBand(o);
+    const [a0, a1] = gapSpan(o);
+    const mid = (b.b0 + b.b1) / 2;
+    const faceIn = o.fixed; // the room's plaster face at this band
+    const faceOut = b.sign < 0 ? b.b0 : b.b1;
+
+    if (o.kind === 'window') {
+      // glass mid-band, a plain ring + one mullion, and a sill board whose
+      // top lands exactly on the sill height the ruler's row measures.
+      panes.push(bb(o.axis, o.lo, o.hi, mid - 0.006, mid + 0.006, o.sill, o.head));
+      const F = 0.05;
+      frameBoards.push(
+        bb(o.axis, o.lo, o.lo + F, mid - 0.025, mid + 0.025, o.sill, o.head),
+        bb(o.axis, o.hi - F, o.hi, mid - 0.025, mid + 0.025, o.sill, o.head),
+        bb(o.axis, o.lo, o.hi, mid - 0.025, mid + 0.025, o.sill, o.sill + F),
+        bb(o.axis, o.lo, o.hi, mid - 0.025, mid + 0.025, o.head - F, o.head),
+        bb(o.axis, (o.lo + o.hi) / 2 - 0.02, (o.lo + o.hi) / 2 + 0.02, mid - 0.02, mid + 0.02, o.sill, o.head),
+      );
+      const sA = faceIn - b.sign * 0.12; // 12 cm into the room, 1 cm into the band
+      const sB = faceIn + b.sign * 0.01;
+      const [z0, z1] = [Math.min(sA, sB), Math.max(sA, sB)];
+      sillBoards.push(
+        o.axis === 'z'
+          ? { geo: box(o.hi - o.lo + 0.1, 0.04, z1 - z0), mat: trim, at: [(o.lo + o.hi) / 2, o.sill - 0.02, (z0 + z1) / 2] }
+          : { geo: box(z1 - z0, 0.04, o.hi - o.lo + 0.1), mat: trim, at: [(z0 + z1) / 2, o.sill - 0.02, (o.lo + o.hi) / 2] },
+      );
+      skyPlanes.push({
+        pos:
+          o.axis === 'z'
+            ? [(o.lo + o.hi) / 2, (o.sill + o.head) / 2, faceOut + b.sign * 0.14]
+            : [faceOut + b.sign * 0.14, (o.sill + o.head) / 2, (o.lo + o.hi) / 2],
+        rotY: o.axis === 'z' ? (b.sign < 0 ? 0 : Math.PI) : b.sign < 0 ? Math.PI / 2 : -Math.PI / 2,
+        w: o.hi - o.lo + 1.4,
+        h: Math.max(2, o.head - o.sill + 0.9),
+      });
+      continue;
+    }
+
+    // door-like: fill the casing inset (for the sealed front door, up to the
+    // leaf's own edge), then a 6 x 2 cm trim frame on both faces.
+    const leafLo = o.kind === 'sealed' ? (a0 + a1) / 2 - LEAF_W / 2 : o.lo - 0.02;
+    const leafHi = o.kind === 'sealed' ? (a0 + a1) / 2 + LEAF_W / 2 : o.hi + 0.02;
+    casings.push(
+      bb(o.axis, a0, leafLo, b.b0, b.b1, o.sill, o.head),
+      bb(o.axis, leafHi, a1, b.b0, b.b1, o.sill, o.head),
+    );
+    for (const [f, dir] of [
+      [faceIn, -b.sign],
+      [faceOut, b.sign],
+    ]) {
+      const p0 = Math.min(f, f + dir * 0.02);
+      const p1 = Math.max(f, f + dir * 0.02);
+      trimBoards.push(
+        bb(o.axis, a0 - 0.06, a0, p0, p1, o.sill, o.head + 0.06),
+        bb(o.axis, a1, a1 + 0.06, p0, p1, o.sill, o.head + 0.06),
+        bb(o.axis, a0 - 0.06, a1 + 0.06, p0, p1, o.head, o.head + 0.06),
+      );
+    }
+
+    if (o.kind === 'door') {
+      // the leaf stays OPEN, swung flat against the room-side plaster — this
+      // flat has no door you can shut (issue #31's lesson, game/full-shell.js)
+      const c = faceIn - b.sign * 0.05;
+      leafBoards.push(bb(o.axis, o.lo + 0.02, o.lo + 0.02 + LEAF_W, c - 0.02, c + 0.02, 0.005, LEAF_H));
+      hardware.push({
+        geo: cyl(0.02, 0.02, 0.03, 10),
+        rot: [Math.PI / 2, 0, 0],
+        mat: metal,
+        at:
+          o.axis === 'z'
+            ? [o.hi - 0.06, 1.0, faceIn - b.sign * 0.08]
+            : [faceIn - b.sign * 0.08, 1.0, o.hi - 0.06],
+      });
+    } else if (o.kind === 'sealed') {
+      leafBoards.push(bb(o.axis, leafLo, leafHi, mid - 0.025, mid + 0.025, 0.005, LEAF_H));
+      hardware.push({
+        geo: cyl(0.02, 0.02, 0.03, 10),
+        rot: [Math.PI / 2, 0, 0],
+        mat: metal,
+        at: [leafHi - 0.08, 1.05, faceIn + 0.07],
+      });
+    } else if (o.kind === 'slider') {
+      // one fixed pane across the clear width (the sun and the sky come
+      // through it) and the real leaf parked OPEN against the plaster west
+      // of the opening — the balcony is entered through a hole that is a
+      // leaf-width clear, which is what a stopped slider looks like.
+      panes.push(bb(o.axis, o.lo, o.hi, mid - 0.006, mid + 0.006, 0.002, SLIDER_HEAD));
+      const c = faceIn - b.sign * 0.06;
+      const pr0 = o.lo - 1.13;
+      const pr1 = pr0 + 1.3;
+      panes.push(bb(o.axis, pr0 + 0.04, pr1 - 0.04, c - 0.008, c + 0.008, 0.03, SLIDER_HEAD - 0.03));
+      hardware.push(
+        bb(o.axis, pr0, pr0 + 0.04, c - 0.016, c + 0.016, 0.01, SLIDER_HEAD - 0.01),
+        bb(o.axis, pr1 - 0.04, pr1, c - 0.016, c + 0.016, 0.01, SLIDER_HEAD - 0.01),
+        bb(o.axis, pr0, pr1, c - 0.016, c + 0.016, SLIDER_HEAD - 0.05, SLIDER_HEAD - 0.01),
+        bb(o.axis, o.lo, o.lo + 0.04, mid - 0.02, mid + 0.02, 0, SLIDER_HEAD),
+        bb(o.axis, o.hi - 0.04, o.hi, mid - 0.02, mid + 0.02, 0, SLIDER_HEAD),
+        bb(o.axis, o.lo, o.hi, mid - 0.02, mid + 0.02, SLIDER_HEAD - 0.04, SLIDER_HEAD),
+      );
+    }
+  }
+
+  // the sky the flat has windows for: one plane per window outside its own
+  // wall, and three big ones beyond the balcony's parapets (the VIEWS.balcony
+  // camera looks east at the chair, so the "city" has to exist that way too).
+  for (const s of [
+    ...skyPlanes,
+    { pos: [1.5, 2.2, -5.02], rotY: 0, w: 9, h: 6 }, // beyond the far parapet
+    { pos: [3.1, 2.2, -3.8], rotY: -Math.PI / 2, w: 7, h: 6 }, // east
+    { pos: [-0.2, 2.2, -3.8], rotY: Math.PI / 2, w: 6, h: 6 }, // west
+  ]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), sky);
+    m.position.set(...s.pos);
+    m.rotation.y = s.rotY;
+    m.castShadow = false;
+    m.receiveShadow = false;
+    m.userData.tag = 'sky';
+    flat.add(m);
+  }
+
+  mergedMesh(flat, casings.map((e) => ({ ...e, mat: trim })));
+  mergedMesh(flat, trimBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
+  mergedMesh(flat, frameBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
+  mergedMesh(flat, sillBoards, { cast: false });
+  mergedMesh(flat, leafBoards.map((e) => ({ ...e, mat: walnut })));
+  mergedMesh(flat, hardware);
+  mergedMesh(flat, panes.map((e) => ({ ...e, mat: glass })), { cast: false, receive: false });
+
+
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
   const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
   hemi.position.set(0, CEIL_Y, 0);
