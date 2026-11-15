@@ -681,6 +681,41 @@ const SURFACES = {
   leaf: () => surface(TOKENS.leaf, { uvTile: 0.16, roughness: 0.62, map: leafMap, side: THREE.DoubleSide }),
 };
 
+/** Fur grain for the cats (Step 9). White-based like every colour canvas in
+ *  the kit, because it multiplies the VERTEX colours that carry the markings:
+ *  soft tonal clumps plus sparse short guard-hair strokes give the close-up
+ *  views a coat without touching what a marking means. Repeat is per-mesh UV
+ *  (a cat body is one sphere), so 5× lands the tufts at a couple of mm. */
+const furMap = colourMap(256, (ctx, s) => {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, s, s);
+  for (let b = 0; b < 60; b++) {
+    const x = hash1(b * 2.7) * s;
+    const y = hash1(b * 5.3) * s;
+    const r = 10 + hash1(b * 1.3) * 30;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const v = Math.round(255 * (0.9 + hash1(b * 3.1) * 0.1));
+    g.addColorStop(0, `rgba(${v},${v},${v},0.20)`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  for (let i = 0; i < 900; i++) {
+    // guard hairs: short soft strokes running in V (over the head this fans
+    // out from the crown, over the body it reads as the coat lying flat)
+    const x = hash1(i * 1.7) * s;
+    const y = hash1(i * 2.9) * s;
+    const len = 3 + hash1(i * 4.1) * 7;
+    const v = Math.round(255 * (0.78 + hash1(i * 6.3) * 0.22));
+    ctx.strokeStyle = `rgba(${v},${v},${v},${0.1 + hash1(i * 5.7) * 0.08})`;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (hash1(i * 3.3) - 0.5) * 2.5, y + len);
+    ctx.stroke();
+  }
+}, { repeat: [5, 5] });
+
 /** The fabric family: one weave canvas, tinted per use (couch, bedding,
  *  cushions, towels, the throw). Same look the style test set, now with relief. */
 function fabric(color, { uvTile = 0.12, roughness = 0.92, sheen = 0.25 } = {}) {
@@ -830,4 +865,5 @@ export {
   broadLeafGeo,
   contactMap,
   tvScreenMap,
+  furMap,
 };
