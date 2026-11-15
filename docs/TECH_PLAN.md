@@ -147,7 +147,9 @@ play through the slice's click-unlock path.
 - `npm run capture:slice:planted` — each planted fault makes the capture
   FAIL with the right check named.
 - `npm run capture:slice:weak` — swiftshader laptop floor.
-- `npm run audio:slicecheck`.
-- Regressions that must stay green: `style:gate`, `gate`,
-  `capture:style`, `capture:demo`, `capture:demo:determinism`,
-  `audio:democheck`.
+- `npm run audio:slicecheck`, `npm run playtest:bot`.
+- Regressions that must stay green: `gate`, `capture:style`,
+  `capture:demo`, `capture:demo:determinism`, `audio:democheck`.
+  (The look itself is protected structurally: no existing file in `src/`,
+  `design/` or `vendor/` changes, so earlier captures are identical by
+  construction — there is no `style:gate` script.)
