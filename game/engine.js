@@ -1103,7 +1103,8 @@ export function bootGame(cfg) {
     // both 38 floods a frame and wrong for a cat tucked into an alcove, because
     // the nearest-standable spiral grows on Chebyshev rings and can cross a wall
     // into another room — a bathroom cat got the living room's approach cells.
-    const reachShared = bodyGrid.flood(bodyGrid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1]));
+    const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
+    const reachShared = bodyGrid.flood(bodyGrid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1])); // NB a spawn's pos is [x, z] (two numbers); a moment spot is [x, support, z].
     const catSpots = [
       ...MOMENTS.map((m) => ({
         id: m.id,
@@ -1124,8 +1125,6 @@ export function bootGame(cfg) {
         pose: d.pose ?? 'sprawl', // a decoy spot may lie down too (issue #27)
       })),
     ];
-    const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
-    // NB a spawn's pos is [x, z] (two numbers); a moment spot is [x, support, z].
 
     // --- issue #27 (bug 3): seeing through walls.
     // Plaster is opaque and single-sided; the only way to look through it from
