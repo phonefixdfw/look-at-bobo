@@ -1194,8 +1194,9 @@ if (PLANT === 'text') {
   const m = new THREE.MeshStandardMaterial({ color: 0x223344 });
   for (let i = 0; i < 170; i++) {
     const mesh = new THREE.Mesh(g, m); // 170 separate draws: the budget must notice
-    mesh.position.set(-3 + (i % 13) * 0.02, 2.4, -2.4 + Math.floor(i / 13) * 0.02);
-    scene.add(mesh);
+    // children of the camera: in frustum for EVERY view, so no view escapes
+    mesh.position.set((i % 13) * 0.01 - 0.06, (Math.floor(i / 13) * 0.01 - 0.06), -1);
+    camera.add(mesh);
   }
 } else if (PLANT && !['text', 'audio', 'score', 'repeats', 'decoy-share', 'over-budget', 'no-collision'].includes(PLANT)) {
   console.warn(`Unknown plant "${PLANT}".`);
