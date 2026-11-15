@@ -216,6 +216,105 @@
         text-shadow: 0 3px 0 rgba(16, 21, 28, 0.45), 0 10px 30px rgba(0, 0, 0, 0.35);
       }
 
+      /* Step 9 comfort: the settings panel (gear, top-left). Same card
+         vocabulary as the pause card; every control is wired in engine.js. */
+      #settings-btn {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 55;
+        width: 40px;
+        height: 40px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(16, 21, 28, 0.66);
+        color: var(--ui-paper);
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        pointer-events: auto;
+        display: none; /* JS shows it only on pages that wire the panel */
+        align-items: center;
+        justify-content: center;
+      }
+      #settings-btn.show {
+        display: flex;
+      }
+      #settings-panel {
+        position: fixed;
+        top: 62px;
+        left: 16px;
+        z-index: 56;
+        width: 262px;
+        padding: 14px 16px 16px;
+        border-radius: 16px;
+        background: rgba(16, 21, 28, 0.88);
+        color: var(--ui-paper);
+        pointer-events: auto;
+        display: none;
+      }
+      #settings-panel.show {
+        display: block;
+      }
+      #settings-panel h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ui-mustard);
+      }
+      #settings-panel label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 8px 0;
+        font-size: 13px;
+      }
+      #settings-panel input[type='range'] {
+        width: 120px;
+        accent-color: var(--ui-mustard);
+      }
+      #settings-panel input[type='checkbox'] {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--ui-coral);
+      }
+      #settings-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        border: 0;
+        background: none;
+        color: var(--ui-paper);
+        font-size: 18px;
+        cursor: pointer;
+      }
+      /* High contrast (comfort setting, body.hc): solid panels, pure white
+         text, heavier edges. Colour is never the only signal — DAG! keeps
+         its word, the reticle keeps its shape change. */
+      body.hc #hud-score,
+      body.hc #settings-panel,
+      body.hc .pause-card {
+        background: #000 !important;
+        color: #fff;
+        border: 2px solid #fff;
+      }
+      body.hc #prompt,
+      body.hc #ending,
+      body.hc #ending-again {
+        color: #fff;
+        text-shadow: 0 2px 0 #000, 0 0 14px #000;
+      }
+      body.hc #reticle {
+        outline: 2px solid rgba(255, 255, 255, 0.9);
+      }
+      body.hc #dag-label {
+        color: #fff;
+        text-shadow: 0 0 6px #000, 0 0 18px #000;
+      }
+
       /* Step 9 juice: one soft coral breath when DAG! lands (opacity driven
          in JS as a pure function of t — never a CSS keyframe, never a strobe). */
       #wrong-flash {
@@ -413,6 +512,17 @@
           </g>
         </svg>
         <div id="dag-label">DAG!</div>
+      </div>
+      <button id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+      <div id="settings-panel" role="dialog" aria-label="Comfort settings">
+        <button id="settings-close" aria-label="Close settings">×</button>
+        <h2>Comfort</h2>
+        <label>Mouse speed <input id="set-sens" type="range" min="0.2" max="3" step="0.05" /></label>
+        <label>Invert up/down <input id="set-invertY" type="checkbox" /></label>
+        <label>Calm motion <input id="set-motion" type="checkbox" title="No confetti, rain, fireworks or screen flashes. The cats still breathe." /></label>
+        <label>High contrast <input id="set-contrast" type="checkbox" /></label>
+        <label>Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
+        <label>Mute <input id="set-mute" type="checkbox" /></label>
       </div>
       <div id="wrong-flash"></div>
       <div id="ending-veil"></div>

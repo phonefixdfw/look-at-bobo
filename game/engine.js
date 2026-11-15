@@ -69,6 +69,21 @@ export function bootGame(cfg) {
   const SEED = Number.parseInt(params.get('seed') ?? '11', 10) || 11;
   const INITIAL_SCORE = clamp(Number.parseInt(params.get('score') ?? '0', 10) || 0, 0, TARGET);
 
+  // Step 9 comfort/accessibility (issue #19). Every default keeps the game
+  // exactly as the suites captured it. The settings panel writes these same
+  // params into the URL, so a choice survives refresh and shares as a link:
+  // ?sens=0.5..3  ?invertY=1  ?motion=off  ?volume=0..1  ?mute=1  ?contrast=high
+  const sensRaw = Number.parseFloat(params.get('sens') ?? '');
+  const volRaw = Number.parseFloat(params.get('volume') ?? '');
+  const SETTINGS = {
+    sens: Number.isFinite(sensRaw) ? clamp(sensRaw, 0.2, 3) : 1,
+    invertY: params.get('invertY') === '1',
+    reducedMotion: params.get('motion') === 'off', // calm: no confetti/rain/fireworks/flash/blink
+    highContrast: params.get('contrast') === 'high',
+    volume: Number.isFinite(volRaw) ? clamp(volRaw, 0, 1) : 1,
+    muted: params.get('mute') === '1',
+  };
+
   /** Small, seeded, reproducible — the run's only randomness (docs/DECOY_CAT.md). */
   function mulberry32(seed) {
     let a = seed >>> 0;
@@ -222,9 +237,12 @@ export function bootGame(cfg) {
     setText(el.dagLabel, EXACT_DAG);
     el.prompt.classList.toggle('show', spec.prompt && game.phase === 'find');
     if (el.endingAgain) el.endingAgain.classList.toggle('show', spec.ending); // full game: play-again line
-    const celebrate = game.phase === 'win' || game.phase === 'catch';
+    // Comfort (Step 9): calm mode hides the weather-layer celebration — rain,
+    // fireworks, confetti — and the wrong-cat flash; the page keeps everything
+    // gentle (the cats still breathe, the veil still fades in).
+    const celebrate = !SETTINGS.reducedMotion && (game.phase === 'win' || game.phase === 'catch');
     for (const b of bursts) b.mesh.visible = celebrate;
-    for (const m of [rainHeads, rainMuzzles, rainDashes]) m.visible = game.phase === 'win';
+    for (const m of [rainHeads, rainMuzzles, rainDashes]) m.visible = !SETTINGS.reducedMotion && game.phase === 'win';
   }
 
   function updateHandVisibility() {
@@ -491,7 +509,7 @@ export function bootGame(cfg) {
     }
     if (game.phase === 'win') updateRain(t);
     if (game.phase === 'win' || game.phase === 'catch') updateFireworks(t);
-    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE });
+    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE, calm: SETTINGS.reducedMotion });
     // The pointing hand (the demo's choreography, tuned copy): rises with the
     // shout, points, pulls back when the DAG! lands. In `find` it rests in the
     // lower frame — this is a body, not a prop.
@@ -563,8 +581,13 @@ export function bootGame(cfg) {
   // ---------------------------------------------------------------------------
   function stepPlayer(dt, scripted = null) {
     const look = scripted ? { dx: scripted.dyaw ?? 0, dy: scripted.dpitch ?? 0 } : input.takeLook();
-    player.yaw -= look.dx * MOVE.sensitivity;
-    player.pitch = clamp(player.pitch - look.dy * MOVE.sensitivity, -MOVE.pitchLimit, MOVE.pitchLimit);
+    player.yaw -= look.dx * MOVE.sensitivity * SETTINGS.sens;
+    // Comfort: ?invertY=1 flips pitch only (yaw stays natural); ?sens scales both.
+    player.pitch = clamp(
+      player.pitch + (SETTINGS.invertY ? 1 : -1) * look.dy * MOVE.sensitivity * SETTINGS.sens,
+      -MOVE.pitchLimit,
+      MOVE.pitchLimit,
+    );
 
     const fwd = scripted ? (scripted.fwd ?? 0) : (input.isDown('forward') ? 1 : 0) - (input.isDown('back') ? 1 : 0);
     const strafe = scripted ? (scripted.strafe ?? 0) : (input.isDown('right') ? 1 : 0) - (input.isDown('left') ? 1 : 0);
@@ -852,10 +875,10 @@ export function bootGame(cfg) {
       add('win-fires-at-target', `${game.score}/${game.phase}`, `${TARGET}/win`, game.score === TARGET && game.phase === 'win', `reaching ${TARGET} IS the ending`);
       add(
         'win-stage-live',
-        `${rainHeads.visible ? 'rain' : 'no-rain'}/${getComputedStyle(el.ending).display !== 'none' ? 'text' : 'no-text'}`,
+        `${rainHeads.visible ? 'rain' : SETTINGS.reducedMotion ? 'calm' : 'no-rain'}/${getComputedStyle(el.ending).display !== 'none' ? 'text' : 'no-text'}`,
         'rain/text',
-        rainHeads.visible && getComputedStyle(el.ending).display !== 'none',
-        'the win shows the rain of Bobos AND the exact line, live',
+        (rainHeads.visible || SETTINGS.reducedMotion) && getComputedStyle(el.ending).display !== 'none',
+        SETTINGS.reducedMotion ? 'calm mode: rain hidden on purpose, the exact line still shows' : 'the win shows the rain of Bobos AND the exact line, live',
       );
       triggerEvent('wrong');
       add('score-frozen-after-win', `${game.score}/${game.phase}`, `${TARGET}/win`, game.score === TARGET && game.phase === 'win', 'after the win, nothing moves the score');
@@ -1080,7 +1103,8 @@ export function bootGame(cfg) {
       updateHud();
       return v;
     });
-    add('fireworks-on-catch-and-win', fireworks.join('/'), 'false/true/false/true', fireworks.join('/') === 'false/true/false/true', 'a catch earns a pop; the rain is only the win');
+    const fwWant = SETTINGS.reducedMotion ? 'false/false/false/false' : 'false/true/false/true';
+    add('fireworks-on-catch-and-win', fireworks.join('/'), fwWant, fireworks.join('/') === fwWant, SETTINGS.reducedMotion ? 'calm mode: fireworks hidden on purpose, all phases' : 'a catch earns a pop; the rain is only the win');
 
     // --- the look is the chosen look -------------------------------------------
     add('fur-not-pure-black', srgbLuma(TOKENS.furBlack), '≥0.004 luma', srgbLuma(TOKENS.furBlack) >= 0.004, 'imported from src/tokens.js');
@@ -1144,6 +1168,28 @@ export function bootGame(cfg) {
       stats.realLights <= 6 && stats.shadowLights <= 1,
       'sun stays the only shadow light; hall + bedroom get no-shadow fill',
     );
+
+    // Step 9 comfort: the URL is the source of truth, so the check that
+    // generalises is the wiring — parsed state must agree with the URL params
+    // and the body class on ANY url (defaults included).
+    {
+      const p = new URLSearchParams(location.search);
+      const wantHc = p.get('contrast') === 'high';
+      const sensParam = Number.parseFloat(p.get('sens') ?? '');
+      const sensOk = Number.isFinite(sensParam) ? SETTINGS.sens === clamp(sensParam, 0.2, 3) : SETTINGS.sens === 1;
+      add(
+        'comfort-settings-wired',
+        `sens ${SETTINGS.sens} · invertY ${SETTINGS.invertY ? 'on' : 'off'} · motion ${SETTINGS.reducedMotion ? 'calm' : 'full'} · contrast ${SETTINGS.highContrast ? 'high' : 'std'} · vol ${SETTINGS.volume}${SETTINGS.muted ? ' muted' : ''}`,
+        'url params honoured, body class agrees',
+        sensOk &&
+          SETTINGS.invertY === (p.get('invertY') === '1') &&
+          SETTINGS.reducedMotion === (p.get('motion') === 'off') &&
+          SETTINGS.highContrast === wantHc &&
+          document.body.classList.contains('hc') === wantHc &&
+          SETTINGS.muted === (p.get('mute') === '1'),
+        'comfort settings parse from the url and drive the page (panel writes the same params)',
+      );
+    }
 
     // Step 8: the full game appends its own checks (moment count, every
     // moment's contact band, room coverage). The slice adds none.
@@ -1246,6 +1292,8 @@ export function bootGame(cfg) {
         };
       },
       selfTest,
+      /** Comfort settings in force (Step 9): the parsed url params, for tools. */
+      comfort: () => ({ ...SETTINGS }),
 
       // --- moment layer
       moments: ALL_STAGE_IDS.slice(),
@@ -1551,12 +1599,58 @@ export function bootGame(cfg) {
       else input.lock();
     });
     window.addEventListener('keydown', (ev) => {
+      // Comfort panel is open: keys belong to the panel, never to the game.
+      if (window.__lcSettingsOpen) return;
       if (ev.code === 'Space' && gateOpen && !ev.repeat) {
         ev.preventDefault();
         if (game.phase === 'win') tryRestartFromWin();
         else input.queueAction('point');
       }
     });
+    // Step 9 comfort panel: the settings live in the URL, so a choice persists
+    // across refresh, shares as a link, and re-applies in one obvious way.
+    // Guarded: only pages that ship the panel (game/full.html) get wired.
+    const sBtn = document.getElementById('settings-btn');
+    const sPanel = document.getElementById('settings-panel');
+    if (sBtn && sPanel) {
+      sBtn.classList.add('show');
+      const syncOpen = () => {
+        window.__lcSettingsOpen = sPanel.classList.contains('show');
+      };
+      sBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        sPanel.classList.toggle('show');
+        syncOpen();
+      });
+      sPanel.addEventListener('click', (ev) => ev.stopPropagation());
+      const q = (id) => sPanel.querySelector(id);
+      q('#set-sens').value = String(SETTINGS.sens);
+      q('#set-volume').value = String(SETTINGS.volume);
+      q('#set-invertY').checked = SETTINGS.invertY;
+      q('#set-motion').checked = SETTINGS.reducedMotion;
+      q('#set-mute').checked = SETTINGS.muted;
+      q('#set-contrast').checked = SETTINGS.highContrast;
+      const apply = () => {
+        const p = new URLSearchParams(location.search);
+        const setOr = (k, v, on) => (on ? p.set(k, v) : p.delete(k));
+        const sens = Number(q('#set-sens').value);
+        const vol = Number(q('#set-volume').value);
+        setOr('sens', String(sens), sens !== 1);
+        setOr('invertY', '1', q('#set-invertY').checked);
+        setOr('motion', 'off', q('#set-motion').checked);
+        setOr('mute', '1', q('#set-mute').checked);
+        setOr('volume', String(vol), vol !== 1);
+        setOr('contrast', 'high', q('#set-contrast').checked);
+        location.search = p.toString(); // reload: every setting is a URL param
+      };
+      for (const c of sPanel.querySelectorAll('input')) c.addEventListener('change', apply);
+      const sClose = q('#settings-close');
+      if (sClose)
+        sClose.addEventListener('click', () => {
+          sPanel.classList.remove('show');
+          syncOpen();
+        });
+    }
   }
 
   // Fault injection, applied after everything is built so selfTest can catch it.
@@ -1577,6 +1671,8 @@ export function bootGame(cfg) {
 
   function boot() {
     if (GATE_OFF) el.gate.classList.add('hidden');
+    // Comfort: high-contrast mode is one body class (CSS in the page).
+    document.body.classList.toggle('hc', SETTINGS.highContrast);
     // The moment-label chip is tooling (capture frames, phase/moment/view/t/score
     // readout). Step 7: hidden for a real player — it was spoilers-on-screen —
     // but keepable with ?label=on; tool pages (?gate=off) always show it.

@@ -66,17 +66,19 @@ function createConfetti(scene) {
 }
 
 /** One call per frame from applyTime. Writes ONLY pure f(phase, t) values —
- *  each branch has a defined resting value every other frame. */
-function juiceFrame({ phase, t, renderer, els, confetti, baseExposure }) {
+ *  each branch has a defined resting value every other frame. `calm` is the
+ *  comfort setting (motion=off): every juice branch rests, every value is
+ *  still written, so the frame stays deterministic either way. */
+function juiceFrame({ phase, t, renderer, els, confetti, baseExposure, calm }) {
   // 1. Respawn smoothing: a 0.26 s blink when a new round begins. dip(0) = 0,
   //    so captured t=0 frames sit at the base exposure; the sink is at 0.13 s.
-  const blink = phase === 'find' && t < 0.26 ? 0.4 * Math.sin((t / 0.26) * Math.PI) : 0;
+  const blink = !calm && phase === 'find' && t < 0.26 ? 0.4 * Math.sin((t / 0.26) * Math.PI) : 0;
   renderer.toneMappingExposure = baseExposure * (1 - blink);
   // 2. Score pop: the pill punches once at the catch, settles by t=0.5 (all
   //    captured catch frames at t>=1.2 are at rest).
   if (els.score) {
     let s = 1;
-    if (phase === 'catch') {
+    if (!calm && phase === 'catch') {
       const u = clamp(t / 0.5, 0, 1);
       if (u < 1) s = 1 + 0.22 * Math.sin(u * Math.PI) * (1 - u * 0.4);
     }
@@ -86,16 +88,17 @@ function juiceFrame({ phase, t, renderer, els, confetti, baseExposure }) {
   //    16% — a wink, not a flash. Photosensitivity-safe: one slow breath.
   if (els.wrongFlash) {
     let o = 0;
-    if (phase === 'wrong') {
+    if (!calm && phase === 'wrong') {
       const u = clamp((t - 0.8) / 0.55, 0, 1);
       if (u > 0 && u < 1) o = 0.16 * Math.sin(u * Math.PI);
     }
     els.wrongFlash.style.opacity = o.toFixed(4);
   }
-  // 4. Confetti rides the win only; win's own t drives the fall.
+  // 4. Confetti rides the win only; win's own t drives the fall. (Calm mode
+  //    hides it; HUD_SPEC in the engine also gates the rain and fireworks.)
   if (confetti) {
-    confetti.points.visible = phase === 'win';
-    if (phase === 'win') confetti.update(t);
+    confetti.points.visible = !calm && phase === 'win';
+    if (confetti.points.visible) confetti.update(t);
   }
 }
 

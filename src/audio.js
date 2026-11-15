@@ -48,14 +48,22 @@ export function audioPlanFor(moment, overrides = {}) {
  *  console error. Each element records what happened to it (played, ended,
  *  refused, what the decoder says its duration is) so a headless check can
  *  prove the sound REALLY played instead of trusting the plan. */
-export function createVoiceEngine({ resolve = (f) => f } = {}) {
+export function createVoiceEngine({ resolve = (f) => f, volume, muted } = {}) {
   const els = new Map();
   const status = new Map();
+  // Step 9 comfort: volume/mute, defaulting from the URL so every boot of the
+  // game (and every suite run, which passes neither) keeps today's behaviour.
+  const usp = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  const vRaw = volume ?? Number.parseFloat(usp?.get('volume') ?? '');
+  let vol = Number.isFinite(vRaw) ? Math.min(1, Math.max(0, vRaw)) : 1;
+  let mute = muted ?? usp?.get('mute') === '1';
 
   function elFor(file) {
     if (!els.has(file)) {
       const a = new Audio(resolve(file));
       a.preload = 'auto';
+      a.volume = vol;
+      a.muted = mute;
       const st = { file, loaded: false, duration: 0, requested: 0, started: 0, ended: 0, error: null };
       a.addEventListener('loadedmetadata', () => {
         st.loaded = true;
@@ -93,9 +101,9 @@ export function createVoiceEngine({ resolve = (f) => f } = {}) {
           p.then(() => {
             a.pause();
             a.currentTime = 0;
-            a.muted = false;
+            a.muted = mute;
           }).catch((err) => {
-            a.muted = false;
+            a.muted = mute;
             st.error = `unlock-refused:${err && err.name ? err.name : err}`;
           });
         }
@@ -127,5 +135,16 @@ export function createVoiceEngine({ resolve = (f) => f } = {}) {
       for (const f of list) elFor(f); // touch them so the decoder starts
       return list.map((f) => ({ ...status.get(f) }));
     },
+    /** Comfort settings (Step 9): live-adjustable, and readable for checks. */
+    setVolume(v) {
+      vol = Math.min(1, Math.max(0, Number(v)));
+      for (const a of els.values()) a.volume = vol;
+    },
+    setMuted(m) {
+      mute = !!m;
+      for (const a of els.values()) a.muted = mute;
+    },
+    volumeLevel: () => vol,
+    isMuted: () => mute,
   };
 }
