@@ -5,12 +5,19 @@
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a). */
 
+// Each rect is inset 0.08–0.10 m off the plaster's inner face rather than
+// 0.02 m (issue #27, bug 3): the near plane is 0.05 m and walls are not
+// colliders, so at 0.02 m the near plane clipped 3 cm of every wall face and
+// you could see the next room through it. Doorway rects still cross their own
+// wall band — that is the opening — but keep 0.08 m off each jamb.
+// `wall-camera-clearance` in the engine's selfTest measures it from the built
+// slabs, so these numbers cannot drift from the plaster again.
 export const WALK_RECTS = [
-  { id: 'living', x0: -3.12, z0: -2.52, x1: 3.12, z1: 2.52, room: 'living' },
-  { id: 'door1', x0: -1.11, z0: 2.5, x1: -0.09, z1: 2.72, room: 'door' },
-  { id: 'hall', x0: -1.32, z0: 2.66, x1: 0.32, z1: 4.14, room: 'hall' },
-  { id: 'door2', x0: -1.11, z0: 4.08, x1: -0.09, z1: 4.3, room: 'door' },
-  { id: 'bedroom', x0: -3.12, z0: 4.28, x1: 1.98, z1: 6.92, room: 'bedroom' },
+  { id: 'living', x0: -3.04, z0: -2.44, x1: 3.04, z1: 2.44, room: 'living' },
+  { id: 'door1', x0: -1.05, z0: 2.36, x1: -0.15, z1: 2.86, room: 'door' },
+  { id: 'hall', x0: -1.24, z0: 2.76, x1: 0.24, z1: 4.04, room: 'hall' },
+  { id: 'door2', x0: -1.05, z0: 3.96, x1: -0.15, z1: 4.46, room: 'door' },
+  { id: 'bedroom', x0: -3.04, z0: 4.36, x1: 1.9, z1: 6.84, room: 'bedroom' },
 ];
 
 /** Walk-blocking furniture AABBs (walls are handled by the walk rects). */

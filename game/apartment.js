@@ -10,6 +10,7 @@ import { TOKENS } from '../src/tokens.js';
 import { std } from '../src/materials.js';
 import { buildRoom } from '../src/room.js';
 import { floorMap, floorRough, plasterMap, skyMap } from '../src/textures.js';
+import { slabAABB } from '../src/reach.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -79,7 +80,7 @@ export function buildApartment(scene) {
   // ---- walls (0.12 slabs flush with buildRoom's), docs/LEVEL_LAYOUT.md ----
   const H = 2.6;
   const cy = H / 2;
-  mergedMesh(flat, [
+  const walls = [
     // living: east wall, south wall with the doorway at x∈[−1.13,−0.07]
     { geo: box(0.12, H, 5.32), mat: plaster, at: [3.2, cy, 0] },
     { geo: box(2.13, H, 0.12), mat: plaster, at: [-2.195, cy, 2.6] },
@@ -97,7 +98,8 @@ export function buildApartment(scene) {
     { geo: box(0.97, H, 0.12), mat: plaster, at: [1.635, cy, 7.0] },
     { geo: box(2.3, 0.5, 0.12), mat: plaster, at: [0, 0.25, 7.0] },
     { geo: box(2.3, 0.6, 0.12), mat: plaster, at: [0, 2.3, 7.0] },
-  ], { receive: true });
+  ];
+  mergedMesh(flat, walls, { receive: true });
 
   // ---- bedroom window: the same flat sky + the same frame bars ----
   const sky = new THREE.Mesh(
@@ -161,5 +163,7 @@ export function buildApartment(scene) {
     living,
     supports: { ...living.SUPPORTS, boxFloor: 0.02, bedTop: 0.5 },
     lights: { bedLight, hallLight },
+    // the plaster the player must never be able to press a camera against
+    wallBoxes: [...living.wallBoxes, ...walls.map((d, i) => slabAABB(d, `slice#${i}`))],
   };
 }

@@ -38,7 +38,27 @@ import { buildHand } from '../src/hand.js';
 import { VOICE_LINES, audioPlanFor, createVoiceEngine } from '../src/audio.js';
 import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
+import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
+
+/**
+ * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
+ * that way (issue #27, bug 4 — he was rendering backwards).
+ *
+ * The angle convention, shared by cameras and cats and documented in
+ * docs/LEVEL_LAYOUT.md: a yaw a faces (−sin a, −cos a). That is what the
+ * camera does with its yaw, because a Three.js camera looks down its own −z.
+ * The cat rig faces the other way: its head, nose and whiskers are at local
+ * +z (docs/CHARACTERS.md), so a bare `rotation.y = a` aims a cat at
+ * (sin a, cos a) — 180° from the number the level declared, which is why
+ * spots authored against the doc appeared to stare at walls.
+ *
+ * One function, one conversion: every place a cat's root gets turned goes
+ * through here, so the rig and the convention can never drift apart again.
+ */
+export function catRootYaw(faceYaw) {
+  return faceYaw + Math.PI;
+}
 
 export function bootGame(cfg) {
   const {
@@ -403,14 +423,14 @@ export function bootGame(cfg) {
   function placeBoboAt(moment) {
     const [x, support, z] = moment.spot;
     bobo.root.position.set(x, supports[support] ?? 0, z);
-    bobo.root.rotation.y = moment.faceYaw;
+    bobo.root.rotation.y = catRootYaw(moment.faceYaw); // see catRootYaw
     setCatPose(bobo, moment.pose);
     game.boboSupport = support;
   }
   function placeDecoyAt(spot) {
     const [x, support, z] = spot.pos;
     decoy.root.position.set(x, supports[support] ?? 0, z);
-    decoy.root.rotation.y = spot.faceYaw;
+    decoy.root.rotation.y = catRootYaw(spot.faceYaw);
     setCatPose(decoy, 'sprawl');
     game.decoyId = spot.id;
     game.decoySupport = support;
@@ -1052,6 +1072,155 @@ export function bootGame(cfg) {
     }
     add('walk-rects-connected', connected ? `${WALK_RECTS.length} rects, one union` : 'union is broken', 'every moment reachable from every spawn', connected, 'one open doorway chain — no locked doors, no jumps');
 
+    // --- measurement kit for the three issue #27 checks (bugs 2, 3, 4) ------
+    // Everything below measures the level as BUILT: the plaster slabs come
+    // from the apartment builders (apt.wallBoxes), the cats' own furniture is
+    // excluded from their sight lines, and the grid is made of cells a 0.30 m
+    // body fits in. Nothing here re-types a coordinate.
+    const wallBoxes = apt.wallBoxes || [];
+    const LOS_TOP = 1.05; // furniture hides a cat up to about waist height
+    const losBoxes = [
+      ...wallBoxes,
+      ...COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: LOS_TOP })),
+    ];
+    const catSpots = [
+      ...MOMENTS.map((m) => ({
+        id: m.id,
+        kind: 'Bobo',
+        x: m.spot[0],
+        z: m.spot[2],
+        y: supports[m.spot[1]] ?? 0,
+        yaw: m.faceYaw,
+        pose: m.pose,
+      })),
+      ...DECOY_SPOTS.map((d) => ({
+        id: d.id,
+        kind: 'decoy',
+        x: d.pos[0],
+        z: d.pos[2],
+        y: supports[d.pos[1]] ?? 0,
+        yaw: d.faceYaw,
+        pose: 'sprawl',
+      })),
+    ];
+    const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
+    // NB a spawn's pos is [x, z] (two numbers); a moment spot is [x, support, z].
+
+    // --- issue #27 (bug 3): seeing through walls.
+    // Plaster is opaque and single-sided; the only way to look through it from
+    // inside the flat is to get the camera within `camera.near` of a face, so
+    // the near plane cuts the face away and you see the next room through the
+    // hole. Furniture cannot do that — it is all COLLIDERS, and the push-out
+    // keeps a body a whole radius out. Walls are not colliders: the walk rects
+    // ARE the walls, so the gap they leave is the entire defence, and until
+    // now they sat 0.02 m off a wall face with a 0.05 m near plane.
+    {
+      const { fails, worst, worstCase } = wallFaceFailures(WALK_RECTS, wallBoxes, { near: camera.near, eye: MOVE.eye });
+      add(
+        'wall-camera-clearance',
+        fails.length ? `${fails.length} hole(s): ${fails.slice(0, 2).join('; ')}` : `${worst.toFixed(2)} m at ${worstCase}`,
+        `closest camera to plaster > near (${camera.near}) + 2 cm`,
+        wallBoxes.length > 0 && fails.length === 0,
+        'measured off the slabs that were actually built; a doorway rect crosses its own wall band on purpose',
+      );
+    }
+
+    // --- issue #27 (bug 2): the bathroom you could walk into and never leave.
+    // `walk-rects-connected` above walks a POINT from rect corner to rect
+    // corner, so it never noticed that a 0.30 m BODY cannot go where a point
+    // can: the toilet's push pad lay across the bathroom's only doorway, and
+    // the vanity's pad cut the room in half. This floods a grid of body-sized
+    // cells — every cell a player can actually stand in — from each spawn, and
+    // asks what the game depends on: can a player who woke up ANYWHERE get to
+    // every room, every other spawn, and a place to STAND AND SEE every cat?
+    {
+      const rooms = [...new Set(WALK_RECTS.map((r) => r.room))];
+      const bad = [];
+      for (const s of SPAWNS) {
+        const start = bodyGrid.cellAt(s.pos[0], s.pos[1]);
+        if (start < 0 || !bodyGrid.free[start]) {
+          bad.push(`spawn ${s.room}@${s.pos} is not standable`);
+          continue;
+        }
+        const seen = bodyGrid.flood(start);
+        const here = new Set();
+        for (let i = 0; i < seen.length; i++) if (seen[i] && bodyGrid.owner[i] >= 0) here.add(WALK_RECTS[bodyGrid.owner[i]].room);
+        for (const r of rooms) if (!here.has(r)) bad.push(`${s.room} cannot reach ${r}`);
+        for (const o of SPAWNS) {
+          const c = nearestStandable(bodyGrid, o.pos[0], o.pos[1]);
+          if (!seen[c.idx]) bad.push(`${s.room} cannot reach the ${o.room} spawn`);
+        }
+        // Every cat must be findable from here: a standable cell 0.9–3.4 m
+        // away (aimAt's own range) with an eye-high line to the cat's body.
+        for (const sp of catSpots) {
+          if (!bestApproach(bodyGrid, seen, { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye })) {
+            bad.push(`${s.room} cannot see ${sp.id}`);
+          }
+        }
+      }
+      add(
+        'walk-reachable',
+        bad.length ? bad.slice(0, 3).join(', ') : `${SPAWNS.length} spawns → ${rooms.length} rooms, ${catSpots.length} cats in sight`,
+        'a body (r 0.30), not a point: every spawn reaches every room, spawn and cat',
+        bad.length === 0,
+        'furniture push pads subtracted — the trap in issue #27 was invisible to a point walk',
+      );
+    }
+
+    // --- issue #27 (bug 4): a cat facing a wall reads as a prop, not a pet.
+    // The front of the rig is measured, not assumed: head minus tail pivot,
+    // in world space, on a real cat turned to the declared faceYaw. It must be
+    // within 90° of the direction of the nearest place a player can stand and
+    // see it — Bobo looks out at the room, never at plaster.
+    {
+      const probes = { Bobo: buildCat('bobo'), decoy: buildCat('decoy') };
+      const bad = [];
+      const rendered = [];
+      const vTmp = new THREE.Vector3();
+      const tTmp = new THREE.Vector3();
+      for (const sp of catSpots) {
+        // Approach area = the body-sized cells this cat is actually cut off
+        // to, seen from beside the cat itself. `walk-reachable` is the check
+        // that says a player can GET to that component; here the question is
+        // only which way the cat is pointing relative to the players it can
+        // plausibly have.
+        const near = nearestStandable(bodyGrid, sp.x, sp.z);
+        const a = bestApproach(bodyGrid, bodyGrid.flood(near.idx), { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
+        if (!a) {
+          bad.push(`${sp.id}: no standable sight line`);
+          continue;
+        }
+        const probe = probes[sp.kind];
+        // Reset to a pose both rigs have, so a spot asking for a pose its cat
+        // does not build (the slice's bed-sprawl: `sprawl` is the decoy's pose)
+        // measures the same way in any iteration order — as what it renders.
+        setCatPose(probe, 'sit');
+        setCatPose(probe, sp.pose);
+        if (probe.current !== sp.pose) rendered.push(`${sp.id}→${probe.current}`);
+        probe.root.position.set(sp.x, sp.y, sp.z);
+        probe.root.rotation.y = catRootYaw(sp.yaw);
+        probe.root.updateMatrixWorld(true);
+        const pv = probe.pivots[probe.current];
+        pv.head.getWorldPosition(vTmp);
+        pv.tailPivot.getWorldPosition(tTmp);
+        const fx = vTmp.x - tTmp.x;
+        const fz = vTmp.z - tTmp.z;
+        const fl = Math.hypot(fx, fz) || 1;
+        const dot = (fx * -a.dx + fz * -a.dz) / (fl * a.dist);
+        const deg = (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
+        if (deg > 90) bad.push(`${sp.id} ${deg.toFixed(0)}° off its approach`);
+      }
+      add(
+        'cats-face-the-room',
+        bad.length
+          ? bad.slice(0, 3).join(', ')
+          : `${catSpots.length}/${catSpots.length} face an approach${rendered.length ? ` (${rendered.join(', ')} render as built)` : ''}`,
+        'front within 90° of the nearest place a player can stand and see them',
+        bad.length === 0,
+        'head−tail of the rendered rig, measured, not the yaw number',
+      );
+    }
+
     // scripted dash north: 400 walking steps must stop AT the north wall,
     // inside the walk union (?plant=no-collision sails through it)
     {
@@ -1564,6 +1733,22 @@ export function bootGame(cfg) {
       },
       aimProbe() {
         return catUnderCrosshair() ?? 'nothing';
+      },
+      /** Issue #27: the geometry as BUILT — the plaster slabs the apartment
+       *  builders made, the walk rects, the furniture push boxes, and the
+       *  camera numbers that decide what a player can see through. Harnesses
+       *  and the node probes measure these instead of re-typing coordinates
+       *  (the mistake that let the bathroom trap and the wall holes ship). */
+      geometryDebug() {
+        return {
+          walls: (apt.wallBoxes ?? []).map((w) => ({ ...w })),
+          rects: WALK_RECTS.map((r) => ({ ...r })),
+          colliders: COLLIDERS.map((c) => ({ ...c })),
+          near: camera.near,
+          eye: MOVE.eye,
+          radius: MOVE.playerRadius,
+          supports: { ...supports },
+        };
       },
       /** Cue bookkeeping for the audio check / step 7 bot: which planned cues
        *  are already consumed for the current phase, and the phase clock. */
