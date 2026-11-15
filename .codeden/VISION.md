@@ -10,7 +10,7 @@ Bobo is a real cat, about 15 lb, and mostly black. He has white feet, a white bi
 A second cat — the decoy (his name is TBD; call him "the decoy cat" until Brandon names him). He is mostly black with white feet and a white neck, and has **no white spot on his forehead** — Bobo's white forehead dash is the tell that tells the two cats apart. He is very fat: 22 lb, against Bobo's about 15 lb. He just lies around the apartment as scenery, like Bobo does. Nothing else about his habits is known, and nothing is invented about him; his name and placement are TBD.
 
 ## How it plays
-1. You walk through a modern one-bedroom apartment in first person (mouse and keyboard).
+1. You walk through a modern one-bedroom apartment in first person (mouse and keyboard, or a virtual thumb stick on a phone).
 2. Bobo is somewhere in the apartment doing something cute. The decoy cat lies somewhere else, doing absolutely nothing.
 3. You find him, aim at him and press a button. Your hand points and a voice yells "LOOK AT BOBO!"
 4. Fireworks and a celebration go off, and you get one point.
@@ -43,7 +43,7 @@ Someone plays through all 10 points, laughs at the ending, and wants to show a f
 - Keep it short, about 10 to 15 minutes from start to finish. (Length is a guess, to confirm.)
 
 ## Not goals (for now)
-- Phones, touch controls and microphone shouting.
+- Microphone shouting (the shout stays a press: click/Space, or the big button on a phone). Phones and touch controls left this list with issue #25 — `game/full.html` plays on a phone (virtual stick, drag-to-look, shout button, landscape-first, auto low-quality).
 - Enemies, health, timers or failure states. (The wrong-cat penalty is a gentle one-point setback, not a failure state: no harsh buzzer, no game over.)
 - Harming, scaring or mocking the decoy cat in any way.
 - Multiplayer.

@@ -201,3 +201,10 @@ name of what caught it. A tool that only ever says PASS proves nothing.
   transparent) before setting `ready`**; take the cue from `transitionend` with a timer as the
   backstop, so a hidden tab can never hang the contract. The player keeps the fade.
   Record: `docs/PLAYTEST_NOTES.md` §13.
+- **Issue #25 (phone support) added two read-only LC debug hooks on `game/full.html`**
+  (additive, contract unchanged, never affect a normal game): `LC.touchDebug()` reports
+  `{active, autoLow, controls:{stick,lookPointers,fwd,strafe,run}, virtual:{…held stick
+  keys}}` and `LC.gpuDebug()` reports `{quality, pixelRatio, devicePixelRatio, shadows,
+  confetti, canvasW, canvasH, touch}` — the phone posture actually in force. Captures never
+  run as a touch device, so pixel ratio stays 1 on every captured frame; `npm run
+  check:mobile` is the consumer of both hooks (`docs/PLAYTEST_NOTES.md` §14).
