@@ -413,3 +413,103 @@ beside the sink run, plant clear of the curtain seam, pen on the desk).
 brief — real Bobo details stay TBD and live in the data files, never in
 `src/`. Machine playtests still aren't hands (item 15 stands). Bot runs
 seeded (`?seed=`); a human's order will differ and that's the point.
+
+## 12. Step 9 — polish (branch `codeden/build-a-game-step-9-polish-ee41`, issue #19, PRs #20 + #21)
+
+Step 9 lands as small fully-green chunks on `main`. Nothing was bought
+(`audio:dry` still 0 credits, no new voice generation); no downloads, no
+bundler — every texture, material and animation stays code. Plain static
+files throughout. `your did it! you wind` and `DAG!` remain byte-exact and
+are still asserted by `ending-text-exact` + the planted-fault run.
+
+**Part 1 (PR #20, merged `9a67648`): realism + living cats.** The
+`src/polish.js` look kit — procedural canvas materials, all white-based
+colour maps because the material `color` multiplies `map`, with the
+hard-won rule recorded inline: under this rig (soft fills + one raking sun,
+no envmap) strong tangent relief boils or eats 60–90% of the diffuse, so
+plaster/fabric/rug carry detail in colour only, wood keeps just plank
+seams, tiles keep a ~0.2 normal. Plus `worldUV()` triplanar bake, a glowing
+TV (emissive + halo + spill, no flicker, still 5 lights / 1 shadow),
+lived-in clutter, big leafy plants, 20 contact-shadow pools. Cats:
+`faceLife()` idle life (whole-body breathing with fuzz shells riding it,
+tail drift, head roll, out-of-sync blinks + double-blinks, alternating ear
+flicks, lazy decoy tail sway) and the `furMap` coat multiplied over the
+vertex-colour markings, so what identifies Bobo vs the decoy is untouched.
+
+**Part 2 (PR #21): juice + comfort settings.**
+
+- Juice (`src/juice.js`): win confetti (140 seeded bits, ONE `Points`
+  draw), a score-pill punch on each catch (at rest by t=0.5 s), one soft
+  coral screen-breath as `DAG!` lands (`#wrong-flash`, max 16%), and a
+  0.26 s `toneMappingExposure` blink between rounds (`dip(0)=0`). Every
+  piece is a pure function of phase-relative `t` — seekable, capture-safe,
+  order-independent, no wall clock, no unseeded random; nothing strobes
+  (each curve is a single soft pulse).
+- Comfort: `?sens` / `?invertY=1` live look controls; `?motion=off` calm
+  mode; `?contrast=high` (one `body.hc` class — solid panels, white text,
+  heavier edges; colour is never the only signal); `?volume` / `?mute=1`
+  on the voice engine. All URL-param backed, so a choice persists and
+  shares; the gear panel in `game/full.html` writes those params and
+  swallows game keys while open. `LC.comfort()` exposes state. selfTest
+  gained `comfort-settings-wired` (full **47**, slice **43**, demo **38**);
+  stress expectations bumped to match.
+
+**Part 3 (this branch): loading + performance + OS reduce-motion.**
+
+- Loading screen from the first byte, retired the moment `LC.ready` is
+  genuinely set (no fake progress bars); it also clears itself on a boot
+  failure so the error card is what you see. Full-page only — the demo and
+  slice stay pixel-identical.
+- `prefers-reduced-motion` (OS level) is now the **default** for calm mode;
+  `?motion=full` overrides it back, `?motion=off` forces calm, and the panel
+  writes `motion=full` explicitly when a player un-checks calm against an OS
+  preference.
+- `?quality=low` weak-GPU path: no shadow pass, no fuzz shells (they roughly
+  double the cats' triangles), no confetti. Materials, lights-as-intent and
+  layout are untouched, so the look never changes — only the cost.
+- Verified the voice files are **already lazy**: `createVoiceEngine` builds
+  each `<audio>` only on unlock/fire, so nothing downloads before the gate
+  click. Documented rather than changed.
+
+**Written pass — critic.** What the probes found and did: the normal-map
+experiments (plaster, fabric, rug, strong wood) all failed the pixel probe
+— diffuse eaten or boiling — and were rolled back to colour-only; the
+surviving arcs/tiles normal is barely there on purpose. The empty-box
+`bobo`/`bobo-face` frames during `couch-loaf` are Step 8 baseline behaviour
+(the fixed views frame the box; the cat reads in the other views), verified
+against the #18 captures, not a Step 9 regression. Comfort defaults are
+byte-identical to the captured game (no suite URL carries a comfort param),
+so every pre-existing proof still means what it meant. High contrast styles
+HUD surfaces only; the scene's own luma envelope is untouched.
+
+**Written pass — genre director.** Juice is punctuation, not noise: the pop
+only on hits, the coral breath only on mistakes, confetti only at the win;
+the `DAG!` beat gained weight without turning scary. Calm mode is additive
+— the game never removes the joy, only the weather (confetti/rain/
+fireworks/flash/blink rest; the cats keep breathing, because that is the
+"alive", not the "jarring").
+
+**Written pass — narrative director.** No string moved. No real Bobo or
+apartment facts were invented — moments/spots/props stay generic and
+data-driven (`game/full-level.js`, `game/full-apartment.js`, `game/full.js`
+rig writes keyed by id), which remains the swap surface for Brandon's real
+details. Calm mode adds no copy, so it cannot spoil; the hint/prompt text is
+unchanged.
+
+**Capture + suite proof (PR #21's chain, `c655222`, all green).**
+`capture:full` 351 frames, selfTest **47/47**, budget **145 draws ≤150 ·
+100,670 tris ≤150k · 5 lights ≤6 · 1 shadow · 1 pass**, console clean;
+`capture:full:determinism` PASS, `capture:full:weak` PASS; the three
+`*:planted` runs FAIL as required; slice 43/43 (+det, +weak), demo 37/37
+(+det), style 36/36; `gate` PASS; audio page/demo/slice/full **24/17/23/23**;
+bots 5/5 and 10/10 (win string exact, one DAG, console clean); stress
+**63/0** on both slice and full; `npm run build` → **dist/ 33 files, 2.39
+MB**. Comfort/quality browser probes: **47/47** on defaults, on OS
+`prefers-reduced-motion` (calm honoured), on the `motion=full` override, on
+`motion=off`, on `quality=low`, and on all settings at once; the panel
+opens, reflects state and reloads on change; the loading overlay is visible
+pre-boot and gone at `ready`.
+
+**Honest caveats.** Nobody has hand-played the game yet (item 15 stands) —
+the comfort panel and calm mode are wired and machine-probed but untested by
+human hands. Machine ears and pixels only, as ever.
