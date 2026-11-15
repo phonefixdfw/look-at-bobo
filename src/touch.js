@@ -24,12 +24,35 @@ export function touchOverride(search = '') {
   return mode === 'on' ? true : mode === 'off' ? false : null;
 }
 
-/** A device you should hand touch controls to. */
+/**
+ * A device you should hand touch controls to.
+ *
+ * Issue #29: every signal here is a POSITIVE (it can only switch touch ON,
+ * never off), because the failure this guards against is a phone landing in the
+ * desktop mouse path, not a desktop landing in touch. A plain desktop answers
+ * all five "no" — measured on headless Chrome 157 at 1280x800: maxTouchPoints 0,
+ * no `ontouchstart`, `pointer: coarse` false, `any-pointer: coarse` false,
+ * `hover: none` false — so the captured desktop page is untouched.
+ *
+ *  * `maxTouchPoints` / `ontouchstart` / `pointer: coarse` — the #26 three;
+ *  * `(hover: none)` — nothing on this device can hover, so nothing can drive
+ *    a pointer-locked cursor either (a touchscreen desktop keeps its mouse and
+ *    still answers "hover", so it stays on the mouse path);
+ *  * UA-CH `mobile` — Chrome's own mobile hint, which a UA string rewrite
+ *    (`?touch=off` style QA links, embedded webviews) cannot fake the other way.
+ *
+ * Detection can still be wrong (a "Desktop site" Chrome tab, a paired
+ * Bluetooth mouse, a stale cached module): the page itself switches to touch
+ * the moment a real finger arrives — see `#29 live switch` in game/engine.js.
+ */
 export function isTouchDevice(win = window) {
   const nav = win.navigator;
   if ((nav?.maxTouchPoints ?? 0) > 0) return true;
   if ('ontouchstart' in win) return true;
-  return typeof win.matchMedia === 'function' && win.matchMedia('(pointer: coarse)').matches;
+  if (typeof win.matchMedia !== 'function') return false;
+  if (win.matchMedia('(pointer: coarse)').matches) return true;
+  if (win.matchMedia('(hover: none)').matches) return true;
+  return nav?.userAgentData?.mobile === true;
 }
 
 /** Phones (the small end of the screen distribution, either orientation). */

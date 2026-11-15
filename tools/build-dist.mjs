@@ -12,14 +12,23 @@
 //   - assets/ — ONLY the files the copied code actually references (scanned for
 //     "assets/..." paths), so dev-only or secret files in assets/ never ship;
 //   - index.html — a real page (title "Look at Bobo", a start link) that
-//     immediately redirects to ENTRY.
+//     immediately redirects to ENTRY;
+//   - build.json — this build's stamp, for a deploy log or a curl to read.
+//
+// Every URL inside dist/ is stamped (issue #29): each relative module, asset and
+// script URL gains `?v=<build stamp>`, so a browser that kept an old copy of one
+// file cannot possibly be handed it for the new build — see "version every URL"
+// below. Only dist/ is rewritten; the source tree keeps plain paths, so dev and
+// the capture tools work exactly as they always did.
 //
 // It never copies: tools/, docs/, captures/, demo/, design/, node_modules/, .git,
 // .env* or anything else not listed. Then it VERIFIES the result: every module
 // the entry imports (transitively, importmap included) and every referenced
-// asset must exist inside dist/ — a missing one fails the build loudly instead
-// of shipping a runtime 404.
+// asset must exist inside dist/, and no shipped URL may be left un-versioned — a
+// missing or un-stamped one fails the build loudly instead of shipping a runtime
+// 404 or a page that mixes two builds.
 
+import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,6 +87,92 @@ function listCodeFiles(dir) {
 
 const posixRel = (p) => relative(DIST, p).split(sep).join('/');
 
+// ------------------------------------------------------------- the build stamp
+
+/** `<short-commit>-<YYYYMMDD>-<HHMM>` in UTC: URL-safe, and readable straight
+ *  out of a phone screenshot — "the deploy has not landed" and "the browser is
+ *  holding an old file" look different. A build from an export with no .git (a
+ *  CI tarball) still gets a stamp: the time is the part that matters. */
+function thisBuild() {
+  let commit = '';
+  try {
+    commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: REPO,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    /* no git here: the timestamp carries the stamp on its own */
+  }
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const day = `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}`;
+  const clock = `${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
+  const safe = (commit || 'nogit').replace(/[^A-Za-z0-9._-]/g, '');
+  return { stamp: `${safe}-${day}-${clock}`, commit: commit || null, built: d.toISOString() };
+}
+
+const BUILD = thisBuild();
+const VPARAM = `v=${BUILD.stamp}`;
+
+// ------------------------------------------------------- stamping the URLs
+
+/** Does this URL have to carry the stamp? Relative or site-root paths that name
+ *  a file: modules, importmap targets, script srcs, asset literals. Bare
+ *  specifiers ("three"), data: URIs and http(s) links are not ours to stamp.
+ *  Asset literals in this repo are written bare ("assets/audio/x.mp3") and get
+ *  their "../" at runtime, so that shape counts as relative here. */
+function needsStamp(u) {
+  if (!u) return false;
+  if (!/^(?:\.\.?\/|\/|assets\/)/.test(u)) return false;
+  return /\.[A-Za-z0-9]+$/.test(u.split(/[?#]/)[0]);
+}
+const re = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const HAS_OUR_STAMP = new RegExp(`[?&]${re(VPARAM)}(?:&|$)`);
+
+/** The same URL with this build's stamp on it (idempotent). */
+function stamped(u) {
+  if (!needsStamp(u) || HAS_OUR_STAMP.test(u)) return u;
+  const hash = u.indexOf('#');
+  const frag = hash > -1 ? u.slice(hash) : '';
+  const base = hash > -1 ? u.slice(0, hash) : u;
+  return `${base}${base.includes('?') ? '&' : '?'}${VPARAM}${frag}`;
+}
+
+/** The path a URL points at inside dist/, query and fragment aside. */
+function resolveUrl(file, spec) {
+  const clean = spec.split(/[?#]/)[0];
+  if (clean.startsWith('/')) return join(DIST, clean);
+  if (clean.startsWith('.')) return resolve(dirname(file), clean);
+  return null;
+}
+
+// The URL shapes this repo actually ships, plus the obvious ones a later step
+// will reach for. Quoted strings only, so prose is safe: a sentence about
+// "three" or "assets" has no `./` in front of it and stays as it was.
+const RE_FROM = /(\b(?:from|import)\s*)(['"])([^'"\n]+)\2/g; // import x from './a.js' / import './a.js'
+const RE_DYNAMIC = /(\bimport\(\s*)(['"])([^'"\n]+)\2(\s*\))/g; // await import('./a.js')
+const RE_ASSET = /(['"])([^'"\n]*\bassets\/[^'"\n]+\.[A-Za-z0-9]+)\1/g; // 'assets/audio/x.mp3'
+const RE_SRC = /(<script[^>]*\bsrc\s*=\s*)(['"])([^'"]+)\2/gi;
+const RE_HREF = /(<link[^>]*\bhref\s*=\s*)(['"])([^'"]+)\2/gi;
+const RE_MAP_VALUE = /("(?:[^"\\]|\\.)*"\s*:\s*")([^"]+)(")/g;
+const RE_STAMP_LITERAL = /window\.LC_BUILD_HTML\s*=\s*('[^']*')/;
+
+/** Every URL a file names, for the audit — the same shapes the rewriter knows. */
+function urlsIn(file, text) {
+  const out = [];
+  if (/\.html?$/.test(file)) {
+    for (const m of text.matchAll(RE_SRC)) out.push(m[3]);
+    for (const m of text.matchAll(RE_HREF)) out.push(m[3]);
+    for (const m of text.matchAll(RE_MAP_VALUE)) out.push(m[2]);
+  } else {
+    for (const m of text.matchAll(RE_FROM)) out.push(m[3]);
+    for (const m of text.matchAll(RE_DYNAMIC)) out.push(m[3]);
+    for (const m of text.matchAll(RE_ASSET)) out.push(m[2]);
+  }
+  return out;
+}
+
 // ------------------------------------------------- 1. clean dist/, check entry
 
 if (!statSync(join(REPO, ENTRY), { throwIfNoEntry: false })?.isFile()) {
@@ -123,6 +218,54 @@ for (const [ref, by] of assetRefs) {
   const dst = join(DIST, ref);
   mkdirSync(dirname(dst), { recursive: true });
   cpSync(src, dst);
+}
+
+// ------------------------------ 3b. stamp every URL inside dist/ (issue #29)
+
+// The bug this exists for: Brandon's phone kept the NEW HTML and the OLD
+// JavaScript. A `?v=2` he typed on the page address says nothing about the ~30
+// files that page imports — full.js, engine.js, every src/*.js, vendor/three and
+// the audio files are each cached under THEIR OWN url, and those URLs never
+// change, so the browser is entitled to hand back last week's bytes. Versioning
+// every one of them at build time makes a stale module un-cacheable-by-mistake:
+// the new page asks for `engine.js?v=<new build>`, which its cache has never
+// seen. The stamp also travels into the page (see LC_BUILD_HTML in
+// game/full.html and LC.buildStamp() in game/engine.js), so the start card shows
+// which build the HTML and the JS each came from.
+let urlCount = 0;
+for (const file of listCodeFiles(DIST)) {
+  const before = readFileSync(file, 'utf8');
+  let after = before;
+  if (/\.html?$/.test(file)) {
+    after = after
+      .replace(RE_SRC, (m, head, q, u) => ((u = stamped(u)), head + q + u + q))
+      .replace(RE_HREF, (m, head, q, u) => ((u = stamped(u)), head + q + u + q));
+    // The importmap is the one place a bare "three" becomes a path; its TARGET
+    // has to be versioned or the whole vendor bundle stays cache-sticky.
+    after = after.replace(
+      /(<script[^>]*\btype\s*=\s*["']importmap["'][^>]*>)([\s\S]*?)(<\/script>)/gi,
+      (m, open, body, close) => open + body.replace(RE_MAP_VALUE, (mm, k, v, e) => k + stamped(v) + e) + close
+    );
+    // The page's own inline stamp, so a stale module cannot hide it. The entry
+    // page MUST carry the hook: without it the visible stamp would be silently
+    // missing from the deploy, which is the thing we are trying to be able to see.
+    if (RE_STAMP_LITERAL.test(after)) {
+      after = after.replace(RE_STAMP_LITERAL, () => `window.LC_BUILD_HTML = ${JSON.stringify(BUILD.stamp)}`);
+    } else if (join(DIST, ENTRY) === file) {
+      fail(
+        `${ENTRY} has no \`window.LC_BUILD_HTML = '...'\` literal for the build to stamp. ` +
+          `The page's visible build stamp depends on it (issue #29) — put the inline script back.`
+      );
+    }
+  } else {
+    after = after
+      .replace(RE_FROM, (m, head, q, u) => ((u = stamped(u)), head + q + u + q))
+      .replace(RE_DYNAMIC, (m, head, q, u, tail) => ((u = stamped(u)), head + q + u + q + tail))
+      .replace(RE_ASSET, (m, q, u) => q + stamped(u) + q);
+  }
+  const urls = urlsIn(file, after);
+  urlCount += urls.filter((u) => HAS_OUR_STAMP.test(u)).length;
+  if (after !== before) writeFileSync(file, after);
 }
 
 // ------------------------------------- 4. verify the copied graph is complete
@@ -176,11 +319,11 @@ while (queue.length) {
   const text = readFileSync(file, 'utf8');
   for (const spec of specifiersIn(file, text)) {
     if (/^(?:data:|https?:|#)/.test(spec)) continue;
-    let target;
-    if (spec.startsWith('/')) target = join(DIST, spec);
-    else if (spec.startsWith('.')) target = resolve(dirname(file), spec);
-    else if (importMap[spec]) target = join(DIST, importMap[spec]);
-    else continue; // bare specifier with no map entry: the page would fail, but that is the page's own importmap to get right
+    // resolveUrl ignores the ?v= the previous section added: the file on disk is
+    // still plain game/engine.js, only the URL carries the build.
+    let target = resolveUrl(file, spec);
+    if (!target && importMap[spec]) target = resolveUrl(file, importMap[spec]);
+    if (!target) continue; // bare specifier with no map entry: the page would fail, but that is the page's own importmap to get right
     if (target.startsWith(DIST) && !existsSync(target)) {
       fail(
         `${posixRel(file)} loads "${spec}", which is missing from dist/. ` +
@@ -198,8 +341,9 @@ while (queue.length) {
 // A real page that opens the game: immediate redirect (script + meta refresh,
 // either alone is enough) with a visible start link as the no-JS/no-refresh
 // fallback. Paths are relative to the site root, so this works whenever dist/
-// is published as the root (xCloud) and under a subpath.
-const href = ENTRY.split('/').map(encodeURIComponent).join('/');
+// is published as the root (xCloud) and under a subpath. The target carries this
+// build's stamp like every other URL here (issue #29).
+const href = `${ENTRY.split('/').map(encodeURIComponent).join('/')}?${VPARAM}`;
 writeFileSync(
   join(DIST, 'index.html'),
   `<!doctype html>
@@ -230,7 +374,39 @@ writeFileSync(
 `
 );
 
-// ------------------------------------------------------------ 6. manifest
+// --------------------------------------------- 6. audit: no un-stamped URL left
+
+// The versioning pass above is a regex sweep over files this script did not
+// write, so it is worth proving it caught everything: crawl dist/ again and fail
+// if any shipped module or asset URL is still missing THIS build's stamp. A file
+// added next week that reaches for a path in a shape this script does not know
+// fails the build here, in the open, instead of quietly staying cache-sticky on
+// a phone.
+const untracked = [];
+for (const file of listCodeFiles(DIST)) {
+  const text = readFileSync(file, 'utf8');
+  for (const url of urlsIn(file, text)) {
+    if (needsStamp(url) && !HAS_OUR_STAMP.test(url)) untracked.push(`${posixRel(file)}: ${url}`);
+  }
+}
+if (untracked.length) {
+  fail(
+    `${untracked.length} URL(s) in dist/ carry no build stamp, so a browser could answer them from a ` +
+      `previous build (issue #29):\n  ${untracked.join('\n  ')}\n` +
+      `If this is a URL shape tools/build-dist.mjs does not know how to stamp, add it there — do not skip the check.`
+  );
+}
+
+// --------------------------------------------------------------- 7. build.json
+
+// So a deploy log, a curl, or the next debug session can ask "what is live?"
+// without a browser: dist/build.json names this build and its commit.
+writeFileSync(
+  join(DIST, 'build.json'),
+  `${JSON.stringify({ build: BUILD.stamp, commit: BUILD.commit, built: BUILD.built, entry: ENTRY }, null, 2)}\n`
+);
+
+// ------------------------------------------------------------ 8. manifest
 
 let files = 0;
 let bytes = 0;
@@ -246,4 +422,8 @@ let bytes = 0;
     }
   }
 })(DIST);
-console.log(`\nnpm run build: dist/ ready — ${files} files, ${(bytes / 1024 / 1024).toFixed(2)} MB, entry ${ENTRY} (graph + assets verified).`);
+console.log(
+  `\nnpm run build: dist/ ready — build ${BUILD.stamp}${BUILD.commit ? '' : ' (no git: time-only stamp)'}, ` +
+    `${files} files, ${(bytes / 1024 / 1024).toFixed(2)} MB, entry ${ENTRY}. ` +
+    `${urlCount} URLs stamped ?${VPARAM}, graph + assets + stamps verified.`
+);

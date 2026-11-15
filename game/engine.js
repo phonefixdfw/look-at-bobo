@@ -83,7 +83,13 @@ export function bootGame(cfg) {
   // Issue #25 (phones): TOUCH decides the CONTROL mode (?touch=on|off wins);
   // AUTO_LOW is a device fact (touch or tiny screen) that only picks the
   // quality DEFAULT — ?quality=low/high always beat it, both ways.
-  const TOUCH = touchOverride(location.search) ?? isTouchDevice();
+  //
+  // Issue #29: TOUCH is a LET, because detection is a guess and the phone that
+  // guesses wrong is the bug being fixed. `?touch=off` still wins at boot (QA on
+  // a real phone), and a mouse never changes the mode, but the first real finger
+  // flips it over — see `enableTouchMode` / `watchForTouch` in section 13.
+  const TOUCH_OVERRIDE = touchOverride(location.search);
+  let TOUCH = TOUCH_OVERRIDE ?? isTouchDevice();
   const AUTO_LOW = autoLowQuality();
   const qualityParam = params.get('quality');
   const SETTINGS = {
@@ -96,6 +102,66 @@ export function bootGame(cfg) {
     // Weak-GPU path: ?quality=low|high, else auto-low on phones (?quality=low).
     quality: qualityParam === 'low' || (qualityParam !== 'high' && AUTO_LOW) ? 'low' : 'full',
   };
+
+  // ---------------------------------------------------------------------------
+  // 0b. The build stamp (issue #29) — "which build am I actually looking at?"
+  // ---------------------------------------------------------------------------
+  // Two independent sources, on purpose:
+  //   * game/full.html carries its own stamp in a 6-line INLINE script, so it
+  //     renders even when the JavaScript on this phone is a stale cached module
+  //     (the failure that cost Brandon a phone test);
+  //   * this file reads the `?v=<stamp>` that `npm run build` put on its OWN
+  //     module URL, so it reports the build the JS really came from.
+  // Same build → one stamp. A stale cache → "build <js> · html <other> …", a
+  // mismatch anyone can read. In the source tree neither exists: both say dev.
+  const JS_BUILD = (() => {
+    try {
+      return new URL(import.meta.url).searchParams.get('v') || 'dev';
+    } catch {
+      return 'dev';
+    }
+  })();
+  const HTML_BUILD = typeof window.LC_BUILD_HTML === 'string' ? window.LC_BUILD_HTML : '';
+  const STAMP_DEBUG = params.get('stamp') === 'on';
+  const DOC_TITLE = document.title;
+
+  /** One line, plain words: build, control mode (and why), quality. */
+  function stampText() {
+    const mode = TOUCH ? 'touch' : TOUCH_OVERRIDE === false ? 'mouse (?touch=off)' : 'mouse';
+    const parts = [stampBit()];
+    if (HTML_BUILD && HTML_BUILD !== JS_BUILD) parts.push('MISMATCH: html and js are different builds');
+    parts.push(`mode ${mode}`, `quality ${SETTINGS.quality}`);
+    return parts.join(' · ');
+  }
+
+  /** One stamp when the page and its JS agree, both when they do not — the
+   *  stale-cache signature, spelled out. A page with no inline stamp (the slice,
+   *  the tool pages) has nothing to compare against and reports its JS only. */
+  function stampBit() {
+    if (!HTML_BUILD || HTML_BUILD === JS_BUILD) return `build ${JS_BUILD}`;
+    return `html ${HTML_BUILD} / js ${JS_BUILD}`;
+  }
+
+  /** Fills the start card, the gear panel, and (with ?stamp=on) the corner text
+   *  the inline script already put up. Skipped under ?gate=off: that mode is for
+   *  capturing frames, and a stamp is not part of the game's pixels. */
+  function renderStamp() {
+    if (GATE_OFF) return;
+    const text = stampText();
+    for (const id of ['build-stamp', 'settings-build']) {
+      const node = document.getElementById(id);
+      if (node) node.textContent = text;
+    }
+    let corner = document.getElementById('build-corner');
+    if (!corner && STAMP_DEBUG) {
+      corner = document.createElement('div');
+      corner.id = 'build-corner';
+      document.body.appendChild(corner);
+    }
+    if (!corner) return;
+    corner.textContent = `${stampBit()} · ${TOUCH ? 'touch' : 'mouse'} · ${SETTINGS.quality}`;
+    if (STAMP_DEBUG) document.title = `${DOC_TITLE} [js ${JS_BUILD}]`;
+  }
 
   /** Small, seeded, reproducible — the run's only randomness (docs/DECOY_CAT.md). */
   function mulberry32(seed) {
@@ -703,7 +769,12 @@ export function bootGame(cfg) {
 
   function stepGame(dt) {
     for (const action of input.consumeActions()) {
-      if (action === 'pause' && started && game.phase !== 'win') game.paused = true;
+      // A "pause" out of src/input.js always means the same thing: the pointer
+      // went away (Esc, a window blur, or the issue #29 switch that hands the
+      // page to a finger). A page steered by thumbs has no pointer to lose, so
+      // there it is a stale request, not the player asking for a break — the
+      // phone keeps its own real pauses (portrait rotate, hidden tab).
+      if (action === 'pause' && !TOUCH && started && game.phase !== 'win') game.paused = true;
       if (action === 'point') aimShout();
     }
     el.pause.classList.toggle('show', game.paused);
@@ -1567,6 +1638,27 @@ export function bootGame(cfg) {
           touch: TOUCH,
         };
       },
+      /** Issue #29 (docs/CAPTURE.md extensions): the build this JS came from —
+       *  the `?v=` the build put on this module's own URL, 'dev' in the source
+       *  tree. Compare with window.LC_BUILD_HTML (the page's inline stamp): a
+       *  mismatch means the browser mixed two builds. Pure read. */
+      buildStamp() {
+        return JS_BUILD;
+      },
+      /** Everything the stamp line is made of, for a headless check to assert. */
+      buildInfo() {
+        return {
+          js: JS_BUILD,
+          html: HTML_BUILD,
+          match: HTML_BUILD === JS_BUILD,
+          touch: TOUCH,
+          touchOverride: TOUCH_OVERRIDE,
+          autoLow: AUTO_LOW,
+          quality: SETTINGS.quality,
+          stampDebug: STAMP_DEBUG,
+          text: stampText(),
+        };
+      },
     };
   }
 
@@ -1677,7 +1769,10 @@ export function bootGame(cfg) {
     }
     input.onLockChange((locked) => {
       if (locked) resumePlay();
-      else if (started && game.phase !== 'win' && !GATE_OFF) game.paused = true;
+      // Losing the pointer pauses — unless the page has switched to touch
+      // (issue #29): the pointer we just dropped was the mistake, not the game.
+      // `enableTouchMode` unlocks in exactly that case.
+      else if (started && game.phase !== 'win' && !GATE_OFF && !TOUCH) game.paused = true;
       el.pause.classList.toggle('show', game.paused);
     });
     input.onLockError(() => {
@@ -1811,6 +1906,9 @@ export function bootGame(cfg) {
       el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
     };
     portraitMQ?.addEventListener?.('change', applyOrientation);
+    // Called late as well as at boot (issue #29 live switch): one shared rule for
+    // "upright means wait" whoever just turned the page into touch mode.
+    applyOrientation();
     // Tab hidden: pause (the phone user returns to a waiting card, not a
     // run that walked off while the screen was off).
     document.addEventListener('visibilitychange', () => {
@@ -1818,6 +1916,44 @@ export function bootGame(cfg) {
       if (document.hidden && started && !game.paused && game.phase !== 'win') game.paused = true;
       el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 13c. The live switch (issue #29) — a finger outranks any detection.
+  // ---------------------------------------------------------------------------
+  // Every JS signal for "this device has no touch" can be wrong (Chrome's
+  // "Desktop site" toggle, a locked-down webview, a stale cached module), but a
+  // POINTER EVENT whose pointerType is "touch" is not a guess: it is a finger
+  // that arrived. So the mouse path watches for one, and hands the controls to
+  // touch the moment it lands — BEFORE the gate's own click handler runs, which
+  // is why a phone never gets as far as requesting pointer lock.
+  //
+  // One-way on purpose: a mouse appearing on a hybrid machine must not steal the
+  // controls from someone using their hands. `?touch=off` is still the last word
+  // at boot (QA on a real phone), and then nothing watches at all.
+  const touchWatch = []; // [type, handler, options] — removed on the switch
+  function enableTouchMode(reason) {
+    if (TOUCH) return false;
+    TOUCH = true;
+    for (const [type, fn, opts] of touchWatch) window.removeEventListener(type, fn, opts);
+    touchWatch.length = 0;
+    input.unlock(); // a cursor we grabbed is not wanted any more
+    initTouchUI(); // build the stick, the shout button, the touch wording
+    renderStamp(); // the start card / gear panel now say "mode touch"
+    console.info(`[look-at-bobo] touch controls on (${reason}) — the page had started in the mouse path.`);
+    return true;
+  }
+
+  function watchForTouch() {
+    if (TOUCH || TOUCH_OVERRIDE !== null) return; // already touch, or the URL decided
+    const onFinger = (ev) => {
+      if (ev.type === 'pointerdown' ? ev.pointerType !== 'touch' : !ev.touches?.length) return;
+      enableTouchMode(ev.type);
+    };
+    const opts = { capture: true, passive: true };
+    // Pointer Events first; `touchstart` for any engine that lacks them.
+    touchWatch.push(['pointerdown', onFinger, opts], ['touchstart', onFinger, opts]);
+    for (const [type, fn, o] of touchWatch) window.addEventListener(type, fn, o);
   }
 
   // Fault injection, applied after everything is built so selfTest can catch it.
@@ -1837,7 +1973,12 @@ export function bootGame(cfg) {
   }
 
   function boot() {
-    if (GATE_OFF) el.gate.classList.add('hidden');
+    if (GATE_OFF) {
+      el.gate.classList.add('hidden');
+      // Capture mode (?gate=off): the stamp chrome must never reach a frame, so
+      // it is hidden by CSS as well as skipped by renderStamp().
+      document.body.classList.add('capture');
+    }
     // Comfort: high-contrast mode is one body class (CSS in the page).
     document.body.classList.toggle('hc', SETTINGS.highContrast);
     // The moment-label chip is tooling (capture frames, phase/moment/view/t/score
@@ -1853,6 +1994,8 @@ export function bootGame(cfg) {
     installContract();
     initTouchUI(); // issue #25: no-op on desktop
     wireInput();
+    watchForTouch(); // issue #29: a finger still switches a mis-detected phone over
+    renderStamp(); // issue #29: which build, which control mode, which quality
     // `LC.ready` is the tool's one signal that the page may be captured, and a
     // capture is a screenshot of the WHOLE page — so ready means "the game is
     // what is on screen", not "the scene is built". The loading overlay fades
@@ -1867,7 +2010,7 @@ export function bootGame(cfg) {
         resizeIfNeeded();
       });
       console.info(
-        `[look-at-bobo] ${cfg.bootName ?? 'game'} ready — ${window.LC.moments.length} stages, ${window.LC.views.length} views, win at ${TARGET}, voice engine ${voices.audioUnlocked() ? 'unlocked' : 'gated'}.`,
+        `[look-at-bobo] ${cfg.bootName ?? 'game'} ready — ${window.LC.moments.length} stages, ${window.LC.views.length} views, win at ${TARGET}, voice engine ${voices.audioUnlocked() ? 'unlocked' : 'gated'} · ${stampText()}.`,
       );
     };
     // Loading screen off — the flat is genuinely ready (this is the real
