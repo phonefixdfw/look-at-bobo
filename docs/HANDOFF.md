@@ -227,7 +227,7 @@
      internal view the render loop reads; bots miss this because `LC.aimAt` teleports the camera. Proven by
      scenario 9 (camera stays within 0.05 m of the player across WASD + mouse-look turns).
   2. **Loop robustness** — the fixed 1/60 sim step now consumes rAF frame deltas, clamped at 0.25 s / 16 catch-up
-     steps: a 500 ms block loses 0.076 s of sim time (98.5% kept), 10 ms cadences drift 0.0006 s/s, 30–240 Hz all
+     steps: a 500 ms main-thread block advances the game at most one clamped frame (+0.033 s on its catch-up frame — it never teleports the player), a 10 ms cadence tracks wall time (+1.0000 s game time per 1 s), 30–240 Hz all
      reach the same 5-point win, an 0.8 s spike clamps clean. New hooks `LC.loopTick` / `LC.loopDebug` /
      `LC.loopDebugReset` / `LC.catsDebug` / `LC.aimProbe` (additive; contract unchanged).
   3. **Spawn clearance** — `pickSpawn` takes an avoid list (≥1.2 m from the other cat / previous spot; room

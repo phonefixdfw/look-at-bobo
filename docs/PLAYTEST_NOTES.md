@@ -265,9 +265,11 @@ headless Chrome, every scenario starts from a fresh page.
    drifts, and the resume keeps going clean.
 6. **Mid-run reload** — reload at score 4, replay to the win: no stale state, hash-shaped sim behaves.
 7. **The 500 ms block** — a synchronous 0.5 s jam of the main thread: the loop clamps (dt capped 0.25 s, 16
-   catch-up steps max) and loses only 0.076 s of sim time (98.5% kept) — no spiral, no explosion.
+   catch-up steps max) and the block’s catch-up frame advanced game time by at most a clamped frame — measured
+   +0.033 s on the first frame after the block — no spiral, no teleport, no explosion.
 8. **Rate-independence** — driving the sim loop at 10/30/60/120/240 Hz cadences: all reach the identical
-   5-point win; 10 ms cadence drift measures 0.0006 s/s; a simulated 0.8 s spike clamps to the cap.
+   5-point win; a 10 ms cadence tracks wall time exactly to four decimals (+1.0000 s per 1 s); a simulated 0.8 s
+   spike clamps to the cap (+0.250 s, clamped=1).
 9. **Camera follows the player** — after a *trusted* gate click, WASD turns and mouse-look turns: the camera
    stays within 0.05 m of the player at eye height 1.62. (This is the scenario that caught the critical bug below.)
 10. **Live selfTest from first person** — after a trusted gate click, `LC.selfTest()` runs from the real

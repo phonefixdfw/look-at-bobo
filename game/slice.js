@@ -1002,8 +1002,9 @@ function selfTest() {
   add(
     'gate-state',
     `${gateHidden ? 'hidden' : 'shown'}/${gateOpen ? 'open' : 'locked'}`,
-    GATE_OFF ? 'hidden/open' : 'shown/locked',
-    gateHidden === GATE_OFF && gateOpen === GATE_OFF,
+    GATE_OFF || gateOpen ? 'hidden/open' : 'shown/locked',
+    gateOpen ? gateHidden : !gateHidden,
+    // (hidden,open) once unlocked — by ?gate=off OR by a real click; shown/locked before
     'click-to-begin before any sound; ?gate=off only for headless capture',
   );
 

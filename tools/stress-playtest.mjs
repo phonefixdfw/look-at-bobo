@@ -236,7 +236,6 @@ try {
   await page.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })));
   await page.waitForTimeout(350);
   const walking = await page.evaluate(() => window.LC.state());
-  window.lastWalk = null;
   const moved = await page.evaluate((p) => {
     const s = window.LC.state();
     return Math.hypot(s.px - p.px, s.pz - p.pz);
@@ -295,20 +294,24 @@ try {
   await waitPhase(page, 'find');
   await page.waitForTimeout(400);
   await page.evaluate(() => window.LC.loopDebugReset());
-  const spike = await page.evaluate(() => {
-    const t0 = window.LC.state().time;
+  // Block the main thread, then resolve on the very next rAF callback — the
+  // game loop's callback for that frame is already registered, so LC.state is
+  // post-catch-up here: this measures ONE frame's worth of game time, not a
+  // whole measurement window of normal frames (that would be a vacuous pass).
+  const spike = await page.evaluate(() => new Promise((resolve) => {
     const stop = Date.now() + 500; // block the main thread like a GC storm
     while (Date.now() < stop) { /* spin */ }
-    return { t0, tDuringBlock: window.LC.state().time };
-  });
-  await page.waitForTimeout(300); // let the loop take its catch-up frame
-  const after = await page.evaluate(() => ({ s: window.LC.state(), d: window.LC.loopDebug() }));
-  const jumped = after.s.time - spike.tDuringBlock;
+    const tDuringBlock = window.LC.state().time;
+    requestAnimationFrame(() => resolve({ tDuringBlock, tNextFrame: window.LC.state().time }));
+  }));
+  const jumped = spike.tNextFrame - spike.tDuringBlock;
   check(
-    'a 500 ms block advances game time by at most 0.25 s (clamped)',
+    'the 500 ms block earns at most 0.25 s on its catch-up frame (clamped)',
     jumped >= 0 && jumped <= 0.25 + 1e-6,
-    `+${jumped.toFixed(3)} s of game time`,
+    `+${jumped.toFixed(3)} s on the first frame after the block`,
   );
+  await page.waitForTimeout(300); // let the loop run clean frames again
+  const after = await page.evaluate(() => ({ s: window.LC.state(), d: window.LC.loopDebug() }));
   check('the clamp fired and the step cap held', after.d.clamped >= 1 && after.d.maxSteps <= after.d.stepCap, `clamped ${after.d.clamped}, max steps ${after.d.maxSteps}/${after.d.stepCap}`);
   check('the loop keeps running after the spike', after.d.frames > 5 && after.s.phase === 'find', `${after.d.frames} frames since reset`);
   await page.close();
@@ -441,11 +444,14 @@ try {
   }));
   check('the reticle is calm again on Bobo', !onBobo.soft && onBobo.probe === 'cat-bobo', `probe ${onBobo.probe}`);
   // turn to a patch of nothing, shout, and demand a reaction (never-silent input)
-  const pose = await page.evaluate(() => {
+  const pose = await page.evaluate(async () => {
     const s = window.LC.state();
     for (let k = 0; k < 8; k++) {
       const yaw = s.yaw + (k / 8) * Math.PI * 2 + 0.1;
       window.LC.respawnHere(s.px, s.pz, yaw);
+      // the camera rides the render loop's rAF frame, not the sim step — wait
+      // for one real frame, else the probe reads the stale previous aim
+      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
       if (window.LC.aimProbe() === 'nothing') return { x: s.px, z: s.pz, yaw };
     }
     return null;
