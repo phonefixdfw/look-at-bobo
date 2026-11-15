@@ -1098,6 +1098,12 @@ export function bootGame(cfg) {
       ...wallBoxes,
       ...COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: LOS_TOP })),
     ];
+    // One shared vantage map for the sight-line and face checks: the cells a run
+    // can actually stand on. Deriving it per cat (nearest-standable + a flood) is
+    // both 38 floods a frame and wrong for a cat tucked into an alcove, because
+    // the nearest-standable spiral grows on Chebyshev rings and can cross a wall
+    // into another room — a bathroom cat got the living room's approach cells.
+    const reachShared = bodyGrid.flood(bodyGrid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1]));
     const catSpots = [
       ...MOMENTS.map((m) => ({
         id: m.id,
@@ -1194,13 +1200,11 @@ export function bootGame(cfg) {
       const vTmp = new THREE.Vector3();
       const tTmp = new THREE.Vector3();
       for (const sp of catSpots) {
-        // Approach area = the body-sized cells this cat is actually cut off
-        // to, seen from beside the cat itself. `walk-reachable` is the check
-        // that says a player can GET to that component; here the question is
-        // only which way the cat is pointing relative to the players it can
-        // plausibly have.
-        const near = nearestStandable(bodyGrid, sp.x, sp.z);
-        const a = bestApproach(bodyGrid, bodyGrid.flood(near.idx), { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
+        // Approach area = the body-sized cells a run can stand on, from the
+        // shared map above. `walk-reachable` is the check that says a player can
+        // GET there; here the question is only which way the cat is pointing
+        // relative to the players it can plausibly have.
+        const a = bestApproach(bodyGrid, reachShared, { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
         if (!a) {
           bad.push(`${sp.id}: no standable sight line`);
           continue;
