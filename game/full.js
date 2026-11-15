@@ -12,7 +12,7 @@
  */
 import * as LEVEL from './full-level.js';
 import { buildFullApartment } from './full-apartment.js';
-import { bootGame } from './engine.js';
+import { bootGame, catRootYaw } from './engine.js';
 
 /* ---- the ten moments, pose by pose ----
  * The engine runs the baseline idle right before this, only during `find`,
@@ -79,7 +79,7 @@ function fullMomentAnim({ bp, base, t, bobo, game, momentById, apt, supports }) 
   } else if (m === 'hall-chase') {
     // the hallway zoomies: quick side-to-side scuttle, tail at full thrash
     // (sideways scale only — a Y-scale would lift his paws off the contact)
-    bobo.root.rotation.y = momentById(m).faceYaw + Math.sin(t * 2.2) * 0.7;
+    bobo.root.rotation.y = catRootYaw(momentById(m).faceYaw) + Math.sin(t * 2.2) * 0.7;
     bp.tailPivot.rotation.y = Math.sin(t * 6.4) * 0.3;
     bp.body.scale.set(base.x * (1 + Math.abs(Math.sin(t * 6)) * 0.02), base.y, base.z);
   }
@@ -147,7 +147,7 @@ function fullExtraChecks({ add, supports, buildCat, setCatPose, contactGap, MOME
   for (const m of MOMENTS) {
     setCatPose(probe, m.pose);
     probe.root.position.set(m.spot[0], supports[m.spot[1]] ?? 0, m.spot[2]);
-    probe.root.rotation.y = m.faceYaw;
+    probe.root.rotation.y = catRootYaw(m.faceYaw);
     const g = contactGap(probe, m.spot[1], supports);
     if (!(g.gap >= -0.001 && g.gap <= 0.002)) bad.push(`${m.id} ${g.gap.toFixed(4)}`);
   }

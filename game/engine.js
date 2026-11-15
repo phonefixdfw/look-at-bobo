@@ -41,6 +41,25 @@ import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
 
+/**
+ * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
+ * that way (issue #27, bug 4 — he was rendering backwards).
+ *
+ * The angle convention, shared by cameras and cats and documented in
+ * docs/LEVEL_LAYOUT.md: a yaw a faces (−sin a, −cos a). That is what the
+ * camera does with its yaw, because a Three.js camera looks down its own −z.
+ * The cat rig faces the other way: its head, nose and whiskers are at local
+ * +z (docs/CHARACTERS.md), so a bare `rotation.y = a` aims a cat at
+ * (sin a, cos a) — 180° from the number the level declared, which is why
+ * spots authored against the doc appeared to stare at walls.
+ *
+ * One function, one conversion: every place a cat's root gets turned goes
+ * through here, so the rig and the convention can never drift apart again.
+ */
+export function catRootYaw(faceYaw) {
+  return faceYaw + Math.PI;
+}
+
 export function bootGame(cfg) {
   const {
     WALK_RECTS, COLLIDERS, MOMENTS, MOMENT_IDS, EVENT_PHASES, ALL_STAGE_IDS,
@@ -404,14 +423,14 @@ export function bootGame(cfg) {
   function placeBoboAt(moment) {
     const [x, support, z] = moment.spot;
     bobo.root.position.set(x, supports[support] ?? 0, z);
-    bobo.root.rotation.y = moment.faceYaw;
+    bobo.root.rotation.y = catRootYaw(moment.faceYaw); // see catRootYaw
     setCatPose(bobo, moment.pose);
     game.boboSupport = support;
   }
   function placeDecoyAt(spot) {
     const [x, support, z] = spot.pos;
     decoy.root.position.set(x, supports[support] ?? 0, z);
-    decoy.root.rotation.y = spot.faceYaw;
+    decoy.root.rotation.y = catRootYaw(spot.faceYaw);
     setCatPose(decoy, 'sprawl');
     game.decoyId = spot.id;
     game.decoySupport = support;
@@ -1145,6 +1164,62 @@ export function bootGame(cfg) {
         'a body (r 0.30), not a point: every spawn reaches every room, spawn and cat',
         bad.length === 0,
         'furniture push pads subtracted — the trap in issue #27 was invisible to a point walk',
+      );
+    }
+
+    // --- issue #27 (bug 4): a cat facing a wall reads as a prop, not a pet.
+    // The front of the rig is measured, not assumed: head minus tail pivot,
+    // in world space, on a real cat turned to the declared faceYaw. It must be
+    // within 90° of the direction of the nearest place a player can stand and
+    // see it — Bobo looks out at the room, never at plaster.
+    {
+      const probes = { Bobo: buildCat('bobo'), decoy: buildCat('decoy') };
+      const bad = [];
+      const rendered = [];
+      const vTmp = new THREE.Vector3();
+      const tTmp = new THREE.Vector3();
+      for (const sp of catSpots) {
+        // Approach area = the body-sized cells this cat is actually cut off
+        // to, seen from beside the cat itself. `walk-reachable` is the check
+        // that says a player can GET to that component; here the question is
+        // only which way the cat is pointing relative to the players it can
+        // plausibly have.
+        const near = nearestStandable(bodyGrid, sp.x, sp.z);
+        const a = bestApproach(bodyGrid, bodyGrid.flood(near.idx), { x: sp.x, z: sp.z, y: sp.y, los: losBoxes, eye: MOVE.eye });
+        if (!a) {
+          bad.push(`${sp.id}: no standable sight line`);
+          continue;
+        }
+        const probe = probes[sp.kind];
+        // Reset to a pose both rigs have, so a spot asking for a pose its cat
+        // does not build (a lying spot on a cat without that pose) measures
+        // the same way in any iteration order — as what it renders.
+        setCatPose(probe, 'sit');
+        setCatPose(probe, sp.pose);
+        if (probe.current !== sp.pose) rendered.push(`${sp.id}→${probe.current}`);
+        probe.root.position.set(sp.x, sp.y, sp.z);
+        probe.root.rotation.y = catRootYaw(sp.yaw);
+        probe.root.updateMatrixWorld(true);
+        const pv = probe.pivots[probe.current];
+        pv.head.getWorldPosition(vTmp);
+        pv.tailPivot.getWorldPosition(tTmp);
+        const fx = vTmp.x - tTmp.x;
+        const fz = vTmp.z - tTmp.z;
+        const fl = Math.hypot(fx, fz) || 1;
+        // (a.dx, a.dz) points from the cat to its vantage; the face must be
+        // turned toward it, so the front·cat→vantage dot is the test.
+        const dot = (fx * a.dx + fz * a.dz) / (fl * a.dist);
+        const deg = (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
+        if (deg > 90) bad.push(`${sp.id} ${deg.toFixed(0)}° off its approach`);
+      }
+      add(
+        'cats-face-the-room',
+        bad.length
+          ? bad.slice(0, 3).join(', ')
+          : `${catSpots.length}/${catSpots.length} face an approach${rendered.length ? ` (${rendered.join(', ')} render as built)` : ''}`,
+        'front within 90° of the nearest place a player can stand and see them',
+        bad.length === 0,
+        'head−tail of the rendered rig, measured, not the yaw number',
       );
     }
 
