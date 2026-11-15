@@ -75,13 +75,18 @@ export function bootGame(cfg) {
   // ?sens=0.5..3  ?invertY=1  ?motion=off  ?volume=0..1  ?mute=1  ?contrast=high
   const sensRaw = Number.parseFloat(params.get('sens') ?? '');
   const volRaw = Number.parseFloat(params.get('volume') ?? '');
+  // OS-level "reduce motion" is the default for calm mode; the url overrides
+  // both ways (?motion=off forces calm, ?motion=full forces the juice back).
+  const OS_REDUCE = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const motionParam = params.get('motion');
   const SETTINGS = {
     sens: Number.isFinite(sensRaw) ? clamp(sensRaw, 0.2, 3) : 1,
     invertY: params.get('invertY') === '1',
-    reducedMotion: params.get('motion') === 'off', // calm: no confetti/rain/fireworks/flash/blink
+    reducedMotion: motionParam === 'off' || (motionParam !== 'full' && OS_REDUCE),
     highContrast: params.get('contrast') === 'high',
     volume: Number.isFinite(volRaw) ? clamp(volRaw, 0, 1) : 1,
     muted: params.get('mute') === '1',
+    quality: params.get('quality') === 'low' ? 'low' : 'full', // weak-GPU path (?quality=low)
   };
 
   /** Small, seeded, reproducible — the run's only randomness (docs/DECOY_CAT.md). */
@@ -112,6 +117,7 @@ export function bootGame(cfg) {
   renderer.toneMappingExposure = BASE_EXPOSURE;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  if (SETTINGS.quality === 'low') renderer.shadowMap.enabled = false; // weak-GPU path: no shadow pass
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x14181f);
@@ -135,9 +141,17 @@ export function bootGame(cfg) {
   const DECOY_LIFT = 1.32 / 1.3;
   decoy.root.scale.x *= DECOY_LIFT;
   scene.add(bobo.root, decoy.root);
+  if (SETTINGS.quality === 'low') {
+    // Weak-GPU path (?quality=low): the fuzz shells roughly double the cats'
+    // triangles, the shadow map is a whole extra pass, confetti is decoration.
+    // Materials, light and layout stay identical — the look never changes.
+    for (const cat of [bobo, decoy])
+      for (const pose of Object.values(cat.pivots)) for (const s of pose.shells ?? []) s.visible = false;
+  }
 
   const { rainHeads, rainMuzzles, rainDashes, bursts, updateRain, updateFireworks } = createCelebration(scene);
   const confetti = createConfetti(scene); // Step 9 juice, win-only (src/juice.js)
+  if (SETTINGS.quality === 'low') confetti.enabled = false; // weak GPU: skip the paper bits
 
   const hand = buildHand();
   const handRig = new THREE.Group();
@@ -192,6 +206,7 @@ export function bootGame(cfg) {
     prompt: document.getElementById('prompt'),
     label: document.getElementById('moment-label'),
     boot: document.getElementById('boot-error'),
+    loading: document.getElementById('loading'),
     gate: document.getElementById('gate'),
     gateBtn: document.getElementById('gate-btn'),
     pause: document.getElementById('pause'),
@@ -1177,17 +1192,19 @@ export function bootGame(cfg) {
       const wantHc = p.get('contrast') === 'high';
       const sensParam = Number.parseFloat(p.get('sens') ?? '');
       const sensOk = Number.isFinite(sensParam) ? SETTINGS.sens === clamp(sensParam, 0.2, 3) : SETTINGS.sens === 1;
+      const wantCalm = p.get('motion') === 'off' || (p.get('motion') !== 'full' && OS_REDUCE);
       add(
         'comfort-settings-wired',
-        `sens ${SETTINGS.sens} · invertY ${SETTINGS.invertY ? 'on' : 'off'} · motion ${SETTINGS.reducedMotion ? 'calm' : 'full'} · contrast ${SETTINGS.highContrast ? 'high' : 'std'} · vol ${SETTINGS.volume}${SETTINGS.muted ? ' muted' : ''}`,
+        `sens ${SETTINGS.sens} · invertY ${SETTINGS.invertY ? 'on' : 'off'} · motion ${SETTINGS.reducedMotion ? 'calm' : 'full'} · contrast ${SETTINGS.highContrast ? 'high' : 'std'} · vol ${SETTINGS.volume}${SETTINGS.muted ? ' muted' : ''} · q ${SETTINGS.quality}`,
         'url params honoured, body class agrees',
         sensOk &&
           SETTINGS.invertY === (p.get('invertY') === '1') &&
-          SETTINGS.reducedMotion === (p.get('motion') === 'off') &&
+          SETTINGS.reducedMotion === wantCalm &&
           SETTINGS.highContrast === wantHc &&
           document.body.classList.contains('hc') === wantHc &&
-          SETTINGS.muted === (p.get('mute') === '1'),
-        'comfort settings parse from the url and drive the page (panel writes the same params)',
+          SETTINGS.muted === (p.get('mute') === '1') &&
+          SETTINGS.quality === (p.get('quality') === 'low' ? 'low' : 'full'),
+        'comfort settings parse from the url (calm follows prefers-reduced-motion unless overridden) and drive the page',
       );
     }
 
@@ -1637,7 +1654,9 @@ export function bootGame(cfg) {
         const vol = Number(q('#set-volume').value);
         setOr('sens', String(sens), sens !== 1);
         setOr('invertY', '1', q('#set-invertY').checked);
-        setOr('motion', 'off', q('#set-motion').checked);
+        if (q('#set-motion').checked) p.set('motion', 'off');
+        else if (OS_REDUCE) p.set('motion', 'full'); // explicit override of the OS preference
+        else p.delete('motion');
         setOr('mute', '1', q('#set-mute').checked);
         setOr('volume', String(vol), vol !== 1);
         setOr('contrast', 'high', q('#set-contrast').checked);
@@ -1686,6 +1705,13 @@ export function bootGame(cfg) {
     installContract();
     wireInput();
     window.LC.ready = true;
+    // Loading screen off — the flat is genuinely ready (this is the real
+    // signal, not a timer). Pages without the overlay (demo/slice) skip it.
+    if (el.loading) {
+      el.loading.classList.add('gone');
+      const node = el.loading;
+      setTimeout(() => node.remove(), 450);
+    }
     window.addEventListener('resize', () => {
       lastWidth = 0;
       resizeIfNeeded();
@@ -1701,6 +1727,7 @@ export function bootGame(cfg) {
     window.LCError = `${err && err.message ? err.message : err}\n${err && err.stack ? err.stack : ''}`;
     el.boot.style.display = 'block';
     el.boot.textContent = `${cfg.failPrefix ?? 'Game failed to start'}:\n${window.LCError}`;
+    if (el.loading) el.loading.classList.add('gone'); // the error card is the message now
     console.error(err);
   }
 }
