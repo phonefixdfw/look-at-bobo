@@ -732,6 +732,48 @@
         display: none;
         z-index: 60;
       }
+
+      /* Issue #29: the build stamp — one plain line saying WHICH build this is,
+         which control mode it picked and which quality it is running, in the
+         start card and in the gear panel. Filled by the inline script below and
+         then by the engine (so a stale cached module shows up as a mismatch).
+         Empty in this file and hidden under ?gate=off, so it can never flash
+         into — or land in — a captured frame. */
+      .lc-stamp {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.01em;
+        color: rgba(247, 244, 238, 0.52);
+      }
+      #build-stamp {
+        margin-top: 14px;
+      }
+      #settings-build {
+        margin: 12px 0 0;
+        line-height: 1.45;
+      }
+      /* ?stamp=on: the same fact at the top of the screen AND in the tab title,
+         so it is readable even when the game itself never boots. Created by JS,
+         only when asked for. */
+      #build-corner {
+        position: fixed;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 70;
+        padding: 4px 9px;
+        border-radius: 8px;
+        background: rgba(10, 13, 18, 0.74);
+        color: #ffd9a8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      body.capture .lc-stamp,
+      body.capture #build-corner {
+        display: none !important;
+      }
     </style>
   </head>
   <body>
@@ -766,6 +808,8 @@
         <label>High contrast <input id="set-contrast" type="checkbox" /></label>
         <label>Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
         <label>Mute <input id="set-mute" type="checkbox" /></label>
+        <!-- issue #29: which build, which control mode, which quality -->
+        <div class="lc-stamp" id="settings-build"></div>
       </div>
       <div id="wrong-flash"></div>
       <div id="ending-veil"></div>
@@ -785,6 +829,9 @@
           ten finds wins it; the wrong cat earns a DAG! and a point off.<br />
           sound on, the takes are real · <span class="only-desktop">desktop (keyboard + mouse) — phones too</span><span class="only-touch">phones: turn your phone sideways for the best view</span>
         </div>
+        <!-- issue #29: which build, which control mode, which quality. Filled by
+             the inline script at the bottom of this file, then by the engine. -->
+        <div class="lc-stamp" id="build-stamp"></div>
       </div>
     </div>
 
@@ -809,6 +856,37 @@
     <div id="moment-label">starting…</div>
     <div id="loading"><div class="box"></div><div>Getting your flat ready…</div></div>
     <div id="boot-error"></div>
+
+    <!-- Issue #29: the build stamp, written by THIS file. It has to be inline:
+         the bug was a phone running a stale cached module, and only inline code
+         is guaranteed to be the code the HTML was shipped with. It runs before
+         the game's JS is even fetched, so a page that never boots still says
+         which build it is — with ?stamp=on, in the tab title and at the top of
+         the screen. The engine then rewrites these lines to add the control mode
+         and the quality, plus the stamp its OWN module URL carries: two different
+         stamps is the stale-cache signature, in plain words. -->
+    <script>
+      window.LC_BUILD_HTML = 'dev'; /* npm run build rewrites this literal */
+      (function () {
+        var q = new URLSearchParams(location.search);
+        if (q.get('gate') === 'off') {
+          document.body.classList.add('capture'); // capture mode: no chrome, ever
+          return;
+        }
+        var text = 'build ' + window.LC_BUILD_HTML;
+        var card = document.getElementById('build-stamp');
+        var panel = document.getElementById('settings-build');
+        if (card) card.textContent = text;
+        if (panel) panel.textContent = text;
+        if (q.get('stamp') === 'on') {
+          var corner = document.createElement('div');
+          corner.id = 'build-corner';
+          corner.textContent = 'html ' + window.LC_BUILD_HTML;
+          document.body.appendChild(corner);
+          document.title = document.title + ' [html ' + window.LC_BUILD_HTML + ']';
+        }
+      })();
+    </script>
     <script type="module" src="./full.js"></script>
   </body>
 </html>

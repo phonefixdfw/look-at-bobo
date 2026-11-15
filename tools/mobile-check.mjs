@@ -5,6 +5,15 @@
 // so every touch path in src/touch.js and game/engine.js runs through its REAL
 // pointer/touch handlers — no synthetic shortcuts.
 //
+// Issue #29 added the scenarios at the end (8-11), which run the opposite
+// situation on purpose: a device whose JavaScript says "no touch" (a plain
+// desktop context — that is what a Chrome "Desktop site" tab, a locked-down
+// webview or a stale cached module looks like to the page), rescued by a finger.
+// Touch is injected into that context with raw CDP `Input.dispatchTouchEvent`:
+// Chrome delivers it as a TRUSTED pointerdown with pointerType 'touch' plus a
+// touchstart, which is exactly the event a mis-detected phone sends, so the live
+// switch is tested through the real pipeline and not a stub.
+//
 // Scenarios:
 //   1   desktop control page: touch mode OFF, pixel ratio 1, quality full,
 //       touch DOM hidden — the capture contract is untouched
@@ -22,10 +31,17 @@
 //   7   a full run to the win AT TEN driven only by real shout-button taps
 //       (plus one deliberate DAG!), exact ending text, and the shout button
 //       restarting the game after the 0.6 s cooldown — at @2x
+//   8   #29 rescue: a touch-blind device locks the pointer, ONE finger takes the
+//       controls over (lock dropped, stick + shout live, no lock asked for
+//       again), the mode line changes, and a mouse afterwards changes nothing
+//   9   #29 ?touch=off stays the mouse path even under a finger — and says so
+//   10  #29 the build stamp: card + gear panel + ?stamp=on corner and title, and
+//       nothing at all under ?gate=off
+//   11  #29 isTouchDevice() signal matrix, run in the page
 //
 //   npm run check:mobile
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,9 +77,21 @@ function check(name, pass, detail = '') {
 const IGNORE = /fullscreen|orientation|favicon|autoplay|AudioContext/i;
 
 const contexts = [];
+/** Counts requestPointerLock() calls for the whole page (issue #29: after a
+ *  finger takes over, the number must never move again). Wrapping the prototype
+ *  changes nothing about the call — it still runs, still grants. */
+const LOCK_COUNTER = () => {
+  window.__locks = 0;
+  const orig = Element.prototype.requestPointerLock;
+  Element.prototype.requestPointerLock = function (...a) {
+    window.__locks++;
+    return orig.apply(this, a);
+  };
+};
 async function phonePage(params, opts = {}) {
   const { viewport = LAND, dsf = 3 } = opts;
   const context = await browser.newContext({ viewport, deviceScaleFactor: dsf, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
+  await context.addInitScript(LOCK_COUNTER);
   contexts.push(context);
   const page = await context.newPage();
   const errs = [];
@@ -76,6 +104,7 @@ async function phonePage(params, opts = {}) {
 }
 async function desktopPage(params) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await context.addInitScript(LOCK_COUNTER);
   contexts.push(context);
   const page = await context.newPage();
   const errs = [];
@@ -94,6 +123,59 @@ const waitPhase = (page, p, ms = 20000) =>
   page.waitForFunction((ph) => window.LC.state().phase === ph, p, { timeout: ms });
 const waitCatchOrWin = (page, ms = 20000) =>
   page.waitForFunction(() => ['catch', 'win'].includes(window.LC.state().phase), null, { timeout: ms });
+
+/** Wait until the game has run `n` FIXED simulation steps (n/60 s of game time),
+ *  and return how long that took. Anything that measures movement or a camera
+ *  turn has to be timed this way rather than with `waitForTimeout`: a phone page
+ *  under SwiftShader renders at single-digit frame rates, so a 500 ms wall-clock
+ *  window can hold one or two steps — enough to turn the camera (one step applies
+ *  the whole accumulated drag) and nowhere near enough to walk anywhere. That is
+ *  how the walk/look checks came to fail at HEAD on a slow GPU with the game
+ *  itself intact. N steps is N `stepGame` calls on any machine, so the same
+ *  numbers mean the same thing here and on Brandon's hardware. */
+async function simSteps(page, n) {
+  const t0 = await page.evaluate(() => ({ steps: window.LC.loopDebug().simSteps, ms: performance.now() }));
+  await page.waitForFunction(
+    ([from, want]) => window.LC.loopDebug().simSteps - from >= want,
+    [t0.steps, n],
+    { timeout: 90000 },
+  );
+  return Math.round((await page.evaluate(() => performance.now())) - t0.ms);
+}
+
+/** Watch for the win from INSIDE the page and shout on the very frame it lands,
+ *  returning `{we, phase, score}` — `we` being `winElapsed` at the instant of the
+ *  tap, which is the whole point: measured from the harness a win is only visible
+ *  a poll or two late, so a harness-side tap can no longer be *provably* inside the
+ *  0.6 s win cooldown. The event is untrusted by necessity (a page cannot mint a
+ *  trusted touch) but it runs the product's real handlers: `#shout-btn`'s own
+ *  `pointerdown` → touch.js' `press` → the engine's `onShout`. */
+function shoutAtWin(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const btn = document.getElementById('shout-btn');
+        const t0 = performance.now();
+        const tick = () => {
+          const s = window.LC.state();
+          if (s.phase === 'win') {
+            const we = window.LC.loopDebug().winElapsed;
+            const fire = (type) =>
+              btn.dispatchEvent(new PointerEvent(type, { pointerId: 991, pointerType: 'touch', bubbles: true, cancelable: true }));
+            fire('pointerdown');
+            fire('pointerup');
+            const after = window.LC.state();
+            resolve({ we, phase: after.phase, score: after.score });
+          } else if (performance.now() - t0 > 60000) {
+            resolve({ error: 'no win within 60 s', phase: s.phase, we: NaN, score: s.score });
+          } else {
+            requestAnimationFrame(tick);
+          }
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+}
 
 // Trusted multi-touch straight through Chrome's input pipeline: real touch
 // events, so the page generates real Pointer Events for src/touch.js.
@@ -197,12 +279,12 @@ try {
     const p0 = await st(page);
     await touch.down(1, 140, 330); // lower-left pad → stick
     await touch.moveTo(1, 140, 250); // 80 px up: past the run band
-    await page.waitForTimeout(700);
+    const walkMs = await simSteps(page, 42); // 0.7 s of game time, whatever the frame rate
     const mid = await touchDbg(page);
     check('stick: forward + run held', mid.controls.stick === true && mid.controls.fwd === 1 && mid.controls.run === true && mid.virtual.forward === true && mid.virtual.run === true, JSON.stringify(mid.controls));
     const p1 = await st(page);
     const moved = Math.hypot(p1.px - p0.px, p1.pz - p0.pz);
-    check('stick: the player really walks', moved > 0.4, `${moved.toFixed(2)} m in 0.7 s`);
+    check('stick: the player really walks', moved > 0.4, `${moved.toFixed(2)} m in 42 steps (${walkMs} ms)`);
     await touch.up(1);
     await page.waitForTimeout(100);
     const rel = await touchDbg(page);
@@ -211,10 +293,10 @@ try {
     // --- drag-to-look ---------------------------------------------------------
     await touch.down(2, 650, 180);
     await touch.moveTo(2, 560, 180); // horizontal: yaw
-    await page.waitForTimeout(80);
+    await simSteps(page, 12); // 0.2 s of game time
     const lookH = await st(page);
     await touch.moveTo(2, 560, 260); // vertical: pitch
-    await page.waitForTimeout(80);
+    await simSteps(page, 12);
     const lookV = await st(page);
     const dbgL = await touchDbg(page);
     await touch.up(2);
@@ -222,12 +304,19 @@ try {
     check('look: the finger counts as a look pointer', dbgL.controls.lookPointers === 1);
 
     // --- multi-touch: walk AND look at once ----------------------------------
+    // Back to the spawn the single-finger walk above proved is clear: the look
+    // test left the camera turned, and a heading that runs into a wall walks
+    // nowhere however well both fingers work. `respawnHere` is the same test hook
+    // the audio and bot checks use, so this measures two live fingers, not which
+    // way the previous test happened to end up facing.
+    await page.evaluate((p) => window.LC.respawnHere(p.px, p.pz, p.yaw), p0);
+    await simSteps(page, 3); // let it land in a rendered frame
     const m0 = await st(page);
     await touch.down(3, 140, 330); // stick finger
     await touch.down(4, 650, 200); // look finger joins
     await touch.moveTo(3, 140, 260);
     await touch.moveTo(4, 580, 200);
-    await page.waitForTimeout(500);
+    await simSteps(page, 42); // 0.7 s of game time
     const both = await touchDbg(page);
     const m1 = await st(page);
     await touch.up(3);
@@ -322,6 +411,7 @@ try {
     const page = await phonePage('?seed=11', { dsf: 2 });
     await page.tap('#gate-btn');
     await waitPhase(page, 'find');
+    const earlyTap = shoutAtWin(page).catch((e) => ({ error: String(e), we: -1, phase: '-', score: -1 }));
     const scores = [];
     let dagged = false;
     let n = 0;
@@ -349,16 +439,229 @@ try {
     }));
     check('mobile win run: ten finds over the shout button', fin.phase === 'win' && fin.score === 10 && fin.target === 10, `score ${fin.score}/${fin.target}, ${scores.join(', ')}`);
     check('mobile win run: exact ending text', ending.text === 'your did it! you wind' && ending.again === 'tap the shout button to look at them again', `"${ending.text}" / "${ending.again}"`);
-    // The shout button doubles as play-again — but only after the cooldown.
-    await page.tap('#shout-btn'); // inside the 0.6 s cooldown: must NOT restart
-    await page.waitForTimeout(200);
-    const early = await st(page);
-    await page.waitForTimeout(700);
-    await page.tap('#shout-btn');
+    // The shout button doubles as play-again — but only after the 0.6 s win
+    // cooldown (`WIN_RESTART_AFTER`), and the tap that proves it has to be fired
+    // from INSIDE the page on the frame the win lands. Measured from the harness,
+    // a win is only observable a poll or two after it happens, and on a software
+    // renderer those round trips can outlast the cooldown: this check failed that
+    // way at HEAD with the rule itself intact. The cooldown is what is under test
+    // here, so the event is synthetic-but-real-handler (touch.js' own `press` →
+    // `onShout`); every find above and the restart below are genuine taps.
+    const early = await earlyTap;
+    check(
+      'mobile win run: shout inside the cooldown does not restart',
+      !early.error && early.we < 0.6 && early.phase === 'win' && early.score === 10,
+      early.error || `winElapsed ${early.we.toFixed(3)} at the tap → ${early.phase} at ${early.score}`,
+    );
+    await page.waitForTimeout(700); // past WIN_RESTART_AFTER
+    await page.tap('#shout-btn'); // a real finger this time: it must restart
     await waitPhase(page, 'find');
     const re = await st(page);
-    check('mobile win run: shout restarts only after the cooldown', early.phase === 'win' && re.phase === 'find' && re.score === 0, `early ${early.phase}, then ${re.phase} at ${re.score}`);
+    check('mobile win run: shout restarts only after the cooldown', re.phase === 'find' && re.score === 0, `then ${re.phase} at ${re.score}`);
     check('mobile win run: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+  // ===========================================================================
+  // 8. Issue #29: the rescue. A device whose every JS signal says "no touch"
+  //    (a Chrome "Desktop site" tab, a locked-down webview, a stale cached
+  //    module — a plain desktop context IS that device to the page) starts in
+  //    the pointer-lock path, and one finger takes the controls back.
+  // ===========================================================================
+  {
+    const page = await desktopPage('?seed=11');
+    const boot = await page.evaluate(() => ({ touch: window.LC.touchDebug().active, locks: window.__locks }));
+    check('#29 a blind device boots in the mouse path', boot.touch === false && boot.locks === 0, JSON.stringify(boot));
+
+    await page.click('#gate-btn'); // a mouse click, like the phone that got here
+    await page.waitForTimeout(600);
+    const grabbed = await page.evaluate(() => ({
+      locks: window.__locks,
+      locked: document.pointerLockElement !== null,
+      paused: window.LC.state().paused,
+    }));
+    check('#29 the mouse path really grabbed the pointer', grabbed.locks === 1 && grabbed.locked === true && grabbed.paused === false, JSON.stringify(grabbed));
+
+    const touch = await touchDriver(page);
+    await touch.down(11, 700, 400); // ONE finger, anywhere on the screen
+    await page.waitForTimeout(250);
+    const sw = await page.evaluate(() => ({
+      dbg: window.LC.touchDebug(),
+      locked: document.pointerLockElement !== null,
+      locks: window.__locks,
+      paused: window.LC.state().paused,
+      cls: document.documentElement.classList.contains('touch'),
+      shout: getComputedStyle(document.getElementById('shout-btn')).display,
+      card: document.getElementById('build-stamp').textContent,
+      panel: document.getElementById('settings-build').textContent,
+      notice: document.getElementById('pause').classList.contains('show'),
+    }));
+    check('#29 one finger switches the controls to touch', sw.dbg.active === true && sw.cls === true && sw.shout === 'flex', `touch ${sw.dbg.active}, shout ${sw.shout}`);
+    check('#29 the switch dropped the pointer without pausing', sw.locked === false && sw.paused === false && sw.notice === false, `locked ${sw.locked}, paused ${sw.paused}`);
+    check('#29 no pointer lock is asked for after the switch', sw.locks === 1, `lock requests ${sw.locks}`);
+    check('#29 the mode line follows the switch', sw.card.includes('mode touch') && sw.panel.includes('mode touch'), sw.card);
+
+    // …and the touch UI is live, not just painted: the stick walks.
+    const w0 = await st(page);
+    await touch.down(12, 140, 700);
+    await touch.moveTo(12, 140, 620);
+    await simSteps(page, 42); // 0.7 s of game time
+    const w1 = await st(page);
+    const wdbg = await touchDbg(page);
+    await touch.up(12);
+    const walked = Math.hypot(w1.px - w0.px, w1.pz - w0.pz);
+    check('#29 the stick walks after the switch', wdbg.controls?.stick === true && walked > 0.2, `walk ${walked.toFixed(2)} m`);
+
+    // The shout button works too, so the switched page is playable to the end.
+    const s0 = (await st(page)).score;
+    await page.evaluate(() => window.LC.aimAt('bobo'));
+    await page.click('#shout-btn');
+    await waitCatchOrWin(page);
+    const s1 = await st(page);
+    check('#29 the shout button scores after the switch', s1.score === s0 + 1, `score ${s0} → ${s1.score}`);
+
+    // A mouse must never take the controls back from a hand.
+    await page.mouse.move(600, 400);
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.mouse.move(760, 430);
+    const back = await page.evaluate(() => ({ touch: window.LC.touchDebug().active, locks: window.__locks, locked: document.pointerLockElement !== null }));
+    check('#29 a mouse does not steal the controls back', back.touch === true && back.locks === 1 && back.locked === false, JSON.stringify(back));
+    check('#29 rescued page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // ===========================================================================
+  // 9. Issue #29: ?touch=off stays the mouse path — a finger included — and
+  //    says out loud on the card why it is holding that choice.
+  // ===========================================================================
+  {
+    const page = await phonePage('?touch=off&seed=11');
+    const card = await page.evaluate(() => document.getElementById('build-stamp').textContent);
+    check('#29 ?touch=off names itself on the start card', card.includes('mode mouse (?touch=off)'), card);
+    await page.tap('#gate-btn'); // a FINGER on the gate, the QA-phone case
+    await page.waitForTimeout(600);
+    const t = await touchDriver(page);
+    await t.down(21, 500, 200);
+    await page.waitForTimeout(200);
+    await t.up(21);
+    const after = await page.evaluate(() => ({ touch: window.LC.touchDebug().active, locks: window.__locks, cls: document.documentElement.classList.contains('touch') }));
+    check('#29 ?touch=off keeps a finger out of touch mode', after.touch === false && after.cls === false && after.locks === 1, JSON.stringify(after));
+    check('#29 ?touch=off page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // ===========================================================================
+  // 10. Issue #29: the build stamp — visible, on both surfaces, readable when
+  //     nothing else is, and nowhere near a captured frame.
+  // ===========================================================================
+  {
+    const page = await phonePage('?seed=11');
+    const info = await page.evaluate(() => window.LC.buildInfo());
+    const dom = await page.evaluate(() => ({
+      card: document.getElementById('build-stamp').textContent,
+      panel: document.getElementById('settings-build').textContent,
+      corner: document.getElementById('build-corner'),
+      title: document.title,
+    }));
+    check('#29 LC.buildStamp works and agrees with the page', info.js === 'dev' && info.html === 'dev' && info.match === true, JSON.stringify({ js: info.js, html: info.html }));
+    check('#29 the start card shows build + mode + quality', dom.card === info.text && dom.card.includes('build ') && dom.card.includes('mode touch') && dom.card.includes('quality low'), dom.card);
+    check('#29 the gear panel shows the same line', dom.panel === info.text);
+    check('#29 no debug chrome unless ?stamp=on', dom.corner === null && !/\[(html|js) /.test(dom.title), dom.title);
+    await page.context().close();
+  }
+  {
+    const page = await desktopPage('?seed=11&stamp=on');
+    const dom = await page.evaluate(() => ({
+      corner: document.getElementById('build-corner')?.textContent ?? null,
+      title: document.title,
+      info: window.LC.buildInfo(),
+    }));
+    check('#29 ?stamp=on puts the stamp on the screen', typeof dom.corner === 'string' && dom.corner.includes('dev') && dom.corner.includes('mouse'), dom.corner);
+    check('#29 ?stamp=on puts it in the tab title too', /\[html dev\]/.test(dom.title) && /\[js dev\]/.test(dom.title), dom.title);
+    await page.context().close();
+  }
+  {
+    // Capture mode: the stamp chrome must be invisible AND empty, in a phone
+    // context, with ?stamp=on trying its hardest to make it appear.
+    const page = await phonePage('?gate=off&stamp=on');
+    const dom = await page.evaluate(() => ({
+      capture: document.body.classList.contains('capture'),
+      card: document.getElementById('build-stamp').textContent,
+      panel: document.getElementById('settings-build').textContent,
+      corner: document.getElementById('build-corner'),
+      title: document.title,
+    }));
+    check('#29 ?gate=off keeps every stamp out of the frame', dom.capture === true && dom.card === '' && dom.panel === '' && dom.corner === null && !/\[/.test(dom.title), JSON.stringify({ capture: dom.capture, card: dom.card }));
+    check('#29 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+  {
+    // The stamped build itself, when one has been made (npm run build).
+    const distEntry = join(REPO, 'dist', 'game', 'full.html');
+    if (!existsSync(distEntry)) {
+      results.push('  SKIP  #29 dist/ stamp checks — run `npm run build` to include them');
+    } else {
+      const build = JSON.parse(readFileSync(join(REPO, 'dist', 'build.json'), 'utf8'));
+      const distServer = await startStaticServer({ root: join(REPO, 'dist'), port: 0 });
+      const context = await browser.newContext({ viewport: LAND, deviceScaleFactor: 3, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
+      contexts.push(context);
+      const page = await context.newPage();
+      const errs = [];
+      const fetched = []; // every script/asset the shipped page actually asked for
+      page.on('request', (req) => {
+        if (/\.(?:js|mp3)(?:\?|$)/.test(req.url())) fetched.push(req.url());
+      });
+      page.on('pageerror', (e) => errs.push(String(e)));
+      page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
+      await page.goto(`${distServer.url}game/full.html`, { waitUntil: 'load' });
+      await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+      const info = await page.evaluate(() => window.LC.buildInfo());
+      // Every module URL in the shipped page has to carry the same stamp, or a
+      // phone can still be handed last build's engine.js.
+      const modules = fetched.filter((u) => u.endsWith('.js') || /\.js\?/.test(u));
+      const unversioned = fetched.filter((u) => !u.includes(`v=${build.build}`));
+      check('#29 dist/: the stamp is this build', info.js === build.build && info.html === build.build && info.match === true, `${info.js} vs build.json ${build.build}`);
+      check('#29 dist/: the card shows a real stamp', info.text.startsWith(`build ${build.build} ·`), info.text);
+      // The count is the guard on the assertion that matters: if the page fetched
+      // hardly any modules, "0 un-versioned" would be vacuous. The full game's
+      // graph is 24 modules (game/ + src/ + the vendor bundle) — 20 leaves room
+      // for a level to be folded into another file, not for a page that loaded
+      // one script.
+      check('#29 dist/: every module URL is versioned', modules.length >= 20 && unversioned.length === 0, `${modules.length} modules fetched, ${unversioned.length} un-versioned`);
+      check('#29 dist/ page: console clean', errs.length === 0, errs.join(' | '));
+      await context.close();
+      await distServer.close();
+    }
+  }
+
+  // ===========================================================================
+  // 11. Issue #29: the detector itself, one row per device shape. Run in the
+  //     page against src/touch.js with fake windows, so a signal set that only
+  //     exists on hardware (a phone in "Desktop site" mode) is still covered.
+  // ===========================================================================
+  {
+    const page = await desktopPage('?gate=off');
+    const m = await page.evaluate(async () => {
+      const { isTouchDevice } = await import('/src/touch.js');
+      const fake = ({ mtp = 0, ots = false, coarse = false, hoverNone = false, uaMobile } = {}) => ({
+        navigator: { maxTouchPoints: mtp, userAgentData: uaMobile === undefined ? undefined : { mobile: uaMobile } },
+        matchMedia: (q) => ({ matches: (q === '(pointer: coarse)' && coarse) || (q === '(hover: none)' && hoverNone) }),
+        ...(ots ? { ontouchstart: null } : {}),
+      });
+      return {
+        phone: isTouchDevice(fake({ mtp: 1, ots: true, coarse: true, hoverNone: true, uaMobile: true })),
+        hoverlessTablet: isTouchDevice(fake({ hoverNone: true })),
+        uaOnlyMobile: isTouchDevice(fake({ uaMobile: true })),
+        touchscreenLaptop: isTouchDevice(fake({ mtp: 10, ots: true })),
+        blindPhone: isTouchDevice(fake({})),
+        desktop: isTouchDevice(fake({ coarse: false, hoverNone: false })),
+      };
+    });
+    check('#29 detector: a phone says touch', m.phone === true);
+    check('#29 detector: hoverless or UA-mobile alone is enough', m.hoverlessTablet === true && m.uaOnlyMobile === true, JSON.stringify(m));
+    check('#29 detector: a touchscreen laptop says touch (as of #26)', m.touchscreenLaptop === true);
+    check('#29 detector: a desktop says mouse', m.desktop === false);
+    check('#29 detector: a phone lying about itself says mouse — and the live switch (8) is what saves it', m.blindPhone === false);
     await page.context().close();
   }
 } finally {
