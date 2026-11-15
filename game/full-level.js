@@ -38,6 +38,15 @@ export const COLLIDERS = [
   { id: 'desk', x0: -3.14, z0: 5.2, x1: -2.54, z1: 6.2 }, // bedroom desk (Step 8)
   { id: 'vanity', x0: -3.09, z0: 2.66, x1: -2.36, z1: 2.98 }, // bathroom (Step 8)
   { id: 'toilet', x0: -1.86, z0: 3.61, x1: -1.49, z1: 4.12 },
+  // Step 8 furniture round 2 (Brandon's list) — footprints as built in
+  // game/full-apartment.js, chosen clear of every spawn, view camera, moment
+  // spot and decoy pot (see the clearance probe in docs/LEVEL_LAYOUT.md).
+  { id: 'tv-stand', x0: 1.19, z0: -2.55, x1: 2.43, z1: -2.09 },
+  { id: 'bookshelf', x0: -3.14, z0: -2.55, x1: -2.84, z1: -1.85 },
+  { id: 'coffee-table', x0: -1.6, z0: 0.27, x1: -0.7, z1: 0.83 },
+  { id: 'kitchen-table', x0: 2.1, z0: 1.25, x1: 3.15, z1: 2.0 },
+  { id: 'hall-console', x0: 0.06, z0: 3.14, x1: 0.34, z1: 3.86 },
+  { id: 'big-plant', x0: -1.87, z0: -2.53, x1: -1.44, z1: -2.11 },
 ];
 
 /** Surfaces the cats stand on that buildRoom does not measure itself. All of
