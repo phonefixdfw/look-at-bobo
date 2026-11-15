@@ -22,7 +22,12 @@
     "capture:demo": "node tools/capture.mjs demo/talking-demo.html --times 0,1.2,2.4 --views diorama,first-person,bobo-face,decoy-face --moments idle,catch,wrong,win --out captures/talking-demo --selftest --param gate=off --param score=7",
     "capture:demo:determinism": "node tools/capture.mjs demo/talking-demo.html --times 1.2 --views diorama,first-person --moments idle,catch,wrong,win --out captures/talking-demo-determinism --determinism --param gate=off --param score=7",
     "capture:demo:planted": "node tools/capture.mjs demo/talking-demo.html --times 1.2 --views first-person --moments catch,wrong,win --out captures/talking-demo-planted --selftest --param gate=off --param plant=text",
-    "audio:democheck": "node tools/audio/demo-check.mjs"
+    "audio:democheck": "node tools/audio/demo-check.mjs",
+    "capture:slice": "node tools/capture.mjs game/slice.html --times 0,1.2,2.4 --views all --moments all --out captures/slice --selftest --param gate=off --param score=2",
+    "capture:slice:determinism": "node tools/capture.mjs game/slice.html --times 1.2 --views first-person,diorama --moments loaf-couch,catch,wrong,win --out captures/slice-determinism --determinism --param gate=off --param score=2",
+    "capture:slice:planted": "node tools/capture.mjs game/slice.html --times 1.2 --views first-person --moments win --out captures/slice-planted --selftest --param gate=off --param plant=text",
+    "capture:slice:weak": "node tools/capture.mjs game/slice.html --times 1.2 --views diorama --moments catch,win --out captures/slice-weak --gpu swiftshader --selftest --param gate=off",
+    "audio:slicecheck": "node tools/audio/slice-check.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.65.1",

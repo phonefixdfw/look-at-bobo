@@ -1,0 +1,384 @@
+<!doctype html>
+<!--
+  game/slice.html — the Step 6 playable vertical slice: find Bobo in the
+  apartment, put the dot on him, point, and shout "LOOK AT BOBO!"
+
+  The loop: five moments (docs/STORY.md placeholders), random order each run
+  with no repeats. Find Bobo and shout: +1 and he's off to a new moment;
+  shout at the wrong cat: the same shout, a gentle "DAG!", −1 (never below
+  zero). Reach 5 points (?win=N to change; the full game will ship 10) and
+  the rain of little Bobo heads falls with the exact line
+  `your did it! you wind`.
+
+  Controls: WASD / arrows to walk · mouse to look · Shift to run ·
+  click or Space to shout at whatever the dot is on · Esc pauses (click to
+  resume). The click that starts the game is also the user gesture that
+  unlocks audio (the real Step 4 takes) and grabs the pointer.
+
+  The look is imported from src/ (the same modules the style test and the
+  Step 5 demo use); the apartment composes src/room.js untouched and
+  extends it (game/apartment.js); the level is pure data (game/level.js).
+  The page implements the window.LC contract (docs/CAPTURE.md) plus the
+  game extensions (LC.state / LC.simulate / LC.trigger / LC.aimAt), so the
+  Step 2 tool captures and gates it:
+
+    Play it:        npm run serve  ->  http://127.0.0.1:8123/game/slice.html
+    Capture it:     npm run capture:slice
+    Audio check:    npm run audio:slicecheck
+
+    Parameters:  ?gate=off  skip the click gate (headless capture only)
+                 ?win=N     points to win (default 5)
+                 ?seed=N    the moment-order seed (default 11)
+                 ?score=N   start at N points
+    Faults to prove the checks bite (selfTest / budget must FAIL):
+      ?plant=text          the joke ending gets "fixed"
+      ?plant=audio         the yell plays the wrong take
+      ?plant=score         the wrong-cat penalty runs below zero
+      ?plant=repeats       the moment queue repeats
+      ?plant=decoy-share   the decoy shares Bobo's spot
+      ?plant=over-budget   170 surprise draw calls
+      ?plant=no-collision  walls stop blocking
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Look at Bobo — Step 6 slice (find him, point, shout)</title>
+    <!-- Inline placeholder icon: no extra request, so a 404 can never hide in a capture. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1e26'/%3E%3Crect x='14' y='7' width='4' height='9' rx='2' fill='%23f1ece1'/%3E%3Ccircle cx='16' cy='21' r='6' fill='%23f1ece1'/%3E%3C/svg%3E" />
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three/three.module.js" } }
+    </script>
+    <style>
+      /* UI rules are part of the design system — docs/ART_STYLE.md §8, and the
+         exact same vocabulary as the style test and the Step 5 demo: score
+         pill, soft reticle, gentle coral X + "DAG!", win veil with the exact
+         text. New here: the find prompt and the pause card. */
+      :root {
+        --ui-ink: #10151c;
+        --ui-paper: #f7f4ee;
+        --ui-mustard: #e8b04a;
+        --ui-coral: #ff8f7d;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #14181f;
+        font: 13px/1.4 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #moment-label {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(16, 21, 28, 0.72);
+        color: #f2f5f8;
+        white-space: pre;
+        z-index: 30;
+      }
+
+      /* ---------- HUD (design system §8): everything below the canvas ---------- */
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      /* Score pill: warm off-white on near-black, the count-up is mustard. */
+      #hud-score {
+        position: fixed;
+        top: 18px;
+        right: 18px;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 18px;
+        border-radius: 999px;
+        background: rgba(16, 21, 28, 0.88);
+        border: 1px solid rgba(247, 244, 238, 0.16);
+        box-shadow: 0 6px 24px rgba(8, 10, 14, 0.35);
+        color: var(--ui-paper);
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+      #hud-score.show {
+        display: flex;
+      }
+      #hud-score .num {
+        color: var(--ui-mustard);
+      }
+      #hud-score .max {
+        font-size: 15px;
+        font-weight: 700;
+        opacity: 0.75;
+      }
+
+      /* Soft aim dot: calm white; coral (never red) when the shout lands wrong. */
+      #reticle {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 26px;
+        height: 26px;
+        margin: -13px 0 0 -13px;
+        border-radius: 50%;
+        border: 2px solid rgba(247, 244, 238, 0.85);
+        display: none;
+      }
+      #reticle.show {
+        display: block;
+      }
+      #reticle::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 4px;
+        height: 4px;
+        margin: -2px 0 0 -2px;
+        border-radius: 50%;
+        background: rgba(247, 244, 238, 0.9);
+      }
+      #reticle.soft {
+        border-color: var(--ui-coral);
+      }
+      #reticle.soft::after {
+        background: var(--ui-coral);
+      }
+
+      /* The find-phase prompt: the whole instruction, in the game's voice. */
+      #prompt {
+        position: fixed;
+        left: 50%;
+        bottom: 44px;
+        transform: translateX(-50%);
+        padding: 8px 18px;
+        border-radius: 999px;
+        background: rgba(16, 21, 28, 0.78);
+        border: 1px solid rgba(247, 244, 238, 0.14);
+        color: var(--ui-paper);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        display: none;
+      }
+      #prompt.show {
+        display: block;
+      }
+
+      /* Wrong-cat: a soft round X in gentle coral + "DAG!" (exact, on purpose). */
+      #dag-burst {
+        position: fixed;
+        left: 50%;
+        top: 44%;
+        transform: translate(-50%, -50%) scale(0);
+        text-align: center;
+        opacity: 0;
+        display: none;
+      }
+      #dag-burst svg {
+        display: block;
+        margin: 0 auto;
+        filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.35));
+      }
+      #dag-label {
+        margin-top: 6px;
+        font-size: 56px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        color: var(--ui-coral);
+        text-shadow: 0 3px 0 rgba(16, 21, 28, 0.45), 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      /* Win: the exact ending text on a warm veil. Never "fixed". */
+      #ending-veil {
+        position: fixed;
+        inset: 0;
+        display: none;
+        background: radial-gradient(120% 90% at 50% 40%, rgba(16, 21, 28, 0.06), rgba(16, 21, 28, 0.55));
+      }
+      #ending-veil.show {
+        display: block;
+      }
+      #ending {
+        position: fixed;
+        top: 40%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 76px;
+        font-weight: 900;
+        letter-spacing: 0.015em;
+        color: var(--ui-paper);
+        text-shadow: 0 4px 0 rgba(16, 21, 28, 0.5), 0 18px 60px rgba(0, 0, 0, 0.55);
+        display: none;
+      }
+      #ending.show {
+        display: block;
+      }
+
+      /* Click-to-begin: the user gesture that unlocks audio (autoplay rules)
+         and grabs the pointer. */
+      #gate {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(120% 90% at 50% 35%, rgba(20, 24, 31, 0.55), rgba(10, 13, 18, 0.9));
+      }
+      #gate.hidden {
+        display: none;
+      }
+      .gate-card {
+        text-align: center;
+        padding: 34px 44px;
+        border-radius: 18px;
+        background: rgba(16, 21, 28, 0.86);
+        border: 1px solid rgba(247, 244, 238, 0.14);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+      }
+      .gate-eyebrow {
+        color: var(--ui-mustard);
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        font-size: 12px;
+        margin-bottom: 14px;
+      }
+      #gate-btn {
+        pointer-events: auto;
+        cursor: pointer;
+        border: 0;
+        border-radius: 999px;
+        padding: 16px 42px;
+        font: inherit;
+        font-size: 22px;
+        font-weight: 900;
+        letter-spacing: 0.03em;
+        color: var(--ui-ink);
+        background: var(--ui-mustard);
+        box-shadow: 0 10px 30px rgba(232, 176, 74, 0.25);
+      }
+      #gate-btn:hover {
+        filter: brightness(1.06);
+      }
+      .gate-note {
+        margin-top: 16px;
+        color: rgba(247, 244, 238, 0.78);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      /* Pause (Esc released the pointer): same card vocabulary, click resumes. */
+      #pause {
+        position: fixed;
+        inset: 0;
+        z-index: 45;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(10, 13, 18, 0.62);
+        cursor: pointer;
+      }
+      #pause.show {
+        display: flex;
+      }
+      .pause-card {
+        text-align: center;
+        padding: 26px 40px;
+        border-radius: 18px;
+        background: rgba(16, 21, 28, 0.88);
+        border: 1px solid rgba(247, 244, 238, 0.14);
+      }
+      .pause-title {
+        font-size: 30px;
+        font-weight: 900;
+        color: var(--ui-paper);
+      }
+      .pause-sub {
+        margin-top: 8px;
+        color: rgba(247, 244, 238, 0.75);
+      }
+
+      #hint {
+        position: fixed;
+        left: 10px;
+        bottom: 10px;
+        padding: 5px 9px;
+        border-radius: 7px;
+        background: rgba(16, 21, 28, 0.66);
+        color: rgba(247, 244, 238, 0.86);
+        z-index: 30;
+        pointer-events: none;
+      }
+
+      #boot-error {
+        position: fixed;
+        inset: 8px;
+        padding: 12px;
+        background: #3a1512;
+        color: #ffd9d4;
+        font-family: ui-monospace, monospace;
+        white-space: pre-wrap;
+        display: none;
+        z-index: 60;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+
+    <div id="hud">
+      <div id="hud-score"><span class="num">00</span><span class="max">/ 05</span></div>
+      <div id="reticle"></div>
+      <div id="prompt">find Bobo, point, and shout!</div>
+      <div id="dag-burst">
+        <svg width="150" height="150" viewBox="0 0 150 150" aria-hidden="true">
+          <g stroke="#ff8f7d" stroke-width="17" stroke-linecap="round" transform="rotate(-8 75 75)">
+            <line x1="38" y1="38" x2="112" y2="112" />
+            <line x1="112" y1="38" x2="38" y2="112" />
+          </g>
+        </svg>
+        <div id="dag-label">DAG!</div>
+      </div>
+      <div id="ending-veil"></div>
+      <div id="ending">your did it! you wind</div>
+    </div>
+
+    <div id="gate">
+      <div class="gate-card">
+        <div class="gate-eyebrow">LOOK AT BOBO — STEP 6 SLICE</div>
+        <button id="gate-btn" type="button">click to start</button>
+        <div class="gate-note">
+          <b>WASD</b> walk · <b>mouse</b> look · <b>Shift</b> run · <b>click / Space</b> shout · <b>Esc</b> pause<br />
+          find Bobo (forehead dash, chest bib), put the dot on him, and shout <b>"LOOK AT BOBO!"</b><br />
+          the wrong cat earns a DAG! and a point off — sound on, the takes are real
+        </div>
+      </div>
+    </div>
+
+    <div id="pause">
+      <div class="pause-card">
+        <div class="pause-title">paused</div>
+        <div class="pause-sub">click anywhere to grab the pointer back</div>
+      </div>
+    </div>
+
+    <div id="hint">WASD + mouse · Shift run · click/Space = shout at the dot · Esc pause</div>
+    <div id="moment-label">starting…</div>
+    <div id="boot-error"></div>
+    <script type="module" src="./slice.js"></script>
+  </body>
+</html>
