@@ -180,8 +180,8 @@ contact sheets archived as PR evidence (`captures/slice/_contact-sheet.png`,
 The genre is "cozy hide-and-seek with one verb". What matters: the loop is
 legible in under a minute, and nothing punishes exploring.
 
-- **The one-verb loop holds:** find → recognise (dash vs collar + size tell,
-  all three measurable and enforced per frame) → point → hear yourself shout.
+- **The one-verb loop holds:** find → recognise (Bobo's dash + bib against a cat with
+  no white above his feet at all, plus the size tell — all measurable and enforced per frame) → point → hear yourself shout.
   The audio check proves the reward sound is a real *LOOK AT BOBO!* at the
   exact moment of the catch (0.25 s into the catch phase), not a beep.
 - **Failure is gentle and correct:** the DAG! costs a point but **not the
@@ -845,7 +845,9 @@ and the bathroom decoy lies on its side by the mat (decoy spots take an
 optional `pose`). Marking rules exist per pose; the decoy's side collar is a
 band across the TOP of the neck — vertex-counted (0 vs 13 whites in the same
 ellipsoid) to be disjoint from Bobo's side bib, so `cats-distinguishable`
-cannot trade tells between the animals. A rolled pose's local x is world-up, so
+cannot trade tells between the animals. **(Issue #34 later deleted the decoy's
+band entirely — the zones in `src/measure.js` stayed behind as the tripwire that
+proves his neck is black. See §17.)** A rolled pose's local x is world-up, so
 both idles and the three rewritten moment anims breathe in the world-horizontal
 plane only on rolled poses — contacts never rock or sink; upright poses run the
 exact original code path. New selfTest check `lying-poses`: ≥3 lying moments
@@ -861,3 +863,46 @@ Expected pixel changes: bedroom scenes (flush furniture, moved rug/plant/lamp,
 moments), bathroom (toilet relocation, lying decoy), first-person frames
 hugging walls (6 cm clamp), and every cat in frame — the facing fixes turn
 most cats around, and three moments plus one decoy spot change pose.
+
+## 17. Issue #34 — the decoy's neck is black now (Brandon: white on his feet only)
+
+**Asked for (2026-11-15, issue #34):** *"On the fat cat, let's remove the white on his neck. Just leave white on his feet."*
+**Delivered:** the decoy has **no marking rules at all** — his only white is the four literal white foot parts that were always there. No neck band/collar, no bib, no forehead dash, and no white muzzle (his muzzle was sharing Bobo's rule, so it went with the neck; the record of what he looks like is now one line in `docs/DECOY_CAT.md`). Bobo is untouched.
+
+### What changed in the art
+- `src/markings.js` — `rulesDecoy()` returns `{head: [], body: []}`. The white **muzzle** rule moved into `rulesBobo()` (it was shared before). The empty rule-set is kept rather than deleted so the builder still has one shape for "which rules are switched on".
+- `src/cat.js` — no code change; a comment updated. The neck cylinder keeps its extra height segments on purpose: the neck-black check below counts vertices in that zone, and they have to exist to be counted.
+
+### What changed in the checks
+- `src/measure.js` — `COLLAR_EXPECT` becomes **`NECK_ZONE_EXPECT`**: the *exact* zones the band used to occupy, kept as the tripwire that proves his neck is black (issue #27 chose them disjoint from Bobo's bib, so a count of 0 means 0 for both cats; Bobo-only `back`/`loaf` throat zones added for him). `scanMarkings` now reports `{dash, bib, neckWhite, headWhite, feet, …}` instead of `collar`; `feet` counts the literal white foot parts (they were never vertex colours).
+- `design/style-test/styletest.js` — `decoy-collar-white` and `bobo-no-collar` deleted; five added: `bobo-head-white` (150 ≥25), `decoy-head-black` (0), `decoy-neck-black` (0), `bobo-neck-black` (0), `white-feet-both` (4/4). **36 → 39 checks.**
+- `game/engine.js` + `demo/talking-demo.js` — `cats-distinguishable` now proves the whole new contract in one place: `dash>0, bib>0, headWhite>0, neckWhite=0` on Bobo; `dash=0, bib=0, neckWhite=0, headWhite=0` on the decoy; white feet on both. The size tell is unchanged (`size-tell-width` ≥1.25×).
+- **New fault injection `?plant=neck`** (style page) — an absence check needs a planted absence-breaker, so this paints the deleted band back onto the decoy's neck zones. It bites: 37/39, failing `decoy-neck-black = 241` (the old band's exact vertex count) and `cats-distinguishable`, exit 1. `?plant=dash` still bites as before (35/39: `bobo-dash-white`, both legibility checks, `cats-distinguishable`).
+- `docs/`: `VISION.md` (and `.codeden/VISION.md`, byte-identical, sha1 `28cfbdd1…`), `STORY.md`, `CHARACTERS.md`, `DECOY_CAT.md` (a dated row in Brandon's own words), `ART_STYLE.md` (the rules table + the measured-tells table), `LEVEL_LAYOUT.md`, `LOCATIONS.md`, `HANDOFF.md`.
+
+### The tells, re-measured
+| | Bobo | decoy |
+|---|---|---|
+| forehead dash | 37 white verts | **0** |
+| chest bib | 484 | **0** |
+| white on the head (muzzle + dash) | 150 | **0** |
+| white in the old neck band's zone | 0 | **0** |
+| white foot parts | 4 | 4 |
+| size | — | **1.32× wide, 1.68× bulk** (limits ≥1.25 / ≥1.35) |
+| dash legibility | 71.9 mm → **26.9 px @ 2.5 m, 11.2 px @ 6 m** | n/a |
+
+Bobo's white-on-black marking contrast stays 14.1:1. The tell set is now *absence-based* on the decoy and *presence-based* on Bobo, and both halves are measured every frame.
+
+### Expected pixel changes (measured, same capture commands, before → after)
+Removing white from a cat changes pixels where his head and neck were visible; nothing else moved.
+| capture | before | after | why |
+|---|---|---|---|
+| `capture:style` | luma 62.5..118.1 · colours 123..222 | **62.5..117.8 · 123..221** | the style page stages both cats in close-up, so the band and the decoy's muzzle were real light |
+| `capture:demo` | luma 25.8..82.2 · colours 83..228 | **21.4..82.0 · 79..228** | the demo frames its cat closest — biggest (still small) drop |
+| `capture:slice` | luma 40.9..96.4 · colours 81..190 | **40.9..96.4 · 81..189** | one fewer colour: the band, at 2–4 m |
+| `capture:full` | luma 45.6..163.5 · colours 84..286 | **unchanged** | the full flat's decoy sits far from every camera view; the probe never saw enough of him |
+
+Geometry is untouched: draws/triangles are identical before and after on all four captures (style 89/101,636 · demo 91/95,748 · slice 98/94,640 · full 146/100,682).
+
+### What the counts are now
+`capture:style` **39/39**, `capture:demo` **37/37**, `capture:slice` **46/46**, `capture:full` **51/51** — every stage green, console clean, plus determinism, weak-GPU, `check:mobile`, bots, stress (`--checks` unchanged: the check *count* only moved on the style page), audio checks and `build` all pass. The planted-fault suites still exit 1 naming their check (`ending-text-exact` at 50/51 full, 45/46 slice), which proves the rewritten `cats-distinguishable` did not blunt the fault-injection path.

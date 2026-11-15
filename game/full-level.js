@@ -100,7 +100,7 @@ export const EVENT_PHASES = ['catch', 'wrong', 'win'];
 export const ALL_STAGE_IDS = [...MOMENT_IDS, ...EVENT_PHASES];
 export const CANONICAL_EVENT_MOMENT = 'box-sit';
 
-/** The decoy: 22 lb scenery with a collar and no dash (docs/DECOY_CAT.md).
+/** The decoy: 22 lb scenery, white on his feet only, no dash (docs/DECOY_CAT.md).
  *  Five spots now — one per room, so "is that…?" can happen anywhere. The
  *  bathroom spot leans on the bath mat; d-bed moved out of the desk area so
  *  the two desk moments keep their distance (≥1.2 m, selfTest enforces). */

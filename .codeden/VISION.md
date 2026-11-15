@@ -7,7 +7,7 @@ A first-person game where you walk through a modern apartment, catch Bobo the ca
 Bobo is a real cat, about 15 lb, and mostly black. He has white feet, a white bib, a white muzzle and a white vertical dash on his forehead. His eyes are yellow-green. In the game he is the star and never a villain or a prop.
 
 ## Who the decoy cat is
-A second cat — the decoy (his name is TBD; call him "the decoy cat" until Brandon names him). He is mostly black with white feet and a white neck, and has **no white spot on his forehead** — Bobo's white forehead dash is the tell that tells the two cats apart. He is very fat: 22 lb, against Bobo's about 15 lb. He just lies around the apartment as scenery, like Bobo does. Nothing else about his habits is known, and nothing is invented about him; his name and placement are TBD.
+A second cat — the decoy (his name is TBD; call him "the decoy cat" until Brandon names him). He is mostly black with **white on his feet only** — no white neck band, no bib, no white muzzle, and **no white spot on his forehead** (Brandon's update, issue #34: "let's remove the white on his neck. Just leave white on his feet"). Bobo's white forehead dash is the tell that tells the two cats apart. He is very fat: 22 lb, against Bobo's about 15 lb. He just lies around the apartment as scenery, like Bobo does. Nothing else about his habits is known, and nothing is invented about him; his name and placement are TBD.
 
 ## How it plays
 1. You walk through a modern one-bedroom apartment in first person (mouse and keyboard, or a virtual thumb stick on a phone).
@@ -22,7 +22,7 @@ A second cat — the decoy (his name is TBD; call him "the decoy cat" until Bran
 Loafing on the couch; stretching on the bed; staring at a bird from the balcony window; head in a cardboard box; sitting in the sink; batting a pen off the desk; sleeping in a laundry basket; chasing his tail in the hallway; making biscuits on a blanket; sitting on the keyboard. (These are first ideas. Real Bobo habits will replace some of them.)
 
 ## The look
-A realistic modern apartment, with believable lighting, materials and furniture. Bobo is a softly stylized, fur-shaded cat built from reference photos, so he reads clearly as Bobo without trying to be a photograph. The decoy cat is built the same way and reads similarly at a glance — mostly black with white feet — so the tells matter: no forehead dash (Bobo's key tell), a white neck rather than Bobo's white bib, and a much bigger, very fat 22 lb body against Bobo's ~15 lb. The whole game is built in code, with no downloaded models or scans.
+A realistic modern apartment, with believable lighting, materials and furniture. Bobo is a softly stylized, fur-shaded cat built from reference photos, so he reads clearly as Bobo without trying to be a photograph. The decoy cat is built the same way and reads similarly at a glance — mostly black with white feet — so the tells matter: no forehead dash (Bobo's key tell), Bobo's white bib with no neck band on the decoy, and a much bigger, very fat 22 lb body against Bobo's ~15 lb. The whole game is built in code, with no downloaded models or scans.
 
 ## The feel
 Joyful and silly. No game over and no timers; the only setback is a gentle one-point penalty for pointing at the wrong cat. Finding Bobo is the reward, and the fireworks make every catch feel like a win.

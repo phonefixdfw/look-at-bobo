@@ -24,7 +24,7 @@ These areas are implied by the generic "normal cat stuff" placeholder moments (r
 
 ## The decoy cat in the spaces (added 2026-11-14)
 - The decoy cat (name TBD — see [`docs/DECOY_CAT.md`](DECOY_CAT.md)) lies around the apartment as scenery, alongside Bobo's moment. He is scenery only: no cute moment belongs to him, and pointing at him triggers the gentle X + "DAG!" one-point penalty instead of a celebration.
-- **Hard constraint:** the decoy must **never be in the same spot as Bobo** at the same time — the two cats must stay distinguishable at a glance (forehead dash is Bobo's key tell; white neck vs white bib; 22 lb vs ~15 lb).
+- **Hard constraint:** the decoy must **never be in the same spot as Bobo** at the same time — the two cats must stay distinguishable at a glance (the forehead dash and the white bib are Bobo's tells; the decoy is black above his feet since issue #34; 22 lb vs ~15 lb).
 - **Placement, number of lounge spots and relocation rules are TBD** — open questions with suggested defaults (he lounges in 3–5 fixed spots and relocates between rounds) are tracked in [`docs/DECOY_CAT.md`](DECOY_CAT.md). Nothing beyond "he lies around the apartment" is invented about his habits.
 
 ## Layout and navigation (accepted provisional defaults — real details TBD)

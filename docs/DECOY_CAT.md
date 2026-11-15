@@ -10,8 +10,9 @@
 | 2026-11-14 | Behavior: he just lies around the apartment as scenery, like Bobo does. Nothing else about his habits is known | Brandon (design change) |
 | 2026-11-14 | Wrong-cat rule: if the player points at him and shouts "LOOK AT BOBO!", they get an **X**, a voice says **"DAG!"** (spelled exactly that way), and they **lose one of their 10 points** | Brandon (design change) |
 | 2026-11-14 | Step 4 voice lines are now: **"LOOK AT BOBO!"**, **"DAG!"**, and the ending text (`your did it! you wind`, spelled exactly that way) | Consequence of the above |
+| 2026-11-15 | **Looks change:** "On the fat cat, let's remove the white on his neck. Just leave white on his feet." So: white on his **feet only** — no neck band/collar, no bib, **no white muzzle**, no forehead dash | Brandon (issue #34) |
 
-**Tells that distinguish the decoy from Bobo:** no white forehead spot (Bobo's white vertical forehead dash is the key tell), white **neck** vs Bobo's white **bib**, 22 lb vs Bobo's ~15 lb. Both are mostly black with white feet. Bobo's description is unchanged.
+**Tells that distinguish the decoy from Bobo (as shipped since issue #34):** no white forehead spot (Bobo's white vertical forehead dash is the key tell), no bib and no white anywhere above his feet (Bobo's white chest bib is Bobo-only), 22 lb vs Bobo's ~15 lb. Both are mostly black with white feet — the feet are the one marking they share, which is what makes the size difference carry the joke. Bobo's description is unchanged.
 
 ## Accepted defaults (Brandon can override any of these)
 | # | Default | Notes |

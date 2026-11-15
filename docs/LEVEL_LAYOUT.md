@@ -98,7 +98,8 @@ no-shadow warm point each in the bedroom (0.9, 2.35, 5.7) and hall
 Every spot has ≥ 2 valid candidates ≥ 1.2 m away (the tail-chase spot
 excludes only `d-hall` at 0.03 m), so "always findable, never the same spot"
 (docs/DECOY_CAT.md) always holds. The decoy is 22 lb scenery (root scale
-1.30/1.13/1.12, collar, no dash, no bib) and is always visible somewhere —
+1.30/1.13/1.12, white on his feet only — no dash, no bib, no neck white, no
+white muzzle) and is always visible somewhere —
 finding it is the joke, clicking it costs −1 (floored at 0).
 
 ## Props the extension adds (bedroom)
@@ -164,7 +165,7 @@ measured 0.65 m, `bobo`↔`bobo-face`).
 | `first-person` | (0.4, 1.62, 1.2) | −1.25 | −0.71 | 55 | yes — 1.4 m from the box, looking down like play feels |
 | `bobo` | (2.95, 0.95, 1.05) | +1.33 | −0.44 | 30 | no — 1.24 m 3/4 on the box cat |
 | `bobo-face` | (2.45, 0.62, 0.75) | +π/2 | −0.35 | 22 | no — 0.7 m face close-up |
-| `decoy-face` | (−0.45, 0.6, −0.35) | −2.56 | −0.23 | 24 | no — decoy close-up (collar, no dash) |
+| `decoy-face` | (−0.45, 0.6, −0.35) | −2.56 | −0.23 | 24 | no — decoy close-up (white feet, no dash, no bib) |
 | `bedroom` | (−0.6, 1.62, 4.35) | −2.28 | −0.35 | 55 | yes — the doorway view of `bed-sprawl` |
 
 ---

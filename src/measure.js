@@ -14,11 +14,23 @@ const BIB_EXPECT = {
   side: { c: [0.062, 0.095, 0.135], h: [0.05, 0.075, 0.085] },
   back: { c: [0, 0.21, 0.115], h: [0.085, 0.055, 0.09] },
 };
-const COLLAR_EXPECT = {
+// The exact zones the decoy's white neck band used to occupy (per pose, cat-root
+// space), kept as the NECK ZONE so the checks can prove it is now black: issue
+// #34 took the neck white away, so one white vertex in here is a regression.
+// They were chosen (issue #27) to be disjoint from Bobo's bib, so 0 means 0 for
+// both cats. The decoy is only ever posed sit / sprawl / side (src/cat.js).
+const NECK_ZONE_EXPECT = {
   sit: { c: [0, 0.386, 0.045], h: [0.125, 0.034, 0.105] },
   sprawl: { c: [0, 0.185, 0.165], h: [0.155, 0.115, 0.04] },
+  // across the TOP of a side-lying cat's neck (the old side band's exact zone)
   side: { c: [0.02, 0.2, 0.165], h: [0.105, 0.015, 0.05] },
+  // the throat in Bobo's own lying poses: clear of his bib (which tops out at
+  // y 0.265 rolled over, y 0.17 loafed), so his counts mean "no band on him"
+  back: { c: [0, 0.34, -0.02], h: [0.1, 0.03, 0.08] },
+  loaf: { c: [0, 0.3, 0.06], h: [0.1, 0.04, 0.09] },
 };
+// The white feet are literal white parts, not vertex colours (src/cat.js).
+const FOOT_TAGS = new Set(['fore-paw', 'hind-foot']);
 const LIN_WHITE = new THREE.Color(TOKENS.furWhite).r;
 const LIN_BLACK = new THREE.Color(TOKENS.furBlack).r;
 
@@ -30,7 +42,11 @@ function scanMarkings(cat, pose) {
   const headGroup = cat.pivots[pose].head;
   const invRoot = new THREE.Matrix4().copy(cat.root.matrixWorld).invert();
   const invHead = new THREE.Matrix4().copy(headGroup.matrixWorld).invert();
-  const out = { dash: 0, bib: 0, collar: 0, shells: 0, whiskers: 0, dashExtent: 0 };
+  // `neckWhite` is the count of white vertices in the zone the decoy's neck band
+  // used to occupy: 0 on both cats since issue #34. `headWhite` proves Bobo's
+  // muzzle + dash landed and the decoy's head is all black. `feet` counts the
+  // literal white paw/foot parts (they are parts, not vertex colours).
+  const out = { dash: 0, bib: 0, neckWhite: 0, headWhite: 0, feet: 0, shells: 0, whiskers: 0, dashExtent: 0 };
   const dashPts = [];
   const v = new THREE.Vector3();
   const m = new THREE.Matrix4();
@@ -44,6 +60,7 @@ function scanMarkings(cat, pose) {
       return;
     }
     if (!obj.isMesh) return;
+    if (FOOT_TAGS.has(obj.userData.tag) && obj.material?.color && Math.abs(obj.material.color.r - LIN_WHITE) < 0.05) out.feet++;
     const col = obj.geometry?.attributes?.color;
     if (!col) return;
     const toHead = isHeadPart(obj);
@@ -53,15 +70,16 @@ function scanMarkings(cat, pose) {
       v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(m);
       const w = (col.getX(i) - LIN_BLACK) / Math.max(1e-6, LIN_WHITE - LIN_BLACK);
       if (toHead) {
+        if (w >= 0.75) out.headWhite++; // Bobo's muzzle + dash; the decoy has neither
         const d = boxSDF(v, DASH_EXPECT.c, DASH_EXPECT.h);
         if (d < -0.002 && w >= 0.75) out.dash++;
         if (d < 0.006 && w >= 0.4) dashPts.push(v.x, v.y, v.z);
       } else {
         if (w < 0.75) continue;
         const bib = BIB_EXPECT[pose];
-        const collar = COLLAR_EXPECT[pose];
+        const neck = NECK_ZONE_EXPECT[pose];
         if (bib && ellSDF(v, bib.c, bib.h) < -0.002) out.bib++;
-        if (collar && ellSDF(v, collar.c, collar.h) < -0.002) out.collar++;
+        if (neck && ellSDF(v, neck.c, neck.h) < -0.002) out.neckWhite++;
       }
     }
   });
@@ -93,4 +111,4 @@ function contactGap(cat, support, SUPPORTS) {
   return { gap: lowest - y0, support, who };
 }
 
-export { DASH_EXPECT, BIB_EXPECT, COLLAR_EXPECT, scanMarkings, contactGap };
+export { DASH_EXPECT, BIB_EXPECT, NECK_ZONE_EXPECT, FOOT_TAGS, scanMarkings, contactGap };
