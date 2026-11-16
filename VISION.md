@@ -14,9 +14,10 @@ A second cat — the decoy (his name is TBD; call him "the decoy cat" until Bran
 2. Bobo is somewhere in the apartment doing something cute. The decoy cat lies somewhere else, doing absolutely nothing.
 3. You find him, aim at him and press a button. Your hand points and a voice yells "LOOK AT BOBO!"
 4. Fireworks and a celebration go off, and you get one point.
-5. If you point at the decoy cat instead, you get a gentle, silly X, a voice says "DAG!" (spelled exactly that way), and you lose one point. The score never drops below 0, there is no game over, and the decoy is completely unbothered.
-6. You respawn somewhere else in the apartment while Bobo moves on to another cute thing, and you search again.
-7. At 10 points it rains Bobos all over the screen and the game says "your did it! you wind" (spelled exactly that way, on purpose).
+5. Every now and then — about one find in six, never the first find of a run, never two in a row, and never more than two per run — Bobo turns up in his full Patriot regalia (the joke costume, issues #55/#58). Point at that Bobo and the party is bigger: **+3 points** and a "+3!" on screen. Which runs get a Patriot is rolled from the game's own seed, so the same seed always tells the same story.
+6. If you point at the decoy cat instead, you get a gentle, silly X, a voice says "DAG!" (spelled exactly that way), and you lose one point. The score never drops below 0, there is no game over, and the decoy is completely unbothered.
+7. You respawn somewhere else in the apartment while Bobo moves on to another cute thing, and you search again.
+8. At 10 points it rains Bobos all over the screen and the game says "your did it! you wind" (spelled exactly that way, on purpose). A Patriot find can carry you past 10 and end the run early — the win reads the score, not a counter.
 
 ## The ten moments (draft, to confirm)
 Loafing on the couch; stretching on the bed; staring at a bird from the balcony window; head in a cardboard box; sitting in the sink; batting a pen off the desk; sleeping in a laundry basket; chasing his tail in the hallway; making biscuits on a blanket; sitting on the keyboard. (These are first ideas. Real Bobo habits will replace some of them.)
