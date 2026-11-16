@@ -1196,10 +1196,11 @@ and dumps every object the renderer submitted with its world AABB, material
 and signature (`--inventory`), or the same per-frame draw counts for every
 view/moment (`--views all --moments all --json`). At the worst frame the
 living room — the room the camera is standing in for the wide views — is 68
-draws on its own, the shell + sky that straddle every room is ~12, the shadow
-pass adds ~20, and the rest is rooms the camera cannot see. That is the real
-shape of the problem: culling can only remove what is not the camera's own
-room, and it can never remove geometry that spans rooms.
+draws on its own, the groups that straddle a doorway or sit outside every room
+rect are 14 more and no cull may ever hide them, the shadow pass adds 19, and
+everything else is rooms the camera cannot see. That is the real shape of the
+problem: culling can only remove what is not the camera's own room, and it can
+never remove geometry that spans rooms.
 
 **Merged statics (`game/full-merge.js`).** Siblings sharing a *shading
 signature* (program + every material field + uniforms + texture identity) are
@@ -1307,7 +1308,8 @@ balcony 7 / 2,464 · shell 5 / 91.
 ### What the numbers are now
 - `capture:full` **507 frames** (13 stages × 13 views × 3 times), selfTest
   **77/77 every frame**, budget **PASS at 147 draws / 98,656 tris**, pixels
-  luma 42.6..135.7 · colours 72..237, console clean.
+  luma 41.8..137.1 · colours 74..230 — byte-for-byte the ranges §22 recorded on
+  `main` — console clean.
 - **Measured on this HEAD with the cap at 150 on both sides**, same tool, same
   507 frames: with `?merge=off&cull=off` the run is **163 draws / 99,290 tris**
   worst (`win/desk`) with **36 frames over 150** and `VERDICT: FAIL`; with the
