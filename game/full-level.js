@@ -21,6 +21,7 @@
 
 import { MOVE } from './level.js';
 import { KITCHEN_COLLIDERS } from './full-kitchen.js';
+import { BEDROOM_COLLIDERS } from './full-bedroom.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
  *  so yaw = atan2(−dx, −dz) means "look towards (dx, dz)", and 0 looks north
@@ -105,17 +106,13 @@ export const COLLIDERS = [
   //    is issue #27's trap wearing a new costume) ──
   { id: 'vanity', x0: -3.1, z0: 2.22, x1: -2.2, z1: 2.7 },
   { id: 'toilet', x0: -1.7, z0: 3.45, x1: -1.02, z1: 3.83 },
-  // ── bedroom: a queen with the headboard flush to the east wall (a floating
-  //    headboard with a 0.60 m gap behind it is a playset tell), a desk on the
-  //    north wall, a wardrobe on the west, the basket in the south-east corner.
-  //    The bed starts at z 6.90, which leaves a 1.17 m aisle down the middle of
-  //    the room from the door to the foot of the bed. ──
-  { id: 'bed', x0: -0.83, z0: 6.9, x1: 1.2, z1: 8.43 }, // 2.03 long × 1.53 wide
-  { id: 'nightstand', x0: 0.7, z0: 6.35, x1: 1.2, z1: 6.85 },
-  { id: 'desk', x0: -2.55, z0: 5.32, x1: -1.15, z1: 6.02 },
-  { id: 'wardrobe', x0: -2.6, z0: 7.4, x1: -2.0, z1: 8.6 },
-  { id: 'laundry-basket', x0: 0.62, z0: 8.8, x1: 1.02, z1: 9.2 },
-  { id: 'bedroom-plant', x0: -2.6, z0: 8.85, x1: -2.1, z1: 9.32 },
+  // ── bedroom (issue #48): the queen's headboard is flush on the WEST wall,
+  //    both nightstands flush either side of it, the desk keeps its north
+  //    strip, dresser and wardrobe sit flush east either side of the 1.07 m
+  //    door-to-window lane, the basket spills south-east of the bed. The
+  //    rects are BEDROOM_COLLIDERS in game/full-bedroom.js, beside the
+  //    furniture they belong to. ──
+  ...BEDROOM_COLLIDERS,
   // ── balcony: the railing (its pad keeps a body a whole radius off the rail)
   //    and the chair and plant that make it a place instead of a ledge ──
   { id: 'balcony-railing', x0: 0.55, z0: -4.4, x1: 2.45, z1: -4.28 },
@@ -208,16 +205,21 @@ export const SPOTS = [
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
   spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 3.1], 1.9),
   spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], 3.06, { open: true }),
-  // ── bedroom (9) ─────────────────────────────────────────────────────────
+  // ── bedroom (9) — issue #48 turned the bed head-west. The five spots on
+  //    the moved pieces came with it (mirrored across the room's middle and
+  //    nudged 0.20 m south for the longer head clearance); the desk, desk-end,
+  //    keyboard and laundry ones are where they were — those pieces stayed.
+  //    The blanket spot is not a pure mirror: the folded blanket now runs
+  //    across the foot, so it sits mid-blanket on the new foot-of-bed fold. ──
   spot('desk-pen', 'desk', 'bedroom', 'sit', [-1.85, 'deskTop', 5.7], 2.89, { open: true }),
   spot('desk-pen', 'desk-end', 'bedroom', 'loaf', [-2.3, 'deskTop', 5.85], 3.01, { open: true }),
   spot('keyboard-sit', 'keyboard', 'bedroom', 'sit', [-1.85, 'kbTop', 5.82], 3.13, { open: true }),
   spot('laundry-nap', 'basket', 'bedroom', 'side', [0.82, 'laundryTop', 9.0], 1.46, { open: true }),
-  spot('bed-stretch', 'bed', 'bedroom', 'back', [0.2, 'bedTop', 7.35], 0.08, { open: true }),
-  spot('bed-stretch', 'bed-foot', 'bedroom', 'side', [-0.4, 'bedTop', 8.25], 1.43, { open: true }),
-  spot('blanket-biscuits', 'blanket', 'bedroom', 'sit', [0.2, 'blanketTop', 7.15], 0, { open: true }),
-  spot('blanket-biscuits', 'wardrobe', 'bedroom', 'loaf', [-1.55, 'floor', 8.0], 0.03),
-  spot('laundry-nap', 'nightstand', 'bedroom', 'side', [0.95, 'nightstandTop', 6.6], 0.28, { open: true }),
+  spot('bed-stretch', 'bed', 'bedroom', 'back', [-1.6, 'bedTop', 7.55], -0.08, { open: true }),
+  spot('bed-stretch', 'bed-foot', 'bedroom', 'side', [-1.0, 'bedTop', 8.45], -1.43, { open: true }),
+  spot('blanket-biscuits', 'blanket', 'bedroom', 'sit', [-0.755, 'blanketTop', 7.855], 0, { open: true }),
+  spot('blanket-biscuits', 'wardrobe', 'bedroom', 'loaf', [0.15, 'floor', 8.2], -0.03),
+  spot('laundry-nap', 'nightstand', 'bedroom', 'side', [-2.35, 'nightstandTop', 6.8], -0.28, { open: true }),
 ];
 
 export const SPOT_IDS = SPOTS.map((s) => s.id);
@@ -316,7 +318,7 @@ export const DECOY_SPOTS = [
   { id: 'd-hall', room: 'hall', pos: [0.35, 'floor', 3.0], faceYaw: 1.23 },
   { id: 'd-entry', room: 'entry', pos: [2.0, 'floor', 2.5], faceYaw: 1.9 },
   { id: 'd-bath', room: 'bathroom', pos: [-2.75, 'floor', 3.55], faceYaw: -0.81, pose: 'side' },
-  { id: 'd-bedroom', room: 'bedroom', pos: [-1.35, 'floor', 6.95], faceYaw: 1.65 }, // 20 cm south: the desk/keyboard pair sat under DECOY_MIN_DIST
+  { id: 'd-bedroom', room: 'bedroom', pos: [-0.55, 'floor', 6.45], faceYaw: -1.65 }, // moved with the bed: the mirrored -0.05/7.15 landed under DECOY_MIN_DIST of the blanket spot
   { id: 'd-balcony', room: 'balcony', pos: [1.4, 'floor', -3.35], faceYaw: 2.82, pose: 'side' },
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
@@ -345,7 +347,7 @@ export const SPAWNS = [
   { room: 'entry', pos: [1.53, 3.73], yaw: 1.5 },
   { room: 'bathroom', pos: [-2.37, 3.33], yaw: -2.2 },
   { room: 'bedroom', pos: [-1.37, 6.63], yaw: 1.6 },
-  { room: 'bedroom', pos: [-1.17, 8.73], yaw: -1.2 },
+  { room: 'bedroom', pos: [-1.5, 9.02], yaw: -1.2 }, // issue #48: the bed's head is west now and reaches z 8.66 here; the south band is the walk to it
 ];
 
 export const SPAWN_AVOID_DIST = 1.2;
@@ -471,12 +473,21 @@ export const SCALE_RANGES = {
   'bar-stool': { w: [0.3, 0.4], d: [0.3, 0.4], h: [0.6, 0.7], note: 'stool 0.36 × 0.36 × 0.65' },
   'bed-queen': { w: [1.95, 2.1], d: [1.45, 1.65], note: 'queen 2.03 long × 1.53 wide' },
   'mattress-height': { top: [0.45, 0.55], note: 'mattress top 0.50' },
-  headboard: { top: [1.0, 1.15], note: 'headboard top ~1.08' },
-  nightstand: { w: [0.45, 0.55], d: [0.45, 0.55], h: [0.5, 0.6], note: 'nightstand 0.50 × 0.50 × 0.55' },
+  headboard: { w: [1.5, 1.65], top: [1.0, 1.25], note: 'rows 43+51: 1.58 wide, top 1.20' },
+  nightstand: { w: [0.45, 0.55], d: [0.42, 0.55], h: [0.5, 0.6], note: 'rows 48+51: 0.50 × 0.45 × 0.55' },
   dresser: { w: [1.2, 1.4], d: [0.45, 0.55], h: [0.75, 0.85], note: 'dresser 1.30 × 0.50 × 0.80' },
   desk: { w: [1.3, 1.5], d: [0.65, 0.75], h: [0.72, 0.78], note: 'desk 1.40 × 0.70 × 0.75' },
   wardrobe: { w: [1.1, 1.3], d: [0.55, 0.65], h: [1.95, 2.15], note: 'wardrobe 1.20 × 0.60 × 2.05' },
-  'laundry-basket': { w: [0.36, 0.46], d: [0.36, 0.46], h: [0.5, 0.62], note: 'basket 0.40 × 0.40 × 0.55' },
+    'laundry-basket': { w: [0.36, 0.46], d: [0.26, 0.46], h: [0.32, 0.42], note: 'row 50: 0.40 × 0.30, rim ~0.37 — the pile row carries the 0.55 assembly top' },
+  'bed-frame': { top: [0.25, 0.35], note: 'row 42: the frame under the mattress, 0.30' },
+  'folded-blanket': { w: [1.3, 1.6], d: [0.24, 0.4], h: [0.03, 0.15], top: [0.52, 0.68], note: 'row 44: folded across the foot, top 0.58' },
+  keyboard: { w: [0.4, 0.48], d: [0.1, 0.18], h: [0.02, 0.05], top: [0.76, 0.82], note: 'row 46: 0.44 × 0.13 × 0.03 on the desk, top 0.79' },
+  monitor: { w: [0.45, 0.62], d: [0.1, 0.28], h: [0.4, 0.62], top: [1.1, 1.4], note: 'row 47: foot+post+panel union, screen to 1.27' },
+  'desk-chair': { w: [0.4, 0.55], d: [0.38, 0.6], note: 'the desk chair: frame and seat together' },
+  'desk-chair-back': { top: [0.85, 0.95], note: 'back of the desk chair, 0.90' },
+  'laundry-pile': { w: [0.22, 0.5], d: [0.18, 0.45], top: [0.5, 0.6], note: 'row 51: heaped ~0.18 over the rim, top 0.55' },
+  'plant-pot': { w: [0.28, 0.42], h: [0.2, 0.4], note: 'the bedroom pot: 0.32 across, 0.32 tall' },
+  'plant-leaf': { h: [0.55, 1.0], top: [0.95, 1.25], note: 'leaves of the bedroom plant, to 1.00' },
   vanity: { w: [0.85, 0.95], d: [0.45, 0.55], h: [0.8, 0.9], note: 'vanity 0.90 × 0.50 × 0.85' },
   toilet: { w: [0.35, 0.42], d: [0.62, 0.72], h: [0.36, 0.45], note: 'toilet 0.38 × 0.68 × 0.40' },
   'balcony-chair': { w: [0.5, 0.62], d: [0.55, 0.65], h: [0.75, 0.95], note: 'balcony chair 0.57 × 0.60 × 0.85' },
