@@ -41,7 +41,7 @@ import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
-import { resolveRunSeed, randomRunSeed } from '../src/run-seed.js';
+import { resolveRunSeed, randomRunSeed, parseSeedParam, DEFAULT_SEED, SEED_MAX } from '../src/run-seed.js';
 
 /**
  * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
@@ -131,6 +131,10 @@ export function bootGame(cfg) {
    *               the stress seeds draw none in their short (win=3) runs: the
    *               capture/bot baselines keep their pixels. Re-pick the tag if
    *               the spot pool or the chance changes — the checks say so.
+   *               Issue #66: that quiet default now only covers the TOOLS. Live
+   *               play draws a fresh random seed per run, so the 1-in-6 rule
+   *               runs on a different number every time and a player actually
+   *               meets him (measured: `patriot-run-coverage-500-runs`).
    *  URL: ?patriot=off disables him entirely; ?patriot=on ALSO dresses the
    *  staged (capture) finds — that is how his capture frames work; ?patriot=N
    *  forces him on live find N (staging stays undressed there, since the
@@ -208,12 +212,14 @@ export function bootGame(cfg) {
   const STAMP_DEBUG = params.get('stamp') === 'on';
   const DOC_TITLE = document.title;
 
-  /** One line, plain words: build, control mode (and why), quality. */
+  /** One line, plain words: build, control mode (and why), quality, and the
+   *  seed this run is playing (issue #66 — read it off the card or the gear
+   *  panel, send it with a bug report, and the run replays with ?seed=). */
   function stampText() {
     const mode = TOUCH ? 'touch' : TOUCH_OVERRIDE === false ? 'mouse (?touch=off)' : 'mouse';
     const parts = [stampBit()];
     if (HTML_BUILD && HTML_BUILD !== JS_BUILD) parts.push('MISMATCH: html and js are different builds');
-    parts.push(`mode ${mode}`, `quality ${SETTINGS.quality}`);
+    parts.push(`mode ${mode}`, `quality ${SETTINGS.quality}`, `seed ${SEED}`);
     return parts.join(' · ');
   }
 
@@ -242,7 +248,7 @@ export function bootGame(cfg) {
       document.body.appendChild(corner);
     }
     if (!corner) return;
-    corner.textContent = `${stampBit()} · ${TOUCH ? 'touch' : 'mouse'} · ${SETTINGS.quality}`;
+    corner.textContent = `${stampBit()} · ${TOUCH ? 'touch' : 'mouse'} · ${SETTINGS.quality} · seed ${SEED}`;
     if (STAMP_DEBUG) document.title = `${DOC_TITLE} [js ${JS_BUILD}]`;
   }
 
@@ -1397,6 +1403,98 @@ export function bootGame(cfg) {
         !drawBad,
         'pickSpotCycle over the whole pool — same seed, same run (issue #53); a +3 win (issue #58) may end a run before the cycle is spent, never out of order',
       );
+
+      // --- the seeds a LIVE page draws (issue #66) ---------------------------
+      // 500 seeds in the shape `randomRunSeed()` hands out, pushed through the
+      // REAL rules — `pickSpotCycle` and `runPatriotPlan`, not copies — so the
+      // answer is "what does a player get?", not "what does a model of it get?".
+      // A fixed master seed generates them, so the numbers are a stable check
+      // value, never a dice roll: the same text on every capture and every run.
+      const RUNS = 500;
+      const drawSeed = mulberry32(20261116);
+      const runSeeds = [];
+      for (let i = 0; i < RUNS; i++) runSeeds.push(Math.floor(drawSeed() * SEED_MAX) + 1);
+      const spotsPerType = new Map();
+      for (const s of SPOTS) spotsPerType.set(s.type, (spotsPerType.get(s.type) ?? 0) + 1);
+      const spotRuns = new Map(SPOTS.map((s) => [s.id, 0]));
+      let patriotRuns = 0;
+      let patriotFinds = 0;
+      let worstRatio = Infinity;
+      let worstSpot = null;
+      for (const s of runSeeds) {
+        for (const id of pickSpotCycle(mulberry32(s))) spotRuns.set(id, (spotRuns.get(id) ?? 0) + 1);
+        const plan = runPatriotPlan(s, MOMENT_IDS.length, { enabled: true });
+        const hits = plan.filter(Boolean).length;
+        if (hits) patriotRuns++;
+        patriotFinds += hits;
+      }
+      for (const s of SPOTS) {
+        // 1.0 = the uniform share for its type (one spot per moment type per
+        // run, so a 7-spot type can only ever give each spot ~1 in 7 runs).
+        const ratio = ((spotRuns.get(s.id) ?? 0) / RUNS) * spotsPerType.get(s.type);
+        if (ratio < worstRatio) {
+          worstRatio = ratio;
+          worstSpot = s.id;
+        }
+      }
+      const shareOf = (id) => `${(((spotRuns.get(id) ?? 0) / RUNS) * 100).toFixed(1)}%`;
+      add(
+        'spot-pool-coverage-500-runs',
+        `worst spot ${worstSpot} at ${(worstRatio * 100).toFixed(0)}% of its share · balcony ${shareOf('window-bird.balcony-rail')} / ${shareOf('couch-loaf.balcony-chair')}`,
+        'every spot ≥ 75% of its uniform share, none never-drawn',
+        worstRatio >= 0.75 && [...spotRuns.values()].every((n) => n > 0),
+        'issue #66: 500 live-shaped seeds through pickSpotCycle — all 28 spots come up. The one-spot-per-moment-type rule, not the seed, is what caps a room: hall-chase has 7 spots so each is ~14% of runs, and the balcony spots ride the 4-spot window-bird and 3-spot couch-loaf types (25% / 33%). Full table in the PR.',
+      );
+      add(
+        'patriot-run-coverage-500-runs',
+        `${((patriotRuns / RUNS) * 100).toFixed(1)}% of runs get a Patriot find, ${(patriotFinds / RUNS).toFixed(2)} finds per run`,
+        'a healthy share of runs, ≤ 2 finds per run',
+        patriotRuns / RUNS > 0.4 && patriotRuns / RUNS < 0.95 && patriotFinds / RUNS <= PATRIOT.maxPerRun,
+        'issue #66 with #58: one roll in six per legal find (never first, never back to back, max two) over ten finds — that is most runs, once a run is not stuck on seed 11, which draws none by design. Every player was stuck on seed 11.',
+      );
+
+      // Where THIS page's seed came from, re-derived from the url so the engine
+      // and the check cannot drift apart (issue #66).
+      const seedP = new URLSearchParams(location.search);
+      const pinnedSeed = parseSeedParam(seedP);
+      const seedShapeOk = Number.isInteger(SEED) && SEED >= 1 && SEED <= SEED_MAX;
+      const seedRuleOk =
+        pinnedSeed !== null
+          ? SEED === pinnedSeed && SEED_SOURCE === SEED_SOURCE.url
+          : GATE_OFF
+            ? SEED === DEFAULT_SEED && SEED_SOURCE === SEED_SOURCE.capture && !LIVE_SEED
+            : SEED_SOURCE === SEED_SOURCE.live && LIVE_SEED;
+      add(
+        'run-seed-source',
+        `${SEED} from ${SEED_SOURCE}`,
+        '?seed=N replays · capture default 11 · live play random',
+        seedRuleOk && seedShapeOk,
+        'issue #66: the seed stays a plain integer so a player can read it off the gear panel or the ?stamp=on line and send it with a bug report',
+      );
+
+      const freshDraws = [randomRunSeed(), randomRunSeed(), randomRunSeed(), randomRunSeed()];
+      add(
+        'run-seed-fresh-every-call',
+        freshDraws.join(' '),
+        'four draws, four different seeds',
+        new Set(freshDraws).size === freshDraws.length && freshDraws.every((s) => Number.isInteger(s) && s >= 1 && s <= SEED_MAX),
+        'issue #66: START, the pause restart and the "play again" after the win each draw a fresh run seed — four identical draws in a row is not a coin flip, it is a broken picker',
+      );
+
+      // And the proof the draw never happens INSIDE a run: sweep the gameplay
+      // stepper under the determinism guard, then re-read both the seed and the
+      // guard's counter. Live randomness lives at boot and at a restart only, so
+      // the measured region stays a pure function of the seed it was handed.
+      const seedHere = SEED;
+      const unseededHere = countUnseededCalls();
+      const simHash = measured(() => simulateHash(240, simScript));
+      add(
+        'run-seed-fixed-in-gameplay',
+        `seed ${SEED}, ${countUnseededCalls() - unseededHere} unseeded calls, sim hash ${simHash}`,
+        'seed unchanged and zero unseeded calls across 240 gameplay steps',
+        SEED === seedHere && countUnseededCalls() === unseededHere && typeof simHash === 'string',
+        'issue #66: the random draw sits outside the measured run on purpose — determinism.js keeps its bite and a run still replays from its seed',
+      );
     }
 
     const inUnion = (x, z) => WALK_RECTS.some((r) => x >= r.x0 - 0.01 && x <= r.x1 + 0.01 && z >= r.z0 - 0.01 && z <= r.z1 + 0.01);
@@ -2146,6 +2244,22 @@ export function bootGame(cfg) {
       patriotPlan(seed = SEED, finds = MOMENT_IDS.length) {
         return runPatriotPlan(Number(seed), Number(finds), { enabled: PATRIOT.enabled });
       },
+      /** The ten spots a seed plays, as data (issue #66): the SAME pure draw
+       *  the queue uses — `pickSpotCycle(mulberry32(seed))`, the cycle seeding
+       *  the engine's refill rule reproduces exactly — so a coverage report
+       *  measures the real rule instead of a copy of it. Pure: nothing in the
+       *  game moves, no queue or dice state is touched. Empty on a level with
+       *  no spot pool (the slice). */
+      spotCycle(seed = SEED) {
+        if (!POOL || !pickSpotCycle) return [];
+        const s = Number(seed);
+        return pickSpotCycle(mulberry32(Number.isFinite(s) ? s : SEED));
+      },
+      /** How this page chose its run seed (issue #66): the number, where it
+       *  came from, and whether a new run will re-draw one. Read-only. */
+      runSeed() {
+        return { seed: SEED, source: SEED_SOURCE, live: LIVE_SEED };
+      },
       simulate(steps, scriptFn) {
         return simulateHash(Number(steps) || 0, typeof scriptFn === 'function' ? scriptFn : simScript);
       },
@@ -2349,6 +2463,11 @@ export function bootGame(cfg) {
           autoLow: AUTO_LOW,
           quality: SETTINGS.quality,
           stampDebug: STAMP_DEBUG,
+          // issue #66: the run's seed and where it came from ('url ?seed=',
+          // 'live random', 'capture default') — a headless check reads these.
+          seed: SEED,
+          seedSource: SEED_SOURCE,
+          liveSeed: LIVE_SEED,
           text: stampText(),
         };
       },
