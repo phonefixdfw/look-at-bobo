@@ -462,6 +462,10 @@ export const VIEWS = {
   'low-angle': { pos: [-1.95, 0.42, 1.75], yaw: 0.381, pitch: 0.055, fov: 55, hand: false }, // floor level, in the window light
   kitchen: { pos: [3.95, 1.55, 0.25], yaw: 0.0, pitch: -0.377, fov: 55, hand: false }, // the sink run and the window over it
   bathroom: { pos: [-1.3, 1.5, 3.55], yaw: 0.872, pitch: -0.376, fov: 55, hand: false }, // the vanity, from the cased opening
+  // issue #67: the vestibule, from the hall — the frame Brandon's playtest
+  // caught as "a weird hall to nowhere", so it is the frame that proves it is
+  // now a lit ENTRY with a front door at the end of it.
+  entry: { pos: [1.71, 1.62, 2.45], yaw: 1.5708, pitch: 0.02, fov: 78, hand: false }, // the front door, from the hall opening
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
   // The three doorways, from standing height, aimed through the hole at a
