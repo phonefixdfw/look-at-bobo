@@ -65,7 +65,15 @@ export function bootGame(cfg) {
     WALK_RECTS, COLLIDERS, MOMENTS, MOMENT_IDS, EVENT_PHASES, ALL_STAGE_IDS,
     CANONICAL_EVENT_MOMENT, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, VIEWS, MOVE,
     pickDecoySpot, pickSpawn,
+    SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, ROOM_LABELS = null,
   } = cfg.level;
+  /** Spot-pool mode (issue #53): the full game ships a SPOTS pool and a run
+   *  draws ten of them; a slice's level has none and every pool branch below
+   *  stays inert, so the slice's behaviour is byte-identical. */
+  const POOL = SPOTS ? new Map(SPOTS.map((s) => [s.id, s])) : null;
+  /** canonical spot id → the moment type that owns it (staging a canonical
+   *  spot must stage its canonicalDecoy, so capture baselines never move). */
+  const CANON_BY_SPOT = POOL ? new Map(MOMENTS.map((m) => [m.canonical, m])) : null;
 
   /** Fixed strings. Exact. On purpose. Never "fixed". */
   const EXACT_ENDING = 'your did it! you wind';
@@ -197,6 +205,13 @@ export function bootGame(cfg) {
 
   const momentById = (id) => MOMENTS.find((m) => m.id === id);
   const decoyById = (id) => DECOY_SPOTS.find((s) => s.id === id);
+
+  /** FNV-1a: an id to a stable seed, so spot staging needs no run state. */
+  function hashId(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+    return h >>> 0;
+  }
 
   // ---------------------------------------------------------------------------
   // 1. Renderer / scene / camera (same rig as the demo)
@@ -385,6 +400,7 @@ export function bootGame(cfg) {
     playing: false,
     paused: false,
     decoyId: MOMENTS[0].canonicalDecoy,
+    spotId: POOL ? MOMENTS[0].canonical : null, // issue #53: which SPOTS entry is live
     boboSupport: MOMENTS[0].spot[1],
     decoySupport: 'rug',
     spawnIdx: 0,
@@ -401,23 +417,39 @@ export function bootGame(cfg) {
   const player = { x: SPAWNS[0].pos[0], z: SPAWNS[0].pos[1], yaw: SPAWNS[0].yaw, pitch: 0, bob: 0 };
 
   /** The decoy pick, plant-aware so ?plant=decoy-share can make the
-   *  "never shares Bobo's spot" rule fail for the capture checks to catch. */
-  function chooseDecoySpot(moment, rand) {
+   *  "never shares Bobo's spot" rule fail for the capture checks to catch.
+   *  Works off any Bobo record — a moment (slice) or a spot (pool). Issue
+   *  #53: the pool's pickDecoySpot also prefers a decoy in ANOTHER room. */
+  function chooseDecoySpot(rec, rand) {
     if (PLANT === 'decoy-share') {
-      return { id: `on-top-of-${moment.id}`, room: moment.room, pos: moment.spot.slice(), faceYaw: moment.faceYaw + 0.7 };
+      return { id: `on-top-of-${rec.id}`, room: rec.room, pos: rec.spot.slice(), faceYaw: rec.faceYaw + 0.7 };
     }
-    return pickDecoySpot(moment.spot, rand);
+    return pickDecoySpot(rec.spot, rand, rec.room ?? null);
   }
 
-  /** The queue iterator: a seeded shuffle per cycle, never repeats inside a
-   *  cycle (?plant=repeats makes it cycle the declared order with repeats). */
+  /** The queue iterator: one seeded draw per cycle, never repeats inside a
+   *  cycle (?plant=repeats makes it cycle the declared order with repeats).
+   *  Spot-pool mode (issue #53): a cycle is the run's TEN spots — one per
+   *  moment type in a room-alternating order — so the queue holds spot ids.
+   *  Seeded exactly like the old moment shuffle: SEED + cycle × 101. */
   function refillQueue() {
-    queue = PLANT === 'repeats' ? MOMENT_IDS.slice(0, 2) : seededShuffle(MOMENT_IDS, SEED + refills++ * 101);
+    if (PLANT === 'repeats') {
+      queue = POOL ? MOMENTS.slice(0, 2).map((m) => m.canonical) : MOMENT_IDS.slice(0, 2);
+      return;
+    }
+    queue = POOL ? pickSpotCycle(mulberry32(SEED + refills++ * 101)) : seededShuffle(MOMENT_IDS, SEED + refills++ * 101);
   }
-  function nextMomentId() {
+  function nextQueueId() {
     if (!queue.length) refillQueue();
     if (PLANT === 'repeats') return queue[0]; // never pops: repeats forever
     return queue.shift();
+  }
+  /** The record this round is played from: a spot (pool) or a moment type
+   *  (slice). Spot records carry the same shape the hydrated moments do —
+   *  type/room/pose/spot triple/faceYaw — so placement code takes either. */
+  function nextRoundRecord() {
+    const id = nextQueueId();
+    return POOL ? POOL.get(id) : momentById(id);
   }
 
   function placeBoboAt(moment) {
@@ -442,14 +474,30 @@ export function bootGame(cfg) {
   function stageFindMoment(id) {
     const m = momentById(id);
     game.momentId = id;
+    game.spotId = POOL ? m.canonical : null;
     placeBoboAt(m);
     placeDecoyAt(decoyById(m.canonicalDecoy));
   }
+  /** Staging at an exact spot (issue #53 — LC can pose ANY spot in the pool).
+   *  A type's canonical spot keeps its canonicalDecoy, so capture baselines
+   *  never move; any other spot gets the decoy a live round would draw, off a
+   *  rand seeded from the spot's own id — same id, same tableau, every run,
+   *  and room-preferring like the live game. */
+  function stageSpot(spotId) {
+    const s = POOL.get(spotId);
+    game.momentId = s.type;
+    game.spotId = spotId;
+    placeBoboAt(s);
+    const canon = CANON_BY_SPOT.get(spotId);
+    if (canon) placeDecoyAt(decoyById(canon.canonicalDecoy));
+    else placeDecoyAt(pickDecoySpot(s.spot, mulberry32(hashId(spotId)), s.room));
+  }
   function startLiveRound() {
-    const m = momentById(nextMomentId());
-    game.momentId = m.id;
-    placeBoboAt(m);
-    placeDecoyAt(chooseDecoySpot(m, rng));
+    const rec = nextRoundRecord();
+    game.momentId = POOL ? rec.type : rec.id;
+    game.spotId = POOL ? rec.id : null;
+    placeBoboAt(rec);
+    placeDecoyAt(chooseDecoySpot(rec, rng));
   }
   function spawnPlayerAt(spawn) {
     player.x = spawn.pos[0];
@@ -517,7 +565,7 @@ export function bootGame(cfg) {
    *  0.07 m from d-hall), and standClearOfCats is the backstop either way. */
   function afterCatch() {
     startLiveRound();
-    const boboRoom = momentById(game.momentId).room;
+    const boboRoom = POOL ? POOL.get(game.spotId).room : momentById(game.momentId).room;
     const avoid = [
       { x: bobo.root.position.x, z: bobo.root.position.z },
       { x: decoy.root.position.x, z: decoy.root.position.z },
@@ -973,7 +1021,7 @@ export function bootGame(cfg) {
     // The checks FIRE the events, so they change score/phase/moment by design.
     // Snapshot what the caller had staged and restore exactly that afterwards —
     // reading the state back after mutating it would "restore" a test artefact.
-    const entry = { phase: game.phase, momentId: game.momentId, time: game.time, view: game.view };
+    const entry = { phase: game.phase, momentId: game.momentId, spotId: game.spotId, time: game.time, view: game.view };
     const savedScore = game.score;
 
     // --- the exact strings ----------------------------------------------------
@@ -1034,7 +1082,7 @@ export function bootGame(cfg) {
       refills = 7;
       const seen = [];
       const L = MOMENT_IDS.length;
-      for (let i = 0; i < L * 3; i++) seen.push(nextMomentId());
+      for (let i = 0; i < L * 3; i++) seen.push(nextQueueId());
       for (let c = 0; c < 3; c++) {
         const cycle = new Set(seen.slice(c * L, c * L + L));
         if (cycle.size !== L) repeatsOk = false;
@@ -1507,7 +1555,7 @@ export function bootGame(cfg) {
     // Step 8: the full game appends its own checks (moment count, every
     // moment's contact band, room coverage). The slice adds none.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes: apt.wallBoxes ?? [] });
+      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes: apt.wallBoxes ?? [], SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, mulberry32, hashId });
     }
 
     game.score = savedScore;
@@ -1521,11 +1569,14 @@ export function bootGame(cfg) {
     if (EVENT_PHASES.includes(id)) {
       stageFindMoment(CANONICAL_EVENT_MOMENT); // the canonical event tableau
       game.phase = id;
+    } else if (POOL && POOL.has(id)) {
+      stageSpot(id); // any spot in the pool (issue #53)
+      game.phase = 'find';
     } else if (momentById(id)) {
       stageFindMoment(id);
       game.phase = 'find';
     } else {
-      throw new Error(`Unknown moment "${id}". Declared: ${ALL_STAGE_IDS.join(', ')}`);
+      throw new Error(`Unknown moment "${id}". Declared: ${ALL_STAGE_IDS.join(', ')}${POOL ? `; or spot: ${SPOT_IDS.join(', ')}` : ''}`);
     }
     firedCues = new Set();
     markCuesUpTo(game.time);
@@ -1540,8 +1591,9 @@ export function bootGame(cfg) {
   }
 
   function restoreAfterSelfTest(entry) {
-    // Restore EXACTLY what selfTest() snapshotted before it fired any events.
-    stageSet(entry.phase === 'find' ? entry.momentId : entry.phase);
+    // Restore EXACTLY what selfTest() snapshotted before it fired any events —
+    // in pool mode a live or staged spot takes priority over the bare type.
+    stageSet(entry.phase === 'find' ? (entry.spotId ?? entry.momentId) : entry.phase);
     stageSeek(entry.time);
     applyView(entry.view);
     updateLabel();
@@ -1624,6 +1676,26 @@ export function bootGame(cfg) {
         if (t != null) this.seek(t);
         this.renderNow();
       },
+      // --- spot layer (issue #53): pose ANY spot in the pool directly.
+      // setMoment also accepts a spot id; moment()/setMoment keep speaking
+      // moment TYPES, this layer speaks the run's exact places.
+      spots: POOL ? SPOT_IDS.slice() : [],
+      spot(id = game.spotId) {
+        if (!POOL || id == null) return null;
+        const s = POOL.get(id);
+        if (!s) throw new Error(`Unknown spot "${id}". Declared: ${SPOT_IDS.join(', ')}`);
+        return { id: s.id, type: s.type, room: s.room, pose: s.pose, spot: s.spot.slice(), faceYaw: s.faceYaw };
+      },
+      setSpot(id) {
+        if (!POOL) throw new Error('This level has no spot pool.');
+        if (!POOL.has(id)) throw new Error(`Unknown spot "${id}". Declared: ${SPOT_IDS.join(', ')}`);
+        this.setMoment(id);
+      },
+      gotoSpot(id, t) {
+        if (id != null) this.setSpot(id);
+        if (t != null) this.seek(t);
+        this.renderNow();
+      },
       time() {
         return game.time;
       },
@@ -1639,6 +1711,8 @@ export function bootGame(cfg) {
           paused: game.paused, score: game.score, target: TARGET, duration: DURATION,
           px: round(player.x), pz: round(player.z), yaw: round(player.yaw), pitch: round(player.pitch),
           decoyId: game.decoyId, seed: SEED, gateOpen, plant: PLANT,
+          spotId: game.spotId ?? null,
+          room: POOL && game.spotId ? POOL.get(game.spotId).room : null,
         };
       },
       camera(name = game.view) {
