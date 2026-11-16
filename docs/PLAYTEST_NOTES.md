@@ -1340,3 +1340,143 @@ balcony 7 / 2,464 · shell 5 / 91.
   real cut is merging inside the living room's own clutter, which means
   teaching the ruler (#46) to measure merged buffers — its own issue, not this
   one.
+
+---
+
+## 26. Issue #67 — the bathroom gets bigger, and the hall stops ending in nothing
+
+**Asked for (Brandon, 2026-11-16):** the bathroom is too cramped to play in,
+and the hall across from it "ends in a dark nothing". Brighten it, re-lay the
+furniture, find the void.
+
+**The bathroom was 2.28 × 1.68 m and its own tub made it unusable.** Issue #61
+brought the tub to the ruler's real 1.68 m and it ended up standing across the
+room's short axis, leaving 0.24 m² of floor a body could actually occupy —
+`hall-chase.bath-mat` still had a standable cell, so every check stayed green
+while the room was a corridor past a bathtub. `bathGapReport` said the mat's
+width "blocked" behind the tub.
+
+**The void was a hole in the plaster.** `WALL_DEFS` built the hall's east band
+(x 0.90 … 1.02) in three pieces that stop at z 3.90 — the entry's south face —
+and nothing continued it to the band's end at z 5.20. From standing in the
+corridor you looked through the wall line into the sky outside the flat, and
+with no plaster there to catch the fill, the last third of the hall was the
+darkest interior in the game. `E-hall-3` (axis `x`, z 3.90 → 5.20, `wall-int`,
+`hall`) closes it. It folds into the plaster mesh the shell already draws, so
+the fix that answers the issue's headline costs **zero draw calls**.
+
+**What changed**
+
+1. **The room grew into the void behind it.** `ROOMS.bathroom.z1` 3.90 →
+   **5.20**: 2.28 × 2.98 = **6.8 m²** (was 3.8), net interior **65.67 → 68.68
+   m²**, still inside issue #33's 65–80 m² band. No new exterior plaster
+   existed to buy: `W-2` already ran to z 5.52 and `E-bath-2` to 5.20, and the
+   bedroom's north band (`M-bed-1`) is the bathroom's south wall now, so
+   `S-bath-1` is simply deleted. Interior wall count unchanged.
+2. **Re-layout** (`game/full-bath.js`): the tub runs east–west along the new
+   south wall (x [−3.30, −1.70] · z [4.45, 5.20]) flush with it, curtain/taps/
+   head/spout/towel bar/mirror/bin move +1.30 m in z with it, and the mat lands
+   in the doorway strip. **The vanity and toilet footprints did not move**, so
+   `hall-chase.vanity` and `hall-chase.bath-mat` land where they always landed.
+   The bathroom walk rect's z1 moved to 5.12 — the only collider-domain change
+   in this issue, and forced by the enlargement. Door-less on purpose, still.
+3. **The hall and the entry got the rooms they always claimed.**
+   `coat-bench` and `hall-console` have been colliders since issue #33 with
+   nothing drawn on them: `game/full-entry.js` (data) and
+   `game/full-entry-mesh.js` (geometry) build the bench with three hooks, the
+   console, a framed print, a bowl, the doormat, a runner down the corridor
+   and four ceiling bodies. No collider added, none moved.
+4. **Light without breaking the cap.** Still four point fills, still
+   `realLights 6`: the hall's moved to `[0.72, 2.34, 3.4]` at 5.4 so it serves
+   the corridor *and* the front door's room, and the bathroom's sits in the
+   middle of the room it grew (`[−2.16, 2.34, 3.71]`, 3.9 @ 5.8 m). The
+   ceiling bodies are emissive shades, not lights — the convention the living
+   room's lamp keeps.
+
+**The budget, because it is always the budget.** `game/full-merge.js` refuses
+to fold a mesh that carries a `name` or a measured `userData` tag, and buckets
+the rest by shading signature + geometry signature + shadow flags. So the new
+meshes are left **unnamed** (nothing looks them up — only the bench, locked by
+its own `scale` tag regardless), and everything that is pale wood, mat or
+frame uses `game/full-apartment.js`'s exact trim recipe with `cast: false`,
+which drops them into the casing/skirting bucket the flat already pays for.
+They are cream painted board paths, which is also simply what a hall like this
+has. Net cost of the whole dressing: **+2 draws** — the measured bench, and
+one emissive fixture mesh.
+
+### Measured (this HEAD, Node 24.22, Chrome 157 headless)
+
+- `capture:full` **546 frames** (14 views × 13 moments × 3 times — `entry` is
+  the new view), selfTest **81/81 in every frame**, budget **PASS: 149 of 150
+  draw calls**, 99,420 triangles, 1 pass, 2 shadow-casting lights,
+  **realLights 6 / 6**, pixels luma 42..149.8, console clean, **VERDICT PASS**.
+  The 149 is `win/overview`; the same frame without the entry dressing
+  measures 147, so the two draws above are the real invoice.
+- **Standable floor in the bathroom, same 0.60 m body, same grid** (the
+  probe `/tmp/opencode/bath-path-probe.mjs` runs the real `WALK_RECTS` +
+  `COLLIDERS`): **2.58 m² as built vs 0.24 m² before #67**, and the three
+  fixture fronts (a point 0.40 m off each usable face) go from *all blocked*
+  to *free and flooded from the flat's root*. `bathGapReport`'s mat-in-front-
+  of-tub row: `blocked` → **standable 1.73 m** against the ruler's ≥ 0.55.
+- **Bathroom brightness**, the four played-room views at `desk-pen` t = 1.2:
+  **bathroom 149, entry 128, kitchen 83, desk 88** — median 108. The room is
+  now 1.38× the flat's median instead of the flat's dark corner, and the
+  `bath-luma-in-band` band is set around that: a white tiled room with porcelain
+  in it reads bright at a sane exposure, so the band is 0.7…1.5 × median with a
+  90…200 absolute floor and ceiling. Turning the fill from 4.6 to 3.9 moved the
+  room 158 → 152, i.e. the tile does most of the work; the fill only has to
+  stop it being a cave.
+- **Entry**: mean luma **128**, **4%** of the frame near-black (limits ≥ 70
+  and ≤ 25%).
+- New checks in `game/full.js`, **77 → 81**: `bath-clear-path` (route + floor,
+  above), `entry-reads-lit`, `front-door-shut-and-found` (the leaf is
+  `LEAF_W` in the cased 1.02 m opening, walnut and lit on the entry camera,
+  no walk rect past it — the front door stays sealed and unreachable),
+  `bath-luma-in-band`. The three pixel checks render **once per page** and
+  cache their numbers, the way `doorways-read-open` does: they measure static
+  geometry and lights, and five renders per `selfTest` call starves the live
+  loop under the stress suite. `npm run playtest:stress:full` now passes
+  `--checks 81`.
+
+**Everything else on this HEAD** (same machine, same run; `/tmp/opencode/suites.sh`
+ran the whole matrix, logs kept per suite):
+
+- `gate` **PASS** — and the four `*:planted` suites **FAIL on purpose, which is
+  their PASS condition**: each injects a known fault and must exit 1 naming it.
+  Their only reported problem is the planted one: `capture:planted` →
+  `box-bottom-to-floor = 0.05`, `capture:full:planted` / `capture:slice:planted`
+  / `capture:demo:planted` → `ending-text-exact = you did it! you win`. `gate`
+  asserts exactly those five verdicts and passes them.
+- `capture:full:determinism` **8/8 byte-identical**, `capture:full:weak`
+  **81/81**, `capture:full:spots` 18 frames **84 draws**, `capture:full:patriot`
+  6 frames **115 draws**, console clean on all.
+- `playtest:bot:full` **10/10 distinct spots, score 10/10, phase win**, spawn→Bobo
+  mean 5.00 m, console clean; `playtest:bot:patriot:full` **5/5** with the costumed
+  find on find 3; `playtest:bot` (slice) **5/5**.
+- `playtest:stress:full` **77 PASS / 0 FAIL**, and its live selfTest line reads
+  "(81 checks) — all 81 green", so the new `--checks 81` is what ran;
+  `playtest:stress` **72 PASS / 0 FAIL**.
+- `check:mobile` **92 PASS / 0 FAIL**; `seed:coverage` unchanged in shape (every
+  spot drawn, rarest `hall-chase.hall-door` 12.0% — the new entry furniture drew
+  no new spot and removed none).
+- Audio and music untouched and green: `audio:fullcheck` **23/23** (win line
+  still 1.86 s, ending still "your did it! you wind"), `audio:democheck`,
+  `audio:slicecheck`, `audio:selftest`, `audio:pagecheck`, `music:selftest`
+  **29/29**, `music:check` **28/28**.
+- The look baselines the slice and demo own are unbroken: `capture:style` **PASS
+  (72 frames)**, `capture:slice` **51/51 checks at 98 draws**,
+  `capture:slice:determinism` **8/8**, `capture:slice:weak` PASS, `capture:demo`
+  **48 frames at 91 draws**, `capture:demo:determinism` **8/8** — none of those
+  pages includes the flat. The capture tool's own scene is byte-identical too:
+  `capture` / `capture:all` **144/144**, `capture:weak` PASS.
+- `build`: dist/ stamped **59 files, 2.88 MB** (+2 over issue #61's 57:
+  `game/full-entry.js`, `game/full-entry-mesh.js`), graph + assets + stamps
+  verified.
+
+**Not done / left on purpose.** The entry's console is a solid-top table with a
+bowl on it — the flat has no keys, wallet or post to hang there, and inventing
+props means inventing moments; the four ceiling bodies are emissive shapes
+rather than light sources, because the flat is at the `realLights <= 6` cap and
+the honest way to light five rooms with four fills is to place them where two
+rooms share one. The bathroom keeps no door: the player who cannot be trapped
+also cannot be locked in a bright one.

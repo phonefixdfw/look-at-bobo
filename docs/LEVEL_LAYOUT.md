@@ -183,19 +183,28 @@ curtains. `game/full.html` boots `bootGame()` from `game/engine.js` against
 this file; every number below is what `game/full-level.js` uses.
 
 ```
-          z=−2.6 ┌───── plant ── TV wall ──── window ───────┐
-                 │ LIVING  couch W · rug · box · big plant  │
-   bookshelf NW  │            kitchenette NE (counter,      │
-                 │            fridge, kettle, sink-sit)     │
-          z=2.6  └──────┐  door                    table 2E ┘
-                 HALL   └──────────────┐ console ┌──────────
-          z=4.2  ┌──────┴── bath W ────┴── door ─┴──────────┐
-                 │ BATH (tub·vanity·toilet·mat) │           │
-          z=2.6… ├──────────────────────────────┤  BEDROOM  │  z up to 7.0
-                 │  (hall continues)            │ desk W ·  │
-                 │                              │ bed · rug │
-                 └──────────────────────────────┴───────────┘
+                 ┌ LIVING + DINING ─────────────┐ ┌ KITCHEN ─────────┐
+                 │ sofa W · coffee table · rug  │ │ L-counters · sink│
+                 │ box · floor lamp · plant     │ │ uppers · fridge  │
+                 │ TV + bookshelf N · table SE  │ │ window over sink │
+                 └──────┐ living→hall ╔═╗  ┌────┘ └───────┬──────────┘
+                        └── door 0.90─╨─╨──╢pass-through  ╟ 0.90
+                 ┌ BATHROOM ──────┐  HALL  ╚══════════════╣
+                 │ 2.28 × 2.98    │ 1.80   ┌ ENTRY ───────┴─────────┐
+                 │ tub · vanity   │ × 2.98 │ 1.38 × 1.68            │
+                 │ · toilet · mat │        │ mat · hooks · console  │
+                 │ bin · window   │  open  │ FRONT DOOR (closed)    │
+                 └────────────────┘ doorway└────────────────────────┘
+                        bedroom→hall door 0.90
+                 ┌ BEDROOM ────────────────────────────────┐
+                 │ bed W · desk · keyboard · dresser ·     │
+                 │ closet · laundry · rug · plant          │
+                 └───────── window (sill 0.90) ────────────┘
 ```
+
+The plan with every measurement on it is `docs/ISSUE_33_REBUILD.md` §2; the
+rooms' rectangles are that table plus issue #67's two changes (bathroom south
+face z 3.90 → 5.20, hall's east band built out to z 5.20).
 
 ## The ten moments (all generic — Brandon swaps the real ones later)
 
@@ -337,11 +346,87 @@ three capture cameras physically sit.
 
 | view | position | yaw | pitch | fov | hand |
 |---|---|---|---|---|---|
-| `kitchen` | (0.9, 1.5, 0.9) | −2.417 | −0.137 | 50 | no — aimed at the sink run |
-| `bathroom` | (−1.25, 1.62, 3.65) | +1.357 | −0.872 | 55 | yes — doorway view of the mat |
-| `desk` | (−1.35, 1.2, 5.55) | +π/2 | −0.266 | 40 | no — pen + Bobo on the desk |
+| `kitchen` | (3.95, 1.55, 0.25) | 0 | −0.377 | 55 | no — aimed at the sink run |
+| `bathroom` | (−1.22, 1.62, 3.02) | +2.2 | −0.3 | 68 | no — from the open doorway, the whole enlarged room |
+| `entry` | (1.45, 1.62, 2.6) | +3.379 | −0.17 | 76 | no — the front door and the entry dressing (issue #67) |
+| `desk` | (−1.85, 1.45, 7.05) | 0 | −0.437 | 45 | no — pen + Bobo on the desk |
 
-All nine views pairwise ≥ 0.5 m (`views-distinct`, 46-check selfTest).
+All fourteen views pairwise ≥ 0.5 m (`views-distinct`). `entry` is the new one:
+the front door's room had no view of its own, which is part of why nobody
+noticed it was empty.
+
+## Issue #67 — a bigger bathroom, and the hall stops ending in nothing
+
+Two things in one issue: the bathroom was too small to play in once the tub
+became a real 1.68 m one, and the hall "ends in a dark nothing".
+
+**The bathroom: 3.8 → 6.8 m².** It took the dead service void behind its own
+south wall: `ROOMS.bathroom.z1` moved 3.90 → **5.20** and the band there
+stopped belonging to two rooms at once — `S-bath-1` is gone from `WALL_DEFS`,
+and the plaster you see from inside the bathroom is the bedroom's own north
+band (`M-bed-1`, z 5.20 … 5.32), which already spanned x −3.30 → −0.53. Wall
+count down one, no new exterior plaster bought: `W-2` ran to z 5.52 and
+`E-bath-2` to 5.20 already, which is what made the void sealed in the first
+place. Interior **2.28 × 2.98**. Layout (`game/full-bath.js`):
+
+| thing | footprint | why |
+|---|---|---|
+| tub | x [−3.30, −1.70] · z [4.45, 5.20] | the long way along the new south wall, flush with it and with the west wall: a body can now stand all the way round the tub's north face (`bathGapReport` "bath mat in front of tub" reads **1.73 m** of standable width, ruler ≥ 0.55) |
+| vanity | x [−3.30, −2.40] · z [2.22, 2.70] | unchanged — the west wall's run is untouched, and its front is where it always was |
+| toilet | x [−2.02, −1.65] · z [2.22, 2.90] | unchanged |
+| mat | x [−2.65, −1.75] · z [3.90, 4.45] | the strip you stand on stepping out of the tub, inside the open doorway |
+| bin | x [−1.58, −1.34] · z [4.90, 5.14] | the SE corner the enlarged room made |
+
+Tub, curtain, taps, shower head, spout, towel bar, mirror and bin all moved
++1.30 m in z with the room; the vanity and toilet did not move, so the two
+bathroom reach-checks (`hall-chase.bath-mat`, `hall-chase.vanity`) still land
+where they always landed. `bathGapReport`'s "bath mat in front of tub" row
+became `standable 1.73 m` against the ruler's ≥ 0.55. No colliders added or
+removed, and the room is still door-less: the issue's rule stands (the player
+can never be trapped).
+
+**The hall's dark nothing: a hole in the plaster, and nothing to look at.**
+`WALL_DEFS` band-built the hall's east wall (x 0.90 … 1.02) for z 2.22 … 3.90
+only — from the entry doorway to the bedroom door the corridor had no east
+wall at all, so the camera looked through it into the void outside the flat
+and the sun lit nothing back. `E-hall-3` (axis `x`, z 3.90 → 5.20) closes it;
+it joins the plaster merge, so **the fix costs no draw calls at all**. The rest
+of the complaint was that both rooms were empty: `game/full-entry.js` (data, no
+Three.js) and `game/full-entry-mesh.js` (geometry) dress them — bench + hooks,
+console, print, bowl, mat, runner, four ceiling bodies. Those draw the two
+colliders the flat has had, unrendered, since issue #33: `coat-bench` in the
+entry and `hall-console` in the hall. **No new colliders** (`collider-set-stable`
+proves the pool never changes); the check caught up with reality rather than
+the level changing.
+
+Light, then. Still four point fills and still `realLights = 6`, exactly the
+budget: the bathroom keeps a fill (3.9 @ 5.8 m, cooler, under its own new
+ceiling body) and the hall's fill was **moved to the entry side of the corridor
+at 5.4** so it serves both rooms — that is the whole lighting change, and it is
+why the bathroom sits at mean luma ~149 where the flat's median is ~109 (tile
+and porcelain, lit).
+
+Four checks came with it, in `game/full.js`:
+
+| check | what it proves |
+|---|---|
+| `bath-clear-path` | a 0.60 m body has a flooded route from the flat's root to 0.40 m off every fixture, and ≥ 2 m² of standable floor (measured 2.67 m², against 0.24 m² before the enlargement) |
+| `bath-luma-in-band` | the bathroom's mean luma is 0.7 … 1.5 of the median of the played rooms and 90 … 200 absolute, so it is neither the dark room again nor a milky one |
+| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (4 % / 128) |
+| `front-door-shut-and-found` | `door-front` is built shut, its leaf is `LEAF_W` in the cased 1.02 m opening, the entry camera sees it, and no walk rect is reachable past it |
+
+The three pixel checks render once per page and remember it, the way
+`doorways-read-open` does: they measure geometry and lights, which cannot
+change between `selfTest` calls, and five renders a call starves the live loop
+under the stress suite.
+
+Budget: two draws (the bench, because the ruler measures it; the lit shades,
+because nothing else at that level glows). Everything else shades exactly like
+the flat's trim paint and folds into a bucket the flat already pays for — see
+the header of `game/full-entry-mesh.js` for how `game/full-merge.js` decides
+what it may fold. Worst full-flat frame after all of this: **149 / 150** draw
+calls. Full check count 77 → **81**, and `playtest:stress:full` in
+`package.json` passes `--checks 81` to match.
 
 ## Procedural textures (Step 8, code-only — no downloads, no paid calls)
 
