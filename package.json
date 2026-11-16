@@ -32,13 +32,14 @@
     "playtest:bot": "node tools/bot-playtest.mjs",
     "playtest:stress": "node tools/stress-playtest.mjs",
     "capture:full": "node tools/capture.mjs game/full.html --times 0,1.2,2.4 --views all --moments all --out captures/full --selftest --param gate=off --param score=2",
+    "capture:full:spots": "node tools/capture.mjs game/full.html --times 1.2 --views diorama --moments couch-loaf.sofa-back,window-bird.e-window,window-bird.balcony-door,window-bird.balcony-rail,couch-loaf.balcony-chair,sink-sit.counter-return,sink-sit.fridge,sink-sit.bar,hall-chase.kitchen,hall-chase.hall-door,hall-chase.entry,hall-chase.entry-door,hall-chase.bath-mat,hall-chase.vanity,desk-pen.desk-end,bed-stretch.bed-foot,blanket-biscuits.wardrobe,laundry-nap.nightstand --out captures/full-spots --selftest --param gate=off --param score=2",
     "capture:full:determinism": "node tools/capture.mjs game/full.html --times 1.2 --views first-person,diorama --moments box-sit,catch,wrong,win --out captures/full-determinism --determinism --param gate=off --param score=2",
     "capture:full:planted": "node tools/capture.mjs game/full.html --times 1.2 --views first-person --moments win --out captures/full-planted --selftest --param gate=off --param plant=text",
     "capture:full:weak": "node tools/capture.mjs game/full.html --times 1.2 --views diorama --moments catch,win --out captures/full-weak --gpu swiftshader --selftest --param gate=off",
     "audio:fullcheck": "node tools/audio/slice-check.mjs --page game/full.html",
     "playtest:bot:full": "node tools/bot-playtest.mjs --page game/full.html",
     "check:mobile": "node tools/mobile-check.mjs",
-    "playtest:stress:full": "node tools/stress-playtest.mjs --page game/full.html --checks 53"
+    "playtest:stress:full": "node tools/stress-playtest.mjs --page game/full.html --checks 55"
   },
   "devDependencies": {
     "playwright-core": "^1.65.1",

@@ -48,6 +48,7 @@ const arg = (name, dflt) => {
 };
 const PAGE = arg('page', 'game/slice.html');
 // issue #27: slice gained cats-face-the-room (45 → 46); full passes --checks 52 (51 + furniture-real-scale, issue #41)
+// issue #53: full gained spot-pool-covers-rooms + run-draw-legal (53 → 55); slice stays 46.
 const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
