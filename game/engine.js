@@ -320,6 +320,8 @@ export function bootGame(cfg) {
     // Optional Step 8 extras — present only on the full-game page:
     pauseRestart: document.getElementById('pause-restart'),
     endingAgain: document.getElementById('ending-again'),
+    // Issue #57: "back to menu" in the pause card (only when cfg.splash is on).
+    pauseMenu: document.getElementById('pause-menu'),
   };
 
   /** What is on screen in each phase. The score pill is live state — except
@@ -551,6 +553,52 @@ export function bootGame(cfg) {
     standClearOfCats();
     input.reset(); // no key or queued shout crosses a restart (Space-mashing included)
     applyStage();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6b. The title screen (issue #57) — only when cfg.splash is passed.
+  //
+  // Per issue #57 the title card is a CSS screen (#gate, dressed by
+  // game/full.html + game/title.css) and `?gate=off` stays FULLY empty — no
+  // title screen, no camera moves, baselines byte-identical. What lives here
+  // is only the small runtime the card needs:
+  //
+  //   * while the card is up (the gate, un-started), nothing ticks: the page
+  //     paints the single boot frame and CSS does the drifting (its own
+  //     rAF, no second WebGL scene, no extra frames);
+  //   * the pause card's "back to menu" and the win's tap/space land on the
+  //     title screen (issue #57) instead of restarting in place;
+  //   * Play from the card then starts a fresh run exactly like the old gate
+  //     click did — same element, same user gesture unlocking audio and
+  //     touch mode.
+  //
+  // Pages without cfg.splash (the slice) never enter any of this — zero
+  // behaviour diff. The data (title, copy) is game/splash.js.
+  // ---------------------------------------------------------------------------
+  const SPLASH_CFG = cfg.splash || null;
+  let splashOn = false; // the title card is up (gate shown, un-started)
+
+  /** Show the title card again from the pause/win states. Play from here
+   *  starts a fresh run, so the card promises what it means. */
+  function backToMenu() {
+    if (!SPLASH_CFG || !started) return; // the gate was never left
+    restartRun();
+    input.unlock(); // the card wants the pointer back
+    started = false; // next Play = startGame, a fresh run
+    el.pause.classList.remove('show');
+    gateOpen = true;
+    el.gate.classList.remove('hidden');
+    document.body.classList.add('splash');
+    updateLabel();
+  }
+
+  /** The win's "click / Space / tap" action: with a title screen the run
+   *  hands back to the menu (issue #57); pages without one restart in place,
+   *  as they always did. */
+  function winExit() {
+    if (game.winElapsed < WIN_RESTART_AFTER) return;
+    if (SPLASH_CFG) backToMenu();
+    else restartRun();
   }
 
   // ---------------------------------------------------------------------------
@@ -1923,6 +1971,7 @@ export function bootGame(cfg) {
     voices.unlock(); // inside the user gesture (autoplay rules)
     if (TOUCH) requestTouchFullscreen(); // also inside the gesture (issue #25)
     el.gate.classList.add('hidden');
+    document.body.classList.remove('splash'); // the card carried the title look (issue #57)
     if (!started) startGame();
   }
 
@@ -1985,6 +2034,23 @@ export function bootGame(cfg) {
         else input.lock(); // the lock-change event clears the pause
       });
     }
+    // Issue #57: and a "back to menu" — the title screen again, Play from
+    // there starts a fresh run. Guarded like the restart button (the slice
+    // has neither). The M key is the same door; Esc while the card is UP
+    // means "I want out" (Esc while playing just pauses, via src/input.js).
+    if (SPLASH_CFG && el.pauseMenu) {
+      el.pauseMenu.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        backToMenu();
+      });
+      window.addEventListener('keydown', (ev) => {
+        if (window.__lcSettingsOpen) return;
+        if ((ev.code === 'KeyM' || ev.code === 'Escape') && gateOpen && started && game.paused && game.phase !== 'win') {
+          ev.preventDefault();
+          backToMenu();
+        }
+      });
+    }
     input.onLockChange((locked) => {
       if (locked) resumePlay();
       // Losing the pointer pauses — unless the page has switched to touch
@@ -2003,7 +2069,7 @@ export function bootGame(cfg) {
       if (TOUCH) return; // issue #25: no pointer lock to grab — the drag zones
       // and the shout button own the screen on touch devices
       if (game.phase === 'win') {
-        tryRestartFromWin();
+        winExit(); // click-on-win: back to the menu with a title screen (issue #57)
         return;
       }
       if (input.isLocked()) input.queueAction('point');
@@ -2014,7 +2080,7 @@ export function bootGame(cfg) {
       if (window.__lcSettingsOpen) return;
       if (ev.code === 'Space' && gateOpen && !ev.repeat) {
         ev.preventDefault();
-        if (game.phase === 'win') tryRestartFromWin();
+        if (game.phase === 'win') winExit(); // Space-on-win: menu, or restart without one (issue #57)
         else input.queueAction('point');
       }
     });
@@ -2093,7 +2159,8 @@ export function bootGame(cfg) {
         if (!gateOpen) voices.unlock(); // ?gate=off phone page: a tap is a gesture too
         if (!started) return;
         if (game.phase === 'win') {
-          tryRestartFromWin(); // the shout button doubles as "play again"
+          winExit(); // the shout button doubles as "play again" — or, with a
+          // title screen, "back to the menu" (issue #57)
           return;
         }
         if (!game.paused) input.queueAction('point');
@@ -2106,9 +2173,11 @@ export function bootGame(cfg) {
     const psub = el.pause?.querySelector?.('.pause-sub');
     if (psub) psub.textContent = 'tap anywhere to keep looking';
     if (el.endingAgain) {
-      el.endingAgain.textContent = 'tap the shout button to look at them again';
+      el.endingAgain.textContent = SPLASH_CFG
+        ? 'tap the shout button to go back to the menu' // issue #57
+        : 'tap the shout button to look at them again';
       el.endingAgain.style.pointerEvents = 'auto'; // a tap target, not a caption
-      el.endingAgain.addEventListener('click', tryRestartFromWin);
+      el.endingAgain.addEventListener('click', () => (SPLASH_CFG ? winExit() : tryRestartFromWin()));
     }
     // Portrait: the game waits behind the rotate hint (its .show is pure CSS,
     // see full.html) — pausing here keeps the sim honest while upright.
