@@ -47,7 +47,7 @@ const arg = (name, dflt) => {
   return i >= 0 ? argv[i + 1] : dflt;
 };
 const PAGE = arg('page', 'game/slice.html');
-// issue #27: slice gained cats-face-the-room (45 → 46); full passes --checks 52 (51 + furniture-real-scale, issue #41)
+// issue #27: slice gained cats-face-the-room (45 → 46); full passes --checks 54: 51 + furniture-real-scale (issue #41), + the living room rows (#46, 53) and + the bedroom rows (issue #48, 54)
 const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
