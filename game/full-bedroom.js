@@ -178,10 +178,14 @@ export const PIECES = [
   piece('laundry-pile', 'fabricPile', [0.69, 0.95], [0.20, 0.55], [8.895, 9.105],
     ['laundry-pile'], 'row 51: the pile, ~0.18 above the rim — its top is `laundryTop`'),
 
-  // ---- the plant, in the south-east corner by the door --------------------
-  piece('plant-pot', 'pot', [0.08, 0.40], [0, 0.32], [8.86, 9.18], ['plant-pot'],
+  // ---- the plant, between the wardrobe and the basket, flush east ---------
+  // It first sat in the south-west corner by the door, but its walk pad (the
+  // collider + 0.30 m body radius) sealed the south pocket off from the rest
+  // of the flat, so `walk-reachable` moved it here: the east wall, directly
+  // south of the wardrobe, north of the basket, clear of the pocket mouth.
+  piece('plant-pot', 'pot', [0.83, 1.15], [0, 0.32], [8.35, 8.67], ['plant-pot'],
     'the pot: 0.32 m across, 0.32 m tall'),
-  piece('plant-leaf', 'leaf', [0.03, 0.45], [0.30, 1.00], [8.81, 9.23], ['plant-leaf'],
+  piece('plant-leaf', 'leaf', [0.78, 1.20], [0.30, 1.00], [8.30, 8.72], ['plant-leaf'],
     'and its leaves, a cone to y 1.00'),
 
   // ---- soft goods: rug and curtains ---------------------------------------
@@ -283,5 +287,5 @@ export const BEDROOM_COLLIDERS = [
   { id: 'dresser', x0: 0.74, z0: 5.40, x1: 1.20, z1: 6.62 },
   { id: 'wardrobe', x0: 0.60, z0: 7.05, x1: 1.20, z1: 8.20 },
   { id: 'laundry-basket', x0: 0.62, z0: 8.85, x1: 1.02, z1: 9.15 },
-  { id: 'bedroom-plant', x0: 0.03, z0: 8.81, x1: 0.45, z1: 9.23 },
+  { id: 'bedroom-plant', x0: 0.78, z0: 8.30, x1: 1.20, z1: 8.72 },
 ];
