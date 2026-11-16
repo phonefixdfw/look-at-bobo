@@ -277,6 +277,17 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'hood',
       'fridge',
       'dishwasher',
+      // ...and the small pieces of issue #44 (ruler rows 23-33): every one of
+      // them must be present and measured, bar and stools included.
+      'microwave',
+      'kettle',
+      'toaster',
+      'coffee-maker',
+      'dish-rack',
+      'trash-bin',
+      'bar-height',
+      'bar-stool',
+      'rug-runner',
       // rows 34-41 and 60: the living room (issue #46). Every one of these is
       // tagged by a mesh game/full-living-mesh.js builds — a row nobody built
       // fails the run, which is the whole point.
