@@ -168,7 +168,12 @@ function batThePen(pen, supports, t) {
  * Appended after the engine's own 48 (46 + the two spot-pool checks issue
  * #53 added) and the rest of the full page's stack (furniture scale, title
  * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, and
- * the three door/wood checks issue #65 added, so the full page reports 68. */
+ * the three door/wood checks issue #65 added, so the full page reports 70. */
+/** Door frames are rendered ONCE per page by `doorways-read-open`: they
+ *  check static geometry, and selfTest runs per capture frame — re-rendering
+ *  six extra frames every time starves the live frame loop under load (the
+ *  stress suite's 150 ms reticle-soft window noticed on a busy machine). */
+const doorFramesDone = { v: false };
 function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], SPOTS = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
@@ -699,7 +704,6 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
    * (there is no door control and there never will be); what was broken is
    * that the open leaves were DRAWN ACROSS their openings, so the flat
    * photographed as a floorplan of shut doors. */
-
   // 1. `doors-read-open`: the geometry of it, data-side. Every `door`
   //    opening owns exactly one leaf, every leaf is a thin slab, and no
   //    leaf overlaps a walk rectangle — a leaf across a walkway is a shut
@@ -800,6 +804,9 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       }
       return { r: r / 81, g: g / 81, b: b / 81, luma: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 81 };
     };
+    // #reticleAim counts renderer.render frames to know the aim render drew
+    // (game/engine.js aimProbeAt): selfTest renders its own frames, so run
+    // the door frames ONCE per page, not on every selfTest call.
     const shoot = (view, aimAt) => {
       camera.position.set(view.pos[0], view.pos[1], view.pos[2]);
       camera.rotation.set(view.pitch, view.yaw, 0);
@@ -813,6 +820,10 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const savedQuat = camera.quaternion.clone();
     const savedFov = camera.fov;
     try {
+      if (doorFramesDone.v) {
+        // second and later selfTest calls in this page: the frames were
+        // rendered and passed once; geometry cannot change between them
+      } else
       for (const o of OPENINGS.filter((x) => x.kind === 'door')) {
         const view = LEVEL.VIEWS[o.id]; // VIEWS carries one per door, keyed by the opening id
         const leafCam = LEAF_CAMS[o.id];
@@ -860,6 +871,7 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
         else if (colourDist <= 40) problems.push(`${o.id}: hole pixel is leaf-coloured (distance ${colourDist.toFixed(0)})`);
         else if (hole.luma <= leafPx.luma + 8) problems.push(`${o.id}: hole not brighter than leaf (${hole.luma.toFixed(0)} vs ${leafPx.luma.toFixed(0)})`);
       }
+      if (!problems.length) doorFramesDone.v = true;
     } finally {
       camera.position.copy(savedPos);
       camera.quaternion.copy(savedQuat);
