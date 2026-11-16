@@ -185,12 +185,12 @@ function spot(type, place, room, pose, pos, faceYaw, extra) {
 
 export const SPOTS = [
   // ── living room (7) ──────────────────────────────────────────────────────
-  spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -2.58, { open: true }),
+  spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
   spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71),
   spot('window-bird', 'e-window', 'living', 'sit', [1.72, 'floor', 0.55], 1.51),
   spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], -0.1),
-  spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], 0.32, { open: true }),
+  spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
   spot('hall-chase', 'living', 'living', 'loaf', [-0.6, 'floor', 0.9], 1.41),
   // ── balcony (2) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md) ──
   spot('window-bird', 'balcony-rail', 'balcony', 'sit', [1.35, 'floor', -3.85], -2.9),
