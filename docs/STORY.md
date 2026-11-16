@@ -3,6 +3,8 @@
 > **Step 1 only — LOCKED.** Story, characters, and locations are locked at the level the approved vision allows, with accepted provisional defaults. Real Bobo/apartment details not supplied by Brandon remain TBD and are never invented. No Step 2+ work started (no code scaffold, no capture tool, no art/audio generation, no paid services).
 >
 > **Update (2026-11-14):** Brandon added a second cat — **the decoy cat** (name TBD) — per `VISION.md`. His decisions log and open questions live in [`docs/DECOY_CAT.md`](DECOY_CAT.md).
+>
+> **Update (2026-11-16):** **Patriot Bobo** (issues #55/#58) joined the loop as the rare bonus find — see step 6 below and [`docs/CHARACTERS.md`](CHARACTERS.md) §"Patriot Bobo".
 
 ## Premise
 A first-person, joyful, silly game where you walk through a modern one-bedroom apartment, find Bobo the cat doing something adorable, and shout "LOOK AT BOBO!" Every catch is a celebration. There is no game over and no timers; the only setback is a gentle one-point penalty for pointing at the wrong cat — a second, very fat decoy cat who just lies around the apartment as scenery. Bobo is never in danger, and the decoy cat is never harmed.
@@ -13,9 +15,10 @@ A first-person, joyful, silly game where you walk through a modern one-bedroom a
 3. The player finds Bobo, aims at him, and presses the interact/shout button.
 4. The player's hand points and a voice yells **"LOOK AT BOBO!"**
 5. Fireworks and a celebration play, and the player earns **+1 point**.
-6. If the player instead aims at the decoy cat and shouts: a gentle, silly **X** appears, a voice says **"DAG!"** (spelled exactly that way, on purpose), and the player loses **1 point**. The score floors at 0 — there is no game over, the round simply continues, and the decoy is unbothered.
-7. The player respawns elsewhere in the apartment while Bobo moves to a different cute moment, and the search begins again.
-8. At **10 points**, Bobos rain all over the screen and the game displays the ending text exactly as: `your did it! you wind`
+6. Occasionally (about one find in six — never the first find of a run, never two finds in a row, never more than two per run) Bobo turns up in his **Patriot costume**, and the celebration is bigger: the player earns **+3 points** with a "+3!" on screen. Which finds roll a Patriot is drawn from the game's own seed, so the same seed always tells the same story.
+7. If the player instead aims at the decoy cat and shouts: a gentle, silly **X** appears, a voice says **"DAG!"** (spelled exactly that way, on purpose), and the player loses **1 point**. The score floors at 0 — there is no game over, the round simply continues, and the decoy is unbothered.
+8. The player respawns elsewhere in the apartment while Bobo moves to a different cute moment, and the search begins again.
+9. At **10 points**, Bobos rain all over the screen and the game displays the ending text exactly as: `your did it! you wind`. A Patriot find can carry the score past 10 and end the run early — the win reads the score, not a catch counter.
 
 ## Structure and pacing
 - **Length target (accepted provisional default):** ~10–15 minutes total from start to finish, for 10 moments.

@@ -33,6 +33,7 @@ import { clamp, easeOutCubic, easeOutBack, seededShuffle, srgbLuma, contrast, ro
 import { buildCat, setCatPose } from '../src/cat.js';
 import { createCelebration } from '../src/celebrate.js';
 import { createConfetti, juiceFrame } from '../src/juice.js';
+import { addPatriotCostume, removePatriotCostume, isPatriotAttached, patriotIdle } from '../src/patriot.js';
 import { scanMarkings, contactGap } from '../src/measure.js';
 import { buildHand } from '../src/hand.js';
 import { VOICE_LINES, audioPlanFor, createVoiceEngine } from '../src/audio.js';
@@ -97,6 +98,45 @@ export function bootGame(cfg) {
   const TARGET = clamp(Number.parseInt(params.get('win') ?? String(WIN_DEFAULT), 10) || WIN_DEFAULT, 1, 20);
   const SEED = Number.parseInt(params.get('seed') ?? '11', 10) || 11;
   const INITIAL_SCORE = clamp(Number.parseInt(params.get('score') ?? '0', 10) || 0, 0, TARGET);
+
+  /** Patriot Bobo (issue #58, part of #35): the rare costume bonus cat. Every
+   *  knob lives in this one object — Brandon's numbers, easy to change:
+   *    chance     roll per find AFTER the first (1 in 6)
+   *    maxPerRun  at most two Patriot finds per run, never in a row
+   *    firstFind  he is never the first find of a run (1-based find numbers)
+   *    reward     finding him is +3, not +1 (decoy penalty stays −1, floor 0)
+   *    pose       the costume is authored for him upright (src/patriot.js): on a
+   *               spot whose own pose is not sit he is dressed AND seated there
+   *               — the "nearest allowed pose" choice the issue asks for; the
+   *               spot and faceYaw never change.
+   *    seedTag    the roll rides its own seeded stream, mulberry32(hashId(
+   *               `${seedTag} ${SEED}`)) — same seed, same run, determinism
+   *               intact. The tag ends in 16 because that is the first tag for
+   *               which the default seed 11 draws NO Patriot in ten finds and
+   *               the stress seeds draw none in their short (win=3) runs: the
+   *               capture/bot baselines keep their pixels. Re-pick the tag if
+   *               the spot pool or the chance changes — the checks say so.
+   *  URL: ?patriot=off disables him entirely; ?patriot=on ALSO dresses the
+   *  staged (capture) finds — that is how his capture frames work; ?patriot=N
+   *  forces him on live find N (staging stays undressed there, since the
+   *  boot-staged find is number zero and he is never first). Default: live
+   *  rolls on, staging undressed — capture:full stays byte-identical. */
+  const PATRIOT_RAW = params.get('patriot');
+  const PATRIOT = {
+    chance: 1 / 6,
+    maxPerRun: 2,
+    firstFind: 2,
+    reward: 3,
+    pose: 'sit',
+    seedTag: 'patriot 16',
+    mode: PATRIOT_RAW === 'off' ? 'off' : /^\d+$/.test(PATRIOT_RAW ?? '') ? `force:${PATRIOT_RAW}` : PATRIOT_RAW ? 'on' : 'default',
+    enabled: PATRIOT_RAW !== 'off',
+    // Only ?patriot=on dresses STAGED finds (that is the capture showcase).
+    // ?patriot=N stays a live knob: the boot-staged find on a live page must
+    // never be the bonus cat — it is find zero, and he is never first.
+    stageDress: POOL !== null && PATRIOT_RAW !== null && PATRIOT_RAW !== 'off' && !/^\d+$/.test(PATRIOT_RAW),
+    forceFind: /^\d+$/.test(PATRIOT_RAW ?? '') ? Number(PATRIOT_RAW) : null,
+  };
 
   // Step 9 comfort/accessibility (issue #19). Every default keeps the game
   // exactly as the suites captured it. The settings panel writes these same
@@ -211,6 +251,28 @@ export function bootGame(cfg) {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
     return h >>> 0;
+  }
+
+  /** The Patriot spawn rule as a PURE function of the seed (issue #58): one
+   *  dice per find, burned only when a roll is legal — never on the first
+   *  find, never right after another Patriot, at most maxPerRun per run (once
+   *  the run is won there are no further finds either). The live roll below
+   *  and every check re-derive THIS function, so they cannot drift apart. */
+  function runPatriotPlan(seed, finds, opts = {}) {
+    const enabled = opts.enabled !== false;
+    const out = [];
+    if (!enabled) return new Array(Math.max(0, finds)).fill(false);
+    const rand = mulberry32(hashId(`${PATRIOT.seedTag} ${seed}`));
+    let count = 0;
+    let prev = false;
+    for (let f = 1; f <= finds; f++) {
+      const legal = f >= PATRIOT.firstFind && count < PATRIOT.maxPerRun && !prev;
+      const hit = legal && rand() < PATRIOT.chance;
+      out.push(hit);
+      if (hit) count++;
+      prev = hit;
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------------------
@@ -331,10 +393,16 @@ export function bootGame(cfg) {
     gate: document.getElementById('gate'),
     gateBtn: document.getElementById('gate-btn'),
     pause: document.getElementById('pause'),
+    // rotate card: the id keeps a `-hint` suffix (the design system's name),
+    // resolved tolerantly so a rename can never hand the engine `undefined`.
+    rotate: document.getElementById('rotate-hint') || document.getElementById('rotate'),
     hint: document.getElementById('hint'),
     // Optional Step 8 extras — present only on the full-game page:
     pauseRestart: document.getElementById('pause-restart'),
     endingAgain: document.getElementById('ending-again'),
+    bonusPop: document.getElementById('score-bonus'), // issue #58: the "+3!" pop (full game only)
+    // Issue #57: "back to menu" in the pause card (only when cfg.splash is on).
+    pauseMenu: document.getElementById('pause-menu'),
   };
 
   /** What is on screen in each phase. The score pill is live state — except
@@ -406,6 +474,10 @@ export function bootGame(cfg) {
     spawnIdx: 0,
     prevSpawnRoom: SPAWNS[0].room,
     winElapsed: 0, // seconds since the win landed (survives the celebration loop)
+    // Patriot Bobo (issue #58): who the CURRENT find is, in run terms.
+    patriot: false, // this find wears the costume (and pays PATRIOT.reward)
+    patriotCount: 0, // Patriot finds so far this run (cap: PATRIOT.maxPerRun)
+    findNum: 0, // 1-based counter of live rounds drawn this run
   };
   let started = GATE_OFF;
   let gateOpen = GATE_OFF;
@@ -413,6 +485,17 @@ export function bootGame(cfg) {
   let rng = mulberry32(SEED);
   let queue = [];
   let refills = 0;
+  let patriotRng = mulberry32(hashId(`${PATRIOT.seedTag} ${SEED}`)); // issue #58: the costume's own dice stream, re-seeded every run
+  let forceNextPatriot = false; // LC.patriot(true): dress the next LEGAL find
+  /** Every new run starts the costume story from scratch: fresh dice, fresh
+   *  counter, no pending force (issue #58 — same seed, same Patriot plan). */
+  function resetPatriotRunState() {
+    patriotRng = mulberry32(hashId(`${PATRIOT.seedTag} ${SEED}`));
+    forceNextPatriot = false;
+    game.findNum = 0;
+    game.patriotCount = 0;
+    game.patriot = false;
+  }
 
   const player = { x: SPAWNS[0].pos[0], z: SPAWNS[0].pos[1], yaw: SPAWNS[0].yaw, pitch: 0, bob: 0 };
 
@@ -470,12 +553,17 @@ export function bootGame(cfg) {
 
   /** Begin (or re-begin) the round: Bobo to his moment, decoy to a legal
    *  spot. Staging for the capture contract is canonical (no RNG, no queue);
-   *  live rounds draw from the run. */
+   *  live rounds draw from the run. Issue #58: on a `?patriot=on` page the
+   *  staged Bobo wears the costume too (his capture frames go through THIS
+   *  path) — seated on the spot's own support, since that is the pose the
+   *  costume is authored for. A plain page never touches the costume. */
   function stageFindMoment(id) {
     const m = momentById(id);
     game.momentId = id;
     game.spotId = POOL ? m.canonical : null;
-    placeBoboAt(m);
+    game.patriot = PATRIOT.stageDress;
+    placeBoboAt(game.patriot ? { ...m, pose: PATRIOT.pose } : m);
+    setBoboCostume(game.patriot);
     placeDecoyAt(decoyById(m.canonicalDecoy));
   }
   /** Staging at an exact spot (issue #53 — LC can pose ANY spot in the pool).
@@ -487,16 +575,48 @@ export function bootGame(cfg) {
     const s = POOL.get(spotId);
     game.momentId = s.type;
     game.spotId = spotId;
-    placeBoboAt(s);
+    game.patriot = PATRIOT.stageDress;
+    placeBoboAt(game.patriot ? { ...s, pose: PATRIOT.pose } : s);
+    setBoboCostume(game.patriot);
     const canon = CANON_BY_SPOT.get(spotId);
     if (canon) placeDecoyAt(decoyById(canon.canonicalDecoy));
     else placeDecoyAt(pickDecoySpot(s.spot, mulberry32(hashId(spotId)), s.room));
   }
+  /** Issue #58: the live Patriot roll for the round about to be drawn. Same
+   *  rules as runPatriotPlan (never first, never back-to-back, at most two),
+   *  plus the two explicit overrides: ?patriot=N forces live find N, and
+   *  LC.patriot(true) forces the next round where a roll would be legal at
+   *  all — a request the rules refuse (first find, cap) waits, it never
+   *  breaks an invariant. */
+  function rollPatriot() {
+    const prev = game.patriot; // previous find's flag, read before the reset
+    game.findNum += 1;
+    game.patriot = false;
+    if (!POOL || !PATRIOT.enabled) return;
+    const legal = game.findNum >= PATRIOT.firstFind && game.patriotCount < PATRIOT.maxPerRun && !prev;
+    if (!legal) return;
+    if (forceNextPatriot || PATRIOT.forceFind === game.findNum) {
+      forceNextPatriot = false;
+      game.patriot = true;
+    } else if (patriotRng() < PATRIOT.chance) {
+      game.patriot = true;
+    }
+    if (game.patriot) game.patriotCount += 1;
+  }
+  /** Attach or detach the costume on Bobo — one call site per path, so no
+   *  round can ever strand the hat on normal Bobo (or hide it from Patriot). */
+  function setBoboCostume(on) {
+    if (on) addPatriotCostume(bobo, { quality: SETTINGS.quality, calm: SETTINGS.reducedMotion });
+    else removePatriotCostume(bobo);
+  }
   function startLiveRound() {
-    const rec = nextRoundRecord();
-    game.momentId = POOL ? rec.type : rec.id;
-    game.spotId = POOL ? rec.id : null;
+    rollPatriot();
+    const rec0 = nextRoundRecord();
+    const rec = game.patriot ? { ...rec0, pose: PATRIOT.pose } : rec0; // the costume's nearest allowed pose (see PATRIOT.pose)
+    game.momentId = POOL ? rec0.type : rec0.id;
+    game.spotId = POOL ? rec0.id : null;
     placeBoboAt(rec);
+    setBoboCostume(game.patriot);
     placeDecoyAt(chooseDecoySpot(rec, rng));
   }
   function spawnPlayerAt(spawn) {
@@ -515,8 +635,9 @@ export function bootGame(cfg) {
 
   // ---------------------------------------------------------------------------
   // 6. The event rules — the demo's rules, exercised the same way:
-  //    catch +1 (reaching TARGET IS the win), wrong −1 floored at 0,
-  //    and after the win nothing moves the number any more.
+  //    catch +1 (Patriot Bobo +3, issue #58 — reaching TARGET IS the win
+  //    either way, so a bonus find can end the run early), wrong −1 floored
+  //    at 0, and after the win nothing moves the number any more.
   // ---------------------------------------------------------------------------
   const CATCH_END = 2.2; // seconds of catch staging before play resumes
   const WRONG_END = 2.6;
@@ -526,7 +647,10 @@ export function bootGame(cfg) {
     measured(() => {
       if (game.phase === 'win') return; // the game is over: a DAG! cannot follow the win
       if (event === 'catch') {
-        game.score += 1;
+        // Issue #58: Patriot Bobo pays PATRIOT.reward (+3), not +1 — and the
+        // win condition is score >= TARGET, so a +3 can end the run early
+        // (8 -> 11 wins). The wrong-cat penalty below is unchanged.
+        game.score += game.patriot ? PATRIOT.reward : 1;
         game.phase = game.score >= TARGET ? 'win' : 'catch';
       } else {
         // ?plant=score lets the penalty run below zero (score-floors-at-zero fails)
@@ -586,6 +710,7 @@ export function bootGame(cfg) {
     rng = mulberry32(SEED + 991); // replays are still seeded runs, never Math.random
     refills = 0;
     queue = [];
+    resetPatriotRunState();
     game.score = 0;
     game.phase = 'find';
     game.time = 0;
@@ -599,6 +724,71 @@ export function bootGame(cfg) {
     standClearOfCats();
     input.reset(); // no key or queued shout crosses a restart (Space-mashing included)
     applyStage();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6b. The title screen (issue #57) — only when cfg.splash is passed.
+  //
+  // Per issue #57 the title card is a CSS screen (#gate, dressed by
+  // game/full.html + game/title.css) and `?gate=off` stays FULLY empty — no
+  // title screen, no camera moves, baselines byte-identical. What lives here
+  // is only the small runtime the card needs:
+  //
+  //   * while the card is up (the gate, un-started), nothing ticks: the page
+  //     paints the single boot frame and CSS does the drifting (its own
+  //     rAF, no second WebGL scene, no extra frames);
+  //   * the pause card's "back to menu" and the win's tap/space land on the
+  //     title screen (issue #57) instead of restarting in place;
+  //   * Play from the card then starts a fresh run exactly like the old gate
+  //     click did — same element, same user gesture unlocking audio and
+  //     touch mode.
+  //
+  // Pages without cfg.splash (the slice) never enter any of this — zero
+  // behaviour diff. The data (title, copy) is game/splash.js.
+  // ---------------------------------------------------------------------------
+  const SPLASH_CFG = cfg.splash || null;
+  let splashOn = false; // the title card is up (gate shown, un-started)
+  // One-gesture tail guard (issue #57): a finger tap is pointerdown → up →
+  // click as ONE sequence. Shout-on-win raises the card inside pointerdown,
+  // and the gate — now covering the screen — catches the click that ENDS the
+  // same tap, which would answer "Play" before the player ever saw the menu.
+  // Every pointerdown bumps a sequence number; the card remembers the one
+  // that raised it, and a gate click from that same sequence is swallowed.
+  // A later tap always carries a fresh number, so Play is never eaten.
+  let pointerSeq = 0;
+  let menuSeq = -1;
+  document.addEventListener('pointerdown', () => { pointerSeq++; }, true);
+
+  /** Show the title card again from the pause/win states. Play from here
+   *  starts a fresh run, so the card promises what it means. The page is
+   *  driven back to exactly its pre-start shape — gate up, gateOpen false,
+   *  started false — so the ONE unlockGate path (audio + touch fullscreen +
+   *  startGame) answers the next click, and the loop (which by now runs)
+   *  sleeps at stepGame's !started guard: nothing moves under the card,
+   *  exactly like the frozen boot frame under the first one. Returns false
+   *  (nothing changed) on pages the card was never offered. */
+  function backToMenu() {
+    if (!SPLASH_CFG || GATE_OFF || !started) return false; // the gate was never left
+    restartRun();
+    input.unlock(); // the card wants the pointer back
+    started = false; // next Play = startGame, a fresh run
+    gateOpen = false; // next Play = unlockGate, the same first-time door
+    resumePlay(); // the pause is over: the menu is not a pause card wearing a hat
+    el.pause.classList.remove('show'); // stepGame sleeps now; clear the card here
+    menuSeq = pointerSeq; // swallow the tail click of THIS gesture only
+    el.gate.classList.remove('hidden');
+    document.body.classList.add('splash');
+    updateLabel();
+    return true;
+  }
+
+  /** The win's "click / Space / tap" action: with a title screen the run
+   *  hands back to the menu (issue #57); pages without one — the slice, and
+   *  every ?gate=off page where the card was never offered — restart in
+   *  place, exactly as they always did. */
+  function winExit() {
+    if (game.winElapsed < WIN_RESTART_AFTER) return;
+    if (!backToMenu()) restartRun();
   }
 
   // ---------------------------------------------------------------------------
@@ -666,6 +856,12 @@ export function bootGame(cfg) {
         cfg.momentAnim({ bp, base, t, bobo, decoy, game, momentById, apt, supports, THREE, clamp, easeOutBack, easeOutCubic });
       }
     }
+    // Patriot's costume life (issue #58): flag wave, small head tilt, one
+    // blink — pure in t, written every frame it is attached, and it RESTS on
+    // removePatriotCostume, so a seeked normal-Bobo frame never strands a
+    // mid-wave flag. Runs after the face/moment writes so the hat rides the
+    // head it just moved.
+    if (isPatriotAttached(bobo)) patriotIdle(bobo, t, { calm: SETTINGS.reducedMotion });
     // The decoy: a slow, heavy breath, sideways only (demo rule: never sinks).
     const dp = decoy.pivots[decoy.current];
     if (dp) {
@@ -692,8 +888,23 @@ export function bootGame(cfg) {
       setStyle(el.dag, 'opacity', k.toFixed(4));
     }
     if (game.phase === 'win') updateRain(t);
-    if (game.phase === 'win' || game.phase === 'catch') updateFireworks(t);
-    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE, calm: SETTINGS.reducedMotion });
+    // Patriot's catch pays the bursts a 1.35 boost (issue #58): extra
+    // fireworks over the regular pop. Calm hides the bursts wholesale in
+    // updateHud, so the boost only ever rides a visible show.
+    if (game.phase === 'win' || game.phase === 'catch') updateFireworks(t, game.phase === 'catch' && game.patriot ? 1.35 : 1);
+    // Bonus pop (issue #58): "+3!" lands once on a PATRIOT catch — a DAG-
+    // style single ease-out-back pulse that rests at opacity 0 every other
+    // frame (single pulse, never a strobe) and stays hidden in calm mode,
+    // same rule as the fireworks and the confetti.
+    if (el.bonusPop) {
+      const bonus = game.phase === 'catch' && game.patriot && !SETTINGS.reducedMotion;
+      const k = bonus ? clamp((t - 0.08) / 0.4, 0, 1) : 0;
+      const s = k <= 0 ? 0.001 : easeOutBack(k);
+      setStyle(el.bonusPop, 'display', k > 0 ? 'block' : 'none');
+      setStyle(el.bonusPop, 'transform', `translate(-50%, -50%) scale(${s.toFixed(4)})`);
+      setStyle(el.bonusPop, 'opacity', k.toFixed(4));
+    }
+    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE, calm: SETTINGS.reducedMotion, bonus: game.phase === 'catch' && game.patriot });
     // The pointing hand (the demo's choreography, tuned copy): rises with the
     // shout, points, pulls back when the DAG! lands. In `find` it rests in the
     // lower frame — this is a body, not a prop.
@@ -851,6 +1062,11 @@ export function bootGame(cfg) {
   let hintDone = !cfg.hintFade;
 
   function stepGame(dt) {
+    // The sim sleeps before the first Play — and again whenever the title
+    // card is back up (issue #57): the loop may already be running from a
+    // past run, but nothing moves or ticks under the card. (Every captured
+    // page boots with started already true, so this never fires there.)
+    if (!started) return;
     for (const action of input.consumeActions()) {
       // A "pause" out of src/input.js always means the same thing: the pointer
       // went away (Esc, a window blur, or the issue #29 switch that hands the
@@ -1023,6 +1239,7 @@ export function bootGame(cfg) {
     // reading the state back after mutating it would "restore" a test artefact.
     const entry = { phase: game.phase, momentId: game.momentId, spotId: game.spotId, time: game.time, view: game.view };
     const savedScore = game.score;
+    game.patriot = false; // the +1 rules below are the PLAIN Bobo rules — Patriot checks (full.js) opt in per check; restoreAfterSelfTest re-stages the flag
 
     // --- the exact strings ----------------------------------------------------
     add('ending-text-exact', el.ending.textContent, `exactly "${EXACT_ENDING}"`, el.ending.textContent === EXACT_ENDING, 'story-fixed, never corrected');
@@ -1146,7 +1363,7 @@ export function bootGame(cfg) {
         drawBad ?? '200 seeded draws: ten distinct, one per type, rooms alternate, decoys legal',
         'every draw legal',
         !drawBad,
-        'pickSpotCycle over the whole pool — same seed, same run (issue #53)',
+        'pickSpotCycle over the whole pool — same seed, same run (issue #53); a +3 win (issue #58) may end a run before the cycle is spent, never out of order',
       );
     }
 
@@ -1496,6 +1713,76 @@ export function bootGame(cfg) {
       'click-to-begin before any sound; ?gate=off only for headless capture',
     );
 
+    // --- the title screen (issue #57) --------------------------------------------
+    // Only pages with cfg.splash have one (the full game); the slice has no title
+    // screen and gets none of these checks. They are state-aware because their
+    // callers arrive from both sides of the card: capture runs them with it
+    // fully absent, the stress run reads it after Play lifted it, and the
+    // mobile check watches it up. The card's contract: shown WITH its body
+    // class before the start, hidden without it after, and nowhere at all
+    // under ?gate=off — no class, no pixels, baselines untouched.
+    if (SPLASH_CFG) {
+      const splashClass = document.body.classList.contains('splash');
+      add(
+        'title-screen-state',
+        gateHidden ? (GATE_OFF ? 'absent' : 'hidden') : 'shown',
+        GATE_OFF ? 'absent (never offered)' : gateOpen ? 'hidden (Play lifted it)' : 'shown (card up)',
+        gateHidden ? (GATE_OFF ? !splashClass : !splashClass) : splashClass,
+        'the title card and its body class arrive and leave together; ?gate=off has neither',
+      );
+      const mark = el.gate.querySelector('svg.bobo');
+      const markOk =
+        Boolean(mark) &&
+        mark.getAttribute('role') === 'img' &&
+        mark.getAttribute('aria-label') === 'Look at Bobo' &&
+        mark.querySelector('title')?.textContent === 'Look at Bobo' &&
+        (gateHidden || mark.getBoundingClientRect().height > 0);
+      add('title-logo-name', mark ? `"${mark.getAttribute('aria-label') || ''}"` : 'no logo', 'named "Look at Bobo"', markOk, 'inline SVG in the page: role, aria-label and <title> agree');
+      const boxes = [];
+      for (const [name, sel] of [
+        ['mark', 'svg.bobo'],
+        ['word', '#title-word'],
+        ['tagline', '.title-tagline'],
+        ['hint', '.title-hint'],
+        ['start', '#gate-btn'],
+        ['row', '.title-row'],
+        ['panel', '#gate-howto-panel'],
+        ['note', '.gate-note'],
+        ['stamp', '#build-stamp'],
+      ]) {
+        const n = el.gate.querySelector(sel);
+        if (!n) continue;
+        const r = n.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) boxes.push({ name, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom });
+      }
+      let layoutMsg = 'n/a (card down)';
+      let layoutOk = true;
+      if (boxes.length) {
+        const cardEl = el.gate.querySelector('.gate-card');
+        const cr = cardEl ? cardEl.getBoundingClientRect() : null;
+        const card = cr && cr.width > 0 ? { top: cr.top, bottom: cr.bottom, left: cr.left, right: cr.right } : null;
+        const bad = [];
+        const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+        for (let i = 0; i < boxes.length; i++)
+          for (let j = i + 1; j < boxes.length; j++) {
+            // Bobo peeking OVER the lettering is the logo, not a collision.
+            if ((boxes[i].name === 'mark' && boxes[j].name === 'word') || (boxes[i].name === 'word' && boxes[j].name === 'mark')) continue;
+            if (hit(boxes[i], boxes[j])) bad.push(`${boxes[i].name}×${boxes[j].name}`);
+          }
+        for (const b of boxes) {
+          // Inside the viewport AND inside the card: the card clips with
+          // overflow:hidden, so a box that fits the screen but spills past
+          // the card is half-painted — the exact 740×360 failure #57 found.
+          const spill = card ? b.y1 > card.bottom + 1 || b.y0 < card.top - 1 || b.x1 > card.right + 1 || b.x0 < card.left - 1 : false;
+          if (spill) bad.push(`${b.name} out of card`);
+          else if (b.y0 < -1 || b.y1 > window.innerHeight + 1 || b.x0 < -1 || b.x1 > window.innerWidth + 1) bad.push(`${b.name} off-screen`);
+        }
+        layoutOk = bad.length === 0;
+        layoutMsg = layoutOk ? `${boxes.length} boxes clean at ${window.innerWidth}×${window.innerHeight}` : bad.join(', ');
+      }
+      add('title-layout-clean', layoutMsg, 'no overlaps, nothing off-screen or spilling the card', layoutOk, 'logo, instructions and START lay out side by side at this viewport');
+    }
+
     // --- celebration staging ---------------------------------------------------
     const fireworks = ['find', 'catch', 'wrong', 'win'].map((p) => {
       const saved = game.phase;
@@ -1600,9 +1887,10 @@ export function bootGame(cfg) {
     }
 
     // Step 8: the full game appends its own checks (moment count, every
-    // moment's contact band, room coverage). The slice adds none.
+    // moment's contact band, room coverage). The slice adds none. Issue #58
+    // hands the Patriot pieces (rule, reward, costume, pop) down the same way.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes: apt.wallBoxes ?? [], SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, mulberry32, hashId });
+      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
     }
 
     game.score = savedScore;
@@ -1760,6 +2048,7 @@ export function bootGame(cfg) {
           decoyId: game.decoyId, seed: SEED, gateOpen, plant: PLANT,
           spotId: game.spotId ?? null,
           room: POOL && game.spotId ? POOL.get(game.spotId).room : null,
+          patriot: game.patriot, patriotCount: game.patriotCount, findNum: game.findNum, // issue #58
         };
       },
       camera(name = game.view) {
@@ -1791,6 +2080,39 @@ export function bootGame(cfg) {
         game.score = clamp(Number(n) || 0, 0, TARGET);
         updateHud();
         updateLabel();
+      },
+      /** Issue #58: Patriot Bobo from the tools side.
+       *  LC.patriot()        → the whole picture: mode (from ?patriot=),
+       *                        whether the CURRENT find is him, finds so far.
+       *  LC.patriot(true)    → force the next round where a Patriot roll is
+       *                        legal at all (never first, never consecutive,
+       *                        under the per-run cap). Returns false — and
+       *                        changes nothing — when ?patriot=off disabled
+       *                        him entirely. LC.patriot(false) cancels.
+       *  Staged (capture) finds dress from ?patriot=on|N, not from here. */
+      patriot(force) {
+        if (force === true) {
+          if (!PATRIOT.enabled) return false;
+          forceNextPatriot = true;
+          return true;
+        }
+        if (force === false) {
+          forceNextPatriot = false;
+          return false;
+        }
+        return {
+          mode: PATRIOT.mode, enabled: PATRIOT.enabled, reward: PATRIOT.reward,
+          chance: PATRIOT.chance, maxPerRun: PATRIOT.maxPerRun, firstFind: PATRIOT.firstFind,
+          stageDress: PATRIOT.stageDress, forceNext: forceNextPatriot,
+          on: game.patriot, count: game.patriotCount, find: game.findNum,
+          costumeAttached: isPatriotAttached(bobo),
+        };
+      },
+      /** The spawn rule as data: the natural (no-force) Patriot plan for a
+       *  seed — one boolean per find. Deterministic by construction; the
+       *  tools compare runs against this without touching the game. */
+      patriotPlan(seed = SEED, finds = MOMENT_IDS.length) {
+        return runPatriotPlan(Number(seed), Number(finds), { enabled: PATRIOT.enabled });
       },
       simulate(steps, scriptFn) {
         return simulateHash(Number(steps) || 0, typeof scriptFn === 'function' ? scriptFn : simScript);
@@ -2044,6 +2366,7 @@ export function bootGame(cfg) {
     voices.unlock(); // inside the user gesture (autoplay rules)
     if (TOUCH) requestTouchFullscreen(); // also inside the gesture (issue #25)
     el.gate.classList.add('hidden');
+    document.body.classList.remove('splash'); // the card carried the title look (issue #57)
     if (!started) startGame();
   }
 
@@ -2052,6 +2375,7 @@ export function bootGame(cfg) {
     rng = mulberry32(SEED);
     refills = 0;
     queue = [];
+    resetPatriotRunState();
     startLiveRound();
     spawnPlayerAt(SPAWNS[0]);
     standClearOfCats();
@@ -2086,7 +2410,12 @@ export function bootGame(cfg) {
   }
 
   function wireInput() {
-    el.gate.addEventListener('click', unlockGate);
+    // Issue #57: a gate click from the SAME gesture that raised the card is
+    // the tail of that tap, not a new "Play" — swallow it (see pointerSeq).
+    el.gate.addEventListener('click', () => {
+      if (pointerSeq === menuSeq) return;
+      unlockGate();
+    });
     el.pause.addEventListener('click', () => {
       if (game.phase === 'win') return;
       // Resume paths by situation: still holding the pointer (a blur paused
@@ -2104,6 +2433,23 @@ export function bootGame(cfg) {
         restartRun();
         if (GATE_OFF || input.isLocked() || TOUCH) resumePlay();
         else input.lock(); // the lock-change event clears the pause
+      });
+    }
+    // Issue #57: and a "back to menu" — the title screen again, Play from
+    // there starts a fresh run. Guarded like the restart button (the slice
+    // has neither). The M key is the same door; Esc while the card is UP
+    // means "I want out" (Esc while playing just pauses, via src/input.js).
+    if (SPLASH_CFG && el.pauseMenu) {
+      el.pauseMenu.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        backToMenu();
+      });
+      window.addEventListener('keydown', (ev) => {
+        if (window.__lcSettingsOpen) return;
+        if ((ev.code === 'KeyM' || ev.code === 'Escape') && gateOpen && started && game.paused && game.phase !== 'win') {
+          ev.preventDefault();
+          backToMenu();
+        }
       });
     }
     input.onLockChange((locked) => {
@@ -2124,7 +2470,7 @@ export function bootGame(cfg) {
       if (TOUCH) return; // issue #25: no pointer lock to grab — the drag zones
       // and the shout button own the screen on touch devices
       if (game.phase === 'win') {
-        tryRestartFromWin();
+        winExit(); // click-on-win: back to the menu with a title screen (issue #57)
         return;
       }
       if (input.isLocked()) input.queueAction('point');
@@ -2135,7 +2481,7 @@ export function bootGame(cfg) {
       if (window.__lcSettingsOpen) return;
       if (ev.code === 'Space' && gateOpen && !ev.repeat) {
         ev.preventDefault();
-        if (game.phase === 'win') tryRestartFromWin();
+        if (game.phase === 'win') winExit(); // Space-on-win: menu, or restart without one (issue #57)
         else input.queueAction('point');
       }
     });
@@ -2214,7 +2560,8 @@ export function bootGame(cfg) {
         if (!gateOpen) voices.unlock(); // ?gate=off phone page: a tap is a gesture too
         if (!started) return;
         if (game.phase === 'win') {
-          tryRestartFromWin(); // the shout button doubles as "play again"
+          winExit(); // the shout button doubles as "play again" — or, with a
+          // title screen, "back to the menu" (issue #57)
           return;
         }
         if (!game.paused) input.queueAction('point');
@@ -2227,9 +2574,11 @@ export function bootGame(cfg) {
     const psub = el.pause?.querySelector?.('.pause-sub');
     if (psub) psub.textContent = 'tap anywhere to keep looking';
     if (el.endingAgain) {
-      el.endingAgain.textContent = 'tap the shout button to look at them again';
+      el.endingAgain.textContent = SPLASH_CFG
+        ? 'tap the shout button to go back to the menu' // issue #57
+        : 'tap the shout button to look at them again';
       el.endingAgain.style.pointerEvents = 'auto'; // a tap target, not a caption
-      el.endingAgain.addEventListener('click', tryRestartFromWin);
+      el.endingAgain.addEventListener('click', () => (SPLASH_CFG ? winExit() : tryRestartFromWin()));
     }
     // Portrait: the game waits behind the rotate hint (its .show is pure CSS,
     // see full.html) — pausing here keeps the sim honest while upright.
@@ -2314,6 +2663,9 @@ export function bootGame(cfg) {
   function boot() {
     if (GATE_OFF) {
       el.gate.classList.add('hidden');
+      // The title screen is FULLY absent here — element, class, everything —
+      // so nothing it styles can reach a capture pixel (issue #57).
+      document.body.classList.remove('splash');
       // Capture mode (?gate=off): the stamp chrome must never reach a frame, so
       // it is hidden by CSS as well as skipped by renderStamp().
       document.body.classList.add('capture');
@@ -2330,6 +2682,13 @@ export function bootGame(cfg) {
     applyTime(0);
     resize();
     renderer.render(scene, camera);
+    // issue #57: the title screen lives the whole time the gate is up — the
+    // loading card is on top of the canvas until announceReady, and a rAF
+    // started here would put a game frame between the loading card and the
+    // title card (a flash, and not a byte-identical ?gate=off boot). So the
+    // title screen does NOT run the loop: the page paints this one first-
+    // person frame under #gate, and the drifting view the card asks for is
+    // CSS-only (title.css). The loop starts with the game (LC.play).
     installContract();
     initTouchUI(); // issue #25: no-op on desktop
     wireInput();
