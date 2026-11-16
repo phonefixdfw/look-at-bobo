@@ -46,14 +46,20 @@ export const SLIDER_HEAD = 2.1;
 /** --------------------------------------------------------------------------
  *  The rooms, as interior faces (docs/ISSUE_33_REBUILD.md §2). `area` is
  *  derived, never typed, so the doc's m² figure cannot quietly drift: the net
- *  interior area is the sum of these (65.7 m² as built, before the balcony).
+ *  interior area is the sum of these (68.68 m² since issue #67 grew the
+ *  bathroom, before the balcony).
  *  ------------------------------------------------------------------------- */
 export const ROOMS = [
   { id: 'living', x0: -3.3, z0: -2.9, x1: 2.4, z1: 2.1, label: 'living room' },
   { id: 'kitchen', x0: 2.52, z0: -2.9, x1: 5.52, z1: 0.6, label: 'kitchen' },
   { id: 'hall', x0: -0.9, z0: 2.22, x1: 0.9, z1: 5.2, label: 'hallway' },
   { id: 'entry', x0: 1.02, z0: 2.22, x1: 2.4, z1: 3.9, label: 'entry' },
-  { id: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.02, z1: 3.9, label: 'bathroom' },
+  // Issue #67: the bathroom took the service void that used to sit behind its
+  // south wall — the band x [−3.30, −1.02], z [3.90, 5.20] was sealed plaster
+  // on three sides that no room owned. It is 2.28 × 2.98 = 6.8 m² now, and the
+  // party wall it ends on is the bedroom's own north band (M-bed), so no other
+  // room's rect, doorway or window moved.
+  { id: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.02, z1: 5.2, label: 'bathroom' },
   { id: 'bedroom', x0: -2.6, z0: 5.32, x1: 1.2, z1: 9.32, label: 'bedroom' },
   // Outdoor, reached only through the living room's slider. Bounded by 1.10 m
   // parapets and a railing on top of the far one: no fall, and the camera can
@@ -64,7 +70,8 @@ export const ROOMS = [
 export function roomArea(room) {
   return (room.x1 - room.x0) * (room.z1 - room.z0);
 }
-/** Net interior floor area (m²): 65.67 as built, inside issue #33's 65–80 band. */
+/** Net interior floor area (m²): 68.68 as built since issue #67, inside
+ *  issue #33's 65–80 band (it was 65.67 while the bathroom stopped at z 3.90). */
 export function netInteriorArea() {
   return ROOMS.filter((r) => !r.outdoor).reduce((sum, r) => sum + roomArea(r), 0);
 }
@@ -159,10 +166,13 @@ export const WALL_DEFS = [
   pier('S-ent-2', 'z', 2.27, 2.6, 3.9, 'wall-ext', 'entry'),
   pier('S-ent-h', 'z', 1.25, 2.27, 3.9, 'wall-ext', 'entry', DOOR_HEAD, WALL_H),
 
-  // ── the bathroom: south partition, and the east wall to the hall with a
-  //    door-less cased opening (a room you can walk into and never leave is
-  //    issue #31's bug, so nothing in this flat can ever be shut) ──
-  pier('S-bath-1', 'z', -3.3, -0.9, 3.9, 'wall-int', 'bathroom'),
+  // ── the bathroom: the east wall to the hall with a door-less cased opening
+  //    (a room you can walk into and never leave is issue #31's bug, so nothing
+  //    in this flat can ever be shut). Issue #67 deleted the old `S-bath-1`
+  //    partition at z 3.90: the room now runs south to the bedroom's own north
+  //    band (M-bed, z 5.20), so the sealed service void behind it became floor.
+  //    Nothing else had to be built — W-2 already ran to z 5.52 and E-bath-2 to
+  //    5.20, which is how the void was sealed in the first place. ──
   pier('E-bath-1', 'x', 2.22, 2.52, -1.02, 'wall-int', 'bathroom'),
   pier('E-bath-2', 'x', 3.53, 5.2, -1.02, 'wall-int', 'bathroom'),
   pier('E-bath-h', 'x', 2.52, 3.53, -1.02, 'wall-int', 'bathroom', DOOR_HEAD, WALL_H),
@@ -172,6 +182,13 @@ export const WALL_DEFS = [
   //    bedroom (its door is the gap in M-bed) ──
   pier('E-hall-1', 'x', 2.22, 2.52, 0.9, 'wall-int', 'hall'),
   pier('E-hall-2', 'x', 3.53, 3.9, 0.9, 'wall-int', 'hall'),
+  // Issue #67: the east band stopped at z 3.90, the entry's south face. Past
+  // that the corridor had no wall at all, so from the hall you looked straight
+  // out into the sky — the "ends in a dark nothing" of the issue. The band
+  // x [0.90, 1.02], z [3.90, 5.20] is unowned service space on the far side,
+  // never seen from any room, but it is what closes the corridor on the console
+  // table and the bedroom door.
+  pier('E-hall-3', 'x', 3.9, 5.2, 0.9, 'wall-int', 'hall'),
   pier('E-hall-h', 'x', 2.52, 3.53, 0.9, 'wall-int', 'hall', DOOR_HEAD, WALL_H),
 
   // ── the bedroom: 3.80 × 4.00 with a window on the south exterior wall ──
@@ -242,7 +259,7 @@ export const FLOORS = [
   { id: 'kitchen', room: 'kitchen', x0: 2.52, z0: -2.9, x1: 5.52, z1: 0.6, finish: 'tile' },
   { id: 'hall', room: 'hall', x0: -0.9, z0: 2.22, x1: 0.9, z1: 5.2, finish: 'oak' },
   { id: 'entry', room: 'entry', x0: 1.02, z0: 2.22, x1: 2.4, z1: 3.9, finish: 'tile' },
-  { id: 'bathroom', room: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.02, z1: 3.9, finish: 'tile' },
+  { id: 'bathroom', room: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.02, z1: 5.2, finish: 'tile' },
   { id: 'bedroom', room: 'bedroom', x0: -2.6, z0: 5.32, x1: 1.2, z1: 9.32, finish: 'oak' },
   { id: 'balcony', room: 'balcony', x0: 0.43, z0: -4.52, x1: 2.57, z1: -3.1, finish: 'concrete' },
 ];

@@ -9,8 +9,9 @@
 // capture tools all read.
 //
 // Issue #33 changed two things about this file beyond the coordinates:
-//   * the flat is a real one-bedroom (65.7 m² net, plus a 2.5 m² balcony) with
-//     a ceiling, so the room rectangles moved and the kitchen became a room;
+//   * the flat is a real one-bedroom (68.68 m² net since issue #67 grew the
+//     bathroom, plus a 2.5 m² balcony) with a ceiling, so the room rectangles
+//     moved and the kitchen became a room;
 //   * the ten moment *types* each own several *spots* (`SPOTS` below). A run
 //     draws ten of them, and never two in the same room twice in a row. The
 //     type list itself is still exactly ten, so the capture matrix, the stage
@@ -54,7 +55,7 @@ export const WALK_RECTS = [
   { id: 'kitchen', room: 'kitchen', x0: 2.6, z0: -2.82, x1: 5.44, z1: 0.52 },
   { id: 'hall', room: 'hall', x0: -0.82, z0: 2.3, x1: 0.82, z1: 5.12 },
   { id: 'entry', room: 'entry', x0: 1.1, z0: 2.3, x1: 2.32, z1: 3.82 },
-  { id: 'bathroom', room: 'bathroom', x0: -3.22, z0: 2.3, x1: -1.1, z1: 3.82 },
+  { id: 'bathroom', room: 'bathroom', x0: -3.22, z0: 2.3, x1: -1.1, z1: 5.12 }, // issue #67: 3.82 → 5.12, the same 8 cm inset off the bedroom's north band
   { id: 'bedroom', room: 'bedroom', x0: -2.52, z0: 5.4, x1: 1.12, z1: 9.24 },
   // The balcony's walkable strip stops short of the railing by the railing's
   // own push pad: no fall, no pressing the camera against the parapet, and the
@@ -214,8 +215,8 @@ export const SPOTS = [
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
   spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.5, 'floor', 3.0], 1.57),
-  spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 3.1], -1.67), // issue #59: #49's bathroom pieces + #47's living pad moved the nearest vantage to the east band — the loaf now faces the opening (was 1.9)
-  spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], -1.57, { open: true }), // issue #59: turned to face the room, not the toilet (was 3.06)
+  spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 4.12], 1.22), // issue #67: rode the tub south onto the mat's new place at its face. It turned west-north-west, along the tub's face: with the room opened up, the nearest place a player can stand and see him is now the tile west of him, not the doorway band the old cramped room left (issue #59's -1.67)
+  spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], 3.1416, { open: true }), // issue #67: the room opened up south of him, so his nearest vantage is now the open tile due south (issue #59 had him facing the old east band)
   // ── bedroom (9) — issue #48 turned the bed head-west. The five spots on
   //    the moved pieces came with it (mirrored across the room's middle and
   //    nudged 0.20 m south for the longer head clearance); the desk, desk-end,
@@ -361,7 +362,7 @@ export const DECOY_SPOTS = [
   { id: 'd-bar', room: 'kitchen', pos: [4.05, 'floor', -0.62], faceYaw: 1.36, pose: 'side' },
   { id: 'd-hall', room: 'hall', pos: [0.35, 'floor', 3.0], faceYaw: 1.23 },
   { id: 'd-entry', room: 'entry', pos: [2.0, 'floor', 2.5], faceYaw: 1.9 },
-  { id: 'd-bath', room: 'bathroom', pos: [-2.75, 'floor', 3.55], faceYaw: -0.81, pose: 'side' },
+  { id: 'd-bath', room: 'bathroom', pos: [-1.35, 'floor', 3.2], faceYaw: 1.57, pose: 'side' }, // issue #67: moved into the new open floor (the old point came within 1.2 m of the moved mat spot) and turned to the room
   { id: 'd-bedroom', room: 'bedroom', pos: [-0.55, 'floor', 6.45], faceYaw: 0.0 }, // on the rug mid-floor, facing north down the room to the door walk — the nearest stand-and-watch cell; measured: the mirrored yaw was 95° off, this faces the approach head-on
   { id: 'd-balcony', room: 'balcony', pos: [1.4, 'floor', -3.35], faceYaw: 2.82, pose: 'side' },
 ];
@@ -461,7 +462,14 @@ export const VIEWS = {
   'over-shoulder': { pos: [-1.05, 1.95, 1.55], yaw: 0.709, pitch: -0.519, fov: 55, hand: false }, // over the coffee table
   'low-angle': { pos: [-1.95, 0.42, 1.75], yaw: 0.381, pitch: 0.055, fov: 55, hand: false }, // floor level, in the window light
   kitchen: { pos: [3.95, 1.55, 0.25], yaw: 0.0, pitch: -0.377, fov: 55, hand: false }, // the sink run and the window over it
-  bathroom: { pos: [-1.3, 1.5, 3.55], yaw: 0.872, pitch: -0.376, fov: 55, hand: false }, // the vanity, from the cased opening
+  bathroom: { pos: [-1.22, 1.62, 3.02], yaw: 2.2, pitch: -0.3, fov: 68, hand: false }, // issue #67: from the doorway field, looking south-west over the new open tile at the mat, the tub's face and the curtain above it (was the vanity from the cased opening)
+  // issue #67: the vestibule, from the hall — the frame Brandon's playtest
+  // caught as "a weird hall to nowhere", so it is the frame that proves it is
+  // now a lit ENTRY with a front door at the end of it.
+  // issue #67: the front door, from the hall opening — leaf, mat, the console
+  // beside it and the wall it sits in, all in one frame (yaw 3.379 faces
+  // south-south-east down the vestibule; pitch -0.17 drops the floor in).
+  entry: { pos: [1.45, 1.62, 2.6], yaw: 3.379, pitch: -0.17, fov: 76, hand: false },
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
   // The three doorways, from standing height, aimed through the hole at a

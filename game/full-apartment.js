@@ -49,6 +49,7 @@ import { buildFullKitchenDetails } from './full-kitchen-details-mesh.js';
 import { buildFullLiving } from './full-living-mesh.js';
 import { buildFullBath } from './full-bath-mesh.js';
 import { buildFullBedroom } from './full-bedroom-mesh.js';
+import { buildFullEntry } from './full-entry-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
 import { createRoomCull } from './full-cull.js';
 
@@ -598,6 +599,13 @@ export function buildFullApartment(scene) {
   // on the west wall and the rest of the room hangs off that anchor.
   buildFullBedroom(flat);
 
+  // ── the entry and the hall's end (issue #67) ──────────────────────────────
+  // The last two rooms with a floor and no furniture: the shell had drawn the
+  // front door and nothing else, which is half of why the arrival read as a
+  // dead end. The two colliders this realises (`coat-bench`, `hall-console`)
+  // have been in game/full-level.js since the first walk grid, undrawn.
+  buildFullEntry(flat);
+
   // ── issue #61: fold the static geometry the five builders just emitted ────
   // Every room is a data table that drew one mesh per box, so a run of cabinet
   // doors cost twelve draw calls to submit twelve boxes that share a material
@@ -651,9 +659,21 @@ export function buildFullApartment(scene) {
   // roughly the room's diagonal: light that stops at its own room.
   const fills = [
     { at: [4.0, 2.34, -1.1], color: 0xffe6c4, i: 5.0, d: 7.0 }, // kitchen run + aisle
-    { at: [0.0, 2.34, 3.6], color: 0xffe6c4, i: 4.0, d: 6.0 }, // hall, spilling into the entry
+    // issue #67 moved the two circulation fills. The hall+entry one stepped
+    // east and south, to the middle of the zone the visitor is actually in —
+    // the old point on the hall's centre line at z 3.6 lit the corridor's
+    // north end and left the front door, a metre and a half further south
+    // behind a corner, the dimmest interior wall in the flat. The bathroom's
+    // moved to the centre of the room it grew (its old point at z 3.0 was the
+    // middle of the OLD 1.68 m room, so it lit the doorway and left the whole
+    // new south half of the floor in shade) and got brighter: the room is
+    // 1.30 m longer, so the old 3.2 at the old centre no longer reached it.
+    // Still four fills: the flat is at the `realLights ≤ 6` cap, so the new
+    // ceiling bodies in game/full-entry-mesh.js are emissive and these are the
+    // lights, hung one under each.
+    { at: [0.72, 2.34, 3.4], color: 0xffe6c4, i: 5.4, d: 7.0 }, // hall + the front door's room
     { at: [-0.7, 2.34, 7.3], color: 0xffdcc0, i: 5.0, d: 7.5 }, // bedroom
-    { at: [-2.1, 2.34, 3.0], color: 0xf0e8f0, i: 3.2, d: 5.0 }, // bathroom (cooler: a different fixture)
+    { at: [-2.16, 2.34, 3.71], color: 0xf0e8f0, i: 3.9, d: 5.8 }, // bathroom (cooler: a different fixture)
   ].map((f) => {
     const p = new THREE.PointLight(f.color, f.i, f.d, 2);
     p.position.set(...f.at);

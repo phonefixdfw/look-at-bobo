@@ -5,7 +5,9 @@
  * bath mirror, towel bar, tub, bath mat) and row 59 (balcony 1.90 × 1.30
  * decking, railing 1.00 high) plus rows 58 and 61/62, and the bathroom and
  * balcony rows of the room table and the openings table in section 2 (bathroom
- * x [−3.30, −1.02], z [2.22, 3.90], door-less on its east side (the cased
+ * x [−3.30, −1.02], z [2.22, 5.20] — issue #67 grew it south into the void at
+ * the bedroom's north band, from the [2.22, 3.90] the table still prints),
+ * door-less on its east side (the cased
  * opening z 2.42 … 3.48) with the frosted window (z 2.60 … 3.30, sill 1.50) on
  * the west — plus the balcony row: x [0.55, 2.45], z [−4.40, −3.10], decking
  * 1.90 × 1.30, railing 1.00, and the 1.30-clear slider off the living room).
@@ -43,8 +45,9 @@
  *   11 window         the frosted pane — the "soft light" of the brief,
  *                    emissive-only so the light budget stays at six
  *
- * Where everything goes, and why there (the room is 2.28 × 1.68 — every piece
- * is pinned by plaster, the ruler, or a cat spot):
+ * Where everything goes, and why there (the room is 2.28 × 2.98 since issue #67
+ * took the service void behind its south wall — every piece is still pinned by
+ * plaster, the ruler, or a cat spot):
  *   north  the vanity flush in the west corner — the `vanity` cat spot sits on
  *          its top at (−2.65, 2.46) and SUPPORT_DEFS.vanityTop pins the counter
  *          at 0.86 — with the mirror over it and the towel bar to its east, on
@@ -52,25 +55,26 @@
  *   north-east the toilet, back to the north wall facing south, clear of the
  *          vanity (0.38 m between them — a real bathroom leaves 0.20+) and
  *          well west of the doorway; its paper holder on the wall to its east;
- *   south  the tub along the south wall, drain end west, under the window
- *          (the sill is 1.50, the rim 0.55: the window stays above the tub and
- *          the tub still gets its light). It is built 1.60, not the ruler's
- *          1.68 — row 56 ALLOWS 1.5 … 1.8 — because at 1.68 the band between
- *          the tub face and the east plaster measures exactly 0.60, which a
- *          0.30 m body fits but the 0.10 m standability grid does not. At 1.60
- *          the band is 0.68 (the ruler's own 0.60, tolerated only in front of
- *          the tub, with 0.08 of grid play) and the cased opening stays fully
- *          clear. The bathroom SPAWN moved east into that band — the old
- *          point sat on the tub's own floor, which no wall-hung tub layout
- *          can free (see the PR); every cat spot stayed exactly where it was
- *          except the hall dash's, which now faces the bathroom door as the
- *          nearer vantage (see the PR).
- *   middle the mat, 0.90 × 0.55 (row 57's allowed width, the brief's own
- *          number) — its north 10 cm slide under the wall-hung cabinet's
- *          toe, its south edge at the tub's face. That is where the
+ *   south  the tub along the SOUTH wall, drain end west, where the old
+ *          partition used to be — issue #67 moved it 1.30 m down into the floor
+ *          it gained, so the whole window wall (sill 1.50 over a 0.55 rim) and
+ *          the middle of the room are open tile again. It is built 1.60, not
+ *          the ruler's 1.68 — row 56 ALLOWS 1.5 … 1.8 — because at 1.68 the
+ *          band between the tub face and the east plaster measures exactly
+ *          0.60, which a 0.30 m body fits but the 0.10 m standability grid
+ *          does not. At 1.60 the band is 0.68 (the ruler's own 0.60, tolerated
+ *          only in front of the tub, with 0.08 of grid play) and the cased
+ *          opening stays fully clear. The bathroom SPAWN stays east in that
+ *          band — the old point sat on the tub's own floor, which no wall-hung
+ *          tub layout can free (see the PR); every cat spot stayed exactly
+ *          where it was except the mat's, which rode the tub south, and the
+ *          hall dash's, which faces the bathroom door (see the PR).
+ *   middle the 1.73 m strip of open floor the enlargement bought, with the mat
+ *          0.90 × 0.55 (row 57's allowed width, the brief's own number) at the
+ *          tub's north face, where feet land coming out. That is where the
  *          `bath-mat` spot lies, so the cat is on the mat, not bare tile;
- *   east   the doorway's field of floor — the room's only walkable band (see
- *          the walkway report below) — and the bin in its south corner.
+ *   east   the doorway's field of floor — the cased opening's approach, and the
+ *          bin in the corner at the tub's east end.
  *
  * The balcony keeps everything the shell made (concrete, parapets, the metal
  * railing at 1.13) and adds the furniture the placeholder footprints promised:
@@ -86,7 +90,10 @@ const F = (x0, z0, x1, z1) => ({ x0, z0, x1, z1 });
 
 /** Room faces, straight off §2 (interior faces, plaster not centreline). */
 export const BATH = {
-  x0: -3.30, x1: -1.02, z0: 2.22, z1: 3.90,
+  // Issue #67: z1 was 3.90 (a 2.28 × 1.68 = 3.8 m2 room). The sealed service
+  // void behind the old south partition is the room now, to the bedroom's own
+  // north band at z 5.20: 2.28 × 2.98 = 6.8 m2.
+  x0: -3.30, x1: -1.02, z0: 2.22, z1: 5.20,
   // the cased doorway on the east wall (§2 openings table)
   doorLo: 2.42, doorHi: 3.48,
   // the west window (§2 windows: sill 1.50, head 2.05)
@@ -124,13 +131,18 @@ export const FOOT = {
   vanity: F(-3.30, 2.22, -2.40, 2.70),
   // toilet: 0.37 × 0.68, back to the north wall (row 52)
   toilet: F(-2.02, 2.22, -1.65, 2.90),
-  // tub: 1.60 × 0.75 along the south wall, rim 0.55 (row 56, see the header)
-  tub: F(-3.30, 3.15, -1.70, 3.90),
+  // tub: 1.60 × 0.75, drain end west, along the SOUTH plaster — issue #67
+  // moved it off the old partition (z 3.90) down to the room's new south face,
+  // which is what frees the 1.73 m strip of open floor in the middle (rim 0.55,
+  // row 56; see the header for the 1.60)
+  tub: F(-3.30, 4.45, -1.70, 5.20),
   // the mat gets a FOOT for the walkway report but NO collider (2 cm of pile);
-  // its north 10 cm lie under the wall-hung cabinet's toe (toe bottom 6 cm up)
-  mat: F(-2.65, 2.60, -1.75, 3.15),
-  // small bin in the doorway field's south corner
-  bin: F(-1.52, 3.66, -1.28, 3.90),
+  // it lies at the tub's north face, where feet actually land coming out (its
+  // old spot, under the cabinet's toe, went with the tub)
+  mat: F(-2.65, 3.90, -1.75, 4.45),
+  // small bin in the corner at the tub's east end (was the doorway field's
+  // south corner, which the old tub occupied)
+  bin: F(-1.58, 4.90, -1.34, 5.14),
   // balcony chair: the placeholder's footprint, kept verbatim so the
   // `chairSeat` support (1.93 … 2.42, −3.87 … −3.33) still lands on it
   chair: F(1.90, -3.90, 2.45, -3.30),
@@ -304,7 +316,7 @@ export const PIECES = [
 /** The curtain's build numbers (the mesh module gathers them deterministically). */
 export const CURTAIN = {
   rodY: 1.98,
-  rodZ: 3.13, // hung just inside the tub's north face
+  rodZ: 4.43, // hung just inside the tub's north face
   x0: -3.28, // tucked behind the west plaster
   x1: -1.72, // bracket post at the tub's east end
   yBottom: 0.62, // 7 cm over the rim — cloth, not a fence
@@ -323,13 +335,13 @@ export const CURTAIN = {
 export const FITTINGS = {
   paperArm: bx(T.x1 + 0.12, 0.63, 2.225, T.x1 + 0.15, 0.66, 2.32),
   paperRoll: cy(0, 0, 0, 0, 0.055, null, { rotX: Math.PI / 2, len: 0.09, at: [T.x1 + 0.135, 0.645, 2.275] }),
-  tubSpout: cy(0, 0, 0, 0, 0.022, null, { rotZ: Math.PI / 2, len: 0.09, at: [-3.24, 0.62, 3.55] }),
-  tapW: cy(0, 0, 0, 0, 0.019, null, { rotZ: Math.PI / 2, len: 0.06, at: [-3.255, 0.6, 3.42] }),
-  tapE: cy(0, 0, 0, 0, 0.019, null, { rotZ: Math.PI / 2, len: 0.06, at: [-3.255, 0.6, 3.68] }),
-  showerArm: cy(0, 0, 0, 0, 0.016, null, { rotZ: Math.PI / 2, len: 0.5, at: [-3.03, 1.98, 3.42] }),
-  showerHead: cy(-2.79, 3.42, 1.94, 1.98, 0.075, 0.03),
+  tubSpout: cy(0, 0, 0, 0, 0.022, null, { rotZ: Math.PI / 2, len: 0.09, at: [-3.24, 0.62, 4.83] }),
+  tapW: cy(0, 0, 0, 0, 0.019, null, { rotZ: Math.PI / 2, len: 0.06, at: [-3.255, 0.6, 4.70] }),
+  tapE: cy(0, 0, 0, 0, 0.019, null, { rotZ: Math.PI / 2, len: 0.06, at: [-3.255, 0.6, 4.96] }),
+  showerArm: cy(0, 0, 0, 0, 0.016, null, { rotZ: Math.PI / 2, len: 0.5, at: [-3.03, 1.98, 4.70] }),
+  showerHead: cy(-2.79, 4.70, 1.94, 1.98, 0.075, 0.03),
   // the bin: an open enamel tin, 0.20 × 0.20 × 0.28 (its FOOT has slack)
-  bin: bx(-1.50, 0, 3.68, -1.30, 0.28, 3.88),
+  bin: bx(-1.56, 0, 4.92, -1.36, 0.28, 5.12),
   // the sparrow: a small porcelain bird on the balcony's cap rail (1.13),
   // facing the glass door — a ceramic prop, so it rides the enamel mesh and
   // the wood mesh's railing row stays the honest 1.00 it measures
@@ -406,7 +418,7 @@ export function bathGapReport() {
       name: 'bath: doorway field (toilet flank → east plaster)',
       m: BATH.x1 - T.x1, // 0.63: the open floor the body actually crosses
       min: BATH.walkwayTight,
-      note: "row 58's tolerated 0.60, in front of the toilet — the room's whole walkable field",
+      note: "row 58's tolerated 0.60, in front of the toilet — the room's tightest stretch",
     },
     {
       name: 'bath: tub face → east band (body centre)',
@@ -415,10 +427,10 @@ export function bathGapReport() {
       note: "the standable band north of the bin; the tub end and the east plaster are 0.68 apart",
     },
     {
-      name: 'bath: mat strip (vanity face → tub face)',
-      m: U.z0 - (V.z1 + 0.02), // 0.43 of clear floor plus what the mat tucks
-      min: null, // a place to stand and dry feet, not a route
-      note: "0.45 m of clear floor, and the mat itself is 0.55 — 10 cm of it under the cabinet's toe",
+      name: 'bath: open floor (vanity face → tub face)',
+      m: U.z0 - (V.z1 + 0.02), // 1.73 of clear floor: issue #67's whole point
+      min: BATH.walkway,
+      note: "the strip the enlargement bought — 1.73 m of tile to walk on between the fixtures and the tub's face, and the mat lies in it",
     },
     {
       name: 'balcony: slider clear past the chair',

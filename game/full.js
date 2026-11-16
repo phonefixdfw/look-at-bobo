@@ -12,12 +12,12 @@
  */
 import * as LEVEL from './full-level.js';
 import { livingGapReport } from './full-living.js';
-import { bathGapReport } from './full-bath.js';
+import { bathGapReport, FOOT } from './full-bath.js';
 import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
-import { OPENINGS, ROOM_BY_ID, BAND_T } from './full-shell.js';
+import { OPENINGS, ROOM_BY_ID, BAND_T, LEAF_W } from './full-shell.js';
 import { woodTextureAudit } from '../src/polish.js';
 import { SPLASH } from './splash.js';
 
@@ -168,12 +168,18 @@ function batThePen(pen, supports, t) {
  * Appended after the engine's own 48 (46 + the two spot-pool checks issue
  * #53 added) and the rest of the full page's stack (furniture scale, title
  * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, and
- * the three door/wood checks issue #65 added, so the full page reports 70. */
+ * the three door/wood checks issue #65 added, and the four bathroom/entry
+ * checks issue #67 added, so the full page reports 81. */
 /** Door frames are rendered ONCE per page by `doorways-read-open`: they
  *  check static geometry, and selfTest runs per capture frame — re-rendering
  *  six extra frames every time starves the live frame loop under load (the
  *  stress suite's 150 ms reticle-soft window noticed on a busy machine). */
 const doorFramesDone = { v: false };
+/** Same rule for issue #67's three pixel checks: they measure geometry and
+ *  lights, which cannot change between selfTest calls, and they cost five
+ *  renders a pass. `entry` and `luma` are the numbers they measured, kept for
+ *  the detail strings once the measuring is done. */
+const roomLightFrames = { v: false, entry: null, luma: null };
 function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
@@ -935,6 +941,225 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     );
   } else {
     add('doorways-read-open', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
+  }
+
+  // 4. `bath-clear-path` (issue #67): the bathroom measured as a room you can
+  //    stand in. A point walk would have passed the old 2.28 × 1.68 box — the
+  //    complaint was never connectivity, it was that a BODY had nowhere to go.
+  //    So: at the engine's own body radius (0.30, i.e. a 0.60 m wide body), the
+  //    flooded route from the flat's root spawn must reach a cell 0.40 m off
+  //    the usable face of each of the three fixtures (the counter front, the
+  //    toilet front, the tub's face where you step over the rim), and the room
+  //    must have floor of its own to stand on. src/reach.js measures it exactly
+  //    as the game does: walk rects are the body-centre domain, furniture
+  //    subtracts its full push pad. Before the enlargement this measured 0.24
+  //    m2 of standable floor and NOT ONE of the three fronts was standable.
+  {
+    const R = LEVEL.MOVE.playerRadius;
+    const T = FOOT;
+    const FRONT = 0.4; // 0.40 m off a fixture face is where you stand to use it
+    const targets = [
+      ['vanity', (T.vanity.x0 + T.vanity.x1) / 2, T.vanity.z1 + FRONT],
+      ['toilet', (T.toilet.x0 + T.toilet.x1) / 2, T.toilet.z1 + FRONT],
+      ['tub', (T.tub.x0 + T.tub.x1) / 2, T.tub.z0 - FRONT],
+    ];
+    const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: R });
+    const seen = grid.flood(grid.cellAt(LEVEL.SPAWNS[0].pos[0], LEVEL.SPAWNS[0].pos[1]));
+    const bad = [];
+    for (const [name, x, z] of targets) {
+      const i = grid.cellAt(x, z);
+      if (i < 0) bad.push(`${name}: off the grid`);
+      else if (!grid.free[i]) bad.push(`${name}: no body fits 0.40 m off its face`);
+      else if (!seen[i]) bad.push(`${name}: standable but no route from the hall`);
+    }
+    // the room's own standable floor, counted off the same grid
+    const bath = ROOM_BY_ID.bathroom;
+    let cells = 0;
+    for (let j = 0; j < grid.rows; j++) {
+      for (let i = 0; i < grid.cols; i++) {
+        const idx = j * grid.cols + i;
+        if (!grid.free[idx] || !seen[idx]) continue;
+        const x = grid.x0 + (i + 0.5) * grid.cell;
+        const z = grid.z0 + (j + 0.5) * grid.cell;
+        if (x >= bath.x0 && x <= bath.x1 && z >= bath.z0 && z <= bath.z1) cells++;
+      }
+    }
+    const floor = cells * grid.cell * grid.cell;
+    const FLOOR_MIN = 2.0; // m2: two people, or one person and a bath
+    if (floor < FLOOR_MIN) bad.push(`only ${floor.toFixed(2)} m2 of standable floor`);
+    add(
+      'bath-clear-path',
+      bad.length ? bad.join('; ') : `${floor.toFixed(2)} m2 of standable floor; 0.60 m body reaches ${targets.map(([n]) => n).join(', ')} (0.40 m off each face)`,
+      'a 0.60 m body has a flooded route from the flat\'s root to 0.40 m off every bathroom fixture, and ≥ 2 m2 of floor',
+      !bad.length,
+      'issue #67: the old room was connected and still unusable — 0.24 m2 of floor, no fixture standable',
+    );
+  }
+
+  // 5. The three checks that need PIXELS for issue #67: the entry reads as a
+  //    lit room and not a dark nothing, the front door is a door you can see
+  //    (and still built shut), and the bathroom is no longer the flat's dark
+  //    outlier. Same staging as `doorways-read-open` two blocks up: render the
+  //    view, read the framebuffer, put the camera back in `finally`, and once
+  //    they have passed, do not re-render them for the rest of the page's
+  //    selfTest calls — the geometry cannot change between them.
+  if (renderer && camera) {
+    const canvas = renderer.domElement;
+    const gl = renderer.getContext();
+    const leafMeshes = [];
+    scene.traverse((m) => {
+      if (m.isMesh && m.userData?.tag === 'door-leaf') leafMeshes.push(m);
+    });
+    const raycaster = new THREE.Raycaster();
+    const shoot = (v) => {
+      camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
+      camera.rotation.set(v.pitch, v.yaw, 0);
+      camera.fov = v.fov;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+    };
+    /** The whole framebuffer, as mean luma plus the share of pixels black
+     *  enough to read as a hole in the flat rather than a shaded surface. */
+    const frameStats = () => {
+      const w = canvas.width;
+      const h = canvas.height;
+      const buf = new Uint8Array(4 * w * h);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let sum = 0;
+      let dark = 0;
+      const n = w * h;
+      for (let i = 0; i < n; i++) {
+        const luma = 0.2126 * buf[i * 4] + 0.7152 * buf[i * 4 + 1] + 0.0722 * buf[i * 4 + 2];
+        sum += luma;
+        if (luma < 24) dark++;
+      }
+      return { mean: sum / n, dark: dark / n };
+    };
+    const readPatch = (ndc) => {
+      const x = Math.round(((ndc.x + 1) / 2) * canvas.width);
+      const y = Math.round(((1 - ndc.y) / 2) * canvas.height);
+      if (x < 5 || y < 5 || x > canvas.width - 6 || y > canvas.height - 6) return null;
+      const buf = new Uint8Array(4 * 9 * 9);
+      gl.readPixels(x - 4, y - 4, 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let i = 0; i < 81; i++) {
+        r += buf[i * 4];
+        g += buf[i * 4 + 1];
+        b += buf[i * 4 + 2];
+      }
+      return { r: r / 81, g: g / 81, b: b / 81, luma: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 81 };
+    };
+    const problems = { lit: [], door: [], luma: [] };
+    const savedPos = camera.position.clone();
+    const savedQuat = camera.quaternion.clone();
+    const savedFov = camera.fov;
+    try {
+      if (!roomLightFrames.v) {
+        // — the entry, from the hall opening: less than a quarter of the frame
+        //   may be near-black, and the mean has to carry the room.
+        const entry = LEVEL.VIEWS.entry;
+        shoot(entry);
+        const e = frameStats();
+        roomLightFrames.entry = e;
+        if (e.dark > 0.25) problems.lit.push(`entry frame is ${(e.dark * 100).toFixed(0)}% near-black (limit 25%)`);
+        if (e.mean < 70) problems.lit.push(`entry mean luma ${e.mean.toFixed(0)} (limit 70)`);
+
+        // — the front door: the data says it is built shut and nothing is
+        //   reachable beyond it, and the entry camera actually sees its leaf
+        //   where the data says it stands.
+        const leaf = doorLeaves.find((l) => l.id === 'door-front');
+        if (!leaf) problems.door.push('doorLeaves has no door-front');
+        else {
+          if (leaf.open) problems.door.push('the front door is standing open');
+          const bb = leaf.box;
+          const hole = OPENINGS.find((o) => o.id === 'door-front');
+          const w = bb.x1 - bb.x0;
+          if (Math.abs(w - LEAF_W) > 0.005) problems.door.push(`leaf is ${w.toFixed(2)} m wide, not the flat's ${LEAF_W} m leaf`);
+          if (hole && w < 0.8 * (hole.hi - hole.lo)) problems.door.push(`leaf covers only ${(100 * w / (hole.hi - hole.lo)).toFixed(0)}% of the ${((hole.hi - hole.lo) * 100).toFixed(0)} cm case`);
+          if (bb.z0 < 3.8 || bb.z1 > 4.1) problems.door.push(`leaf at z ${bb.z0.toFixed(2)}…${bb.z1.toFixed(2)}, not in the south band`);
+          const outside = LEVEL.WALK_RECTS.some((r) => 1.76 >= r.x0 && 1.76 <= r.x1 && 4.1 >= r.z0 && 4.1 <= r.z1);
+          if (outside) problems.door.push('a walk rect crosses the front door');
+        }
+        const centre = new THREE.Vector3(1.76, 1.2, 3.9);
+        const pc = centre.clone().project(camera);
+        const px = readPatch(pc);
+        if (pc.z > 1 || !px) problems.door.push('the leaf centre is off-screen from the entry view');
+        else {
+          const camV = new THREE.Vector3(entry.pos[0], entry.pos[1], entry.pos[2]);
+          const ndc = new THREE.Vector3(pc.x, pc.y, 0.5).unproject(camera);
+          raycaster.set(camV, ndc.sub(camV).normalize());
+          const hits = raycaster.intersectObjects(leafMeshes, false);
+          const want = camV.distanceTo(centre);
+          if (!hits.length) problems.door.push('no leaf in the frame where the door should be');
+          else if (Math.abs(hits[0].distance - want) > 0.2)
+            problems.door.push(`first leaf at ${hits[0].distance.toFixed(2)} m, the door is ${want.toFixed(2)}`);
+          if (px.luma < 40) problems.door.push(`leaf pixel luma ${px.luma.toFixed(0)}: a black hole, not a door`);
+          if (px.r < px.b + 6) problems.door.push(`leaf pixel is not walnut (r ${px.r.toFixed(0)} b ${px.b.toFixed(0)})`);
+        }
+
+        // — the bathroom against the flat: it must sit inside the same band of
+        //   brightness as the other rooms you play in, and it must not be blown
+        //   out on the way there.
+        const ROOM_VIEWS = ['kitchen', 'bathroom', 'entry', 'desk'];
+        const luma = {};
+        for (const name of ROOM_VIEWS) {
+          shoot(LEVEL.VIEWS[name]);
+          luma[name] = frameStats().mean;
+        }
+        const sorted = ROOM_VIEWS.map((k) => luma[k]).sort((a, b) => a - b);
+        const median = (sorted[1] + sorted[2]) / 2;
+        const bLuma = luma.bathroom;
+        // A bathroom is a white room: tile, porcelain, a frosted pane. It reads
+        // brighter than an oak-floored living room at the same exposure, so the
+        // band is wide on the bright side and the story it tells is the two
+        // failures it catches — a bathroom that fell back to being the flat's
+        // dark corner, and a fill turned up until the room goes milky.
+        if (bLuma < 0.7 * median) problems.luma.push(`bathroom ${bLuma.toFixed(0)} vs flat median ${median.toFixed(0)}: still the dark room`);
+        if (bLuma > 1.5 * median) problems.luma.push(`bathroom ${bLuma.toFixed(0)} vs flat median ${median.toFixed(0)}: brighter than the flat, not just lit`);
+        if (bLuma < 90) problems.luma.push(`bathroom mean luma ${bLuma.toFixed(0)} (limit 90)`);
+        if (bLuma > 200) problems.luma.push(`bathroom mean luma ${bLuma.toFixed(0)}: blown out (limit 200)`);
+        roomLightFrames.luma = { ...luma, median };
+        if (!Object.values(problems).some((p) => p.length)) roomLightFrames.v = true;
+      }
+    } finally {
+      camera.position.copy(savedPos);
+      camera.quaternion.copy(savedQuat);
+      camera.fov = savedFov;
+      camera.updateProjectionMatrix();
+    }
+    const l = roomLightFrames.luma ?? {};
+    const lumaText = Object.entries(l)
+      .filter(([k]) => k !== 'median')
+      .map(([k, v]) => `${k} ${v.toFixed(0)}`)
+      .join(', ');
+    const e = roomLightFrames.entry ?? { dark: 0, mean: 0 };
+    add(
+      'entry-reads-lit',
+      problems.lit.length ? problems.lit.join('; ') : `entry frame ${(e.dark * 100).toFixed(0)}% near-black, mean luma ${e.mean.toFixed(0)}`,
+      'the front door\'s room renders with < 25% near-black pixels and a mean luma ≥ 70',
+      !problems.lit.length,
+      'issue #67: "the hall ends in a dark nothing" — the arrival is now a lit room, proven on pixels',
+    );
+    add(
+      'front-door-shut-and-found',
+      problems.door.length ? problems.door.join('; ') : 'the sealed leaf is where the data says, walnut and lit, and no walk rect crosses it',
+      'door-front: built shut, the flat\'s own leaf width in the south band, seen from the entry camera, no walk rect past it',
+      !problems.door.length,
+      'issue #65 keeps the doorways open; the front door is the opposite case and needs its own eye',
+    );
+    add(
+      'bath-luma-in-band',
+      problems.luma.length ? `${problems.luma.join('; ')} (${lumaText})` : `bathroom inside 0.7…1.5 of the flat median and 90 … 200 absolute (${lumaText})`,
+      'the bathroom\'s mean luma within 0.7…1.5 of the median of the played rooms, and 90 … 200 absolute',
+      !problems.luma.length,
+      'issue #67: brighter, but a bathroom brighter than the living room is the same rig showing',
+    );
+  } else {
+    add('entry-reads-lit', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
+    add('front-door-shut-and-found', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
+    add('bath-luma-in-band', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
   }
 }
 

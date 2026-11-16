@@ -93,10 +93,12 @@ Conventions unchanged: metres, right-handed, floor y = 0, **forward is −z**
 (north), x east. Interior faces are what the walk rects hug (0.08 m inset, the
 issue #27 rule). Wall bands: exterior 0.20, interior 0.12, ceiling y 2.50.
 
-Net interior area **65.7 m²** (living 28.5, kitchen 10.5, hall 5.4, entry 2.3,
-bathroom 3.8, bedroom 15.2) ≈ **707 sq ft**, plus a **2.5 m² balcony**
-(outdoor) — inside the issue's 65–80 m² / 700–850 sq ft target. Gross is
-*measured* off the built wall boxes by the scale selfTest and recorded in
+Net interior area **68.7 m²** (living 28.5, kitchen 10.5, hall 5.4, entry 2.3,
+bathroom 6.8, bedroom 15.2) ≈ **739 sq ft**, plus a **2.5 m² balcony**
+(outdoor) — inside the issue's 65–80 m² / 700–850 sq ft target. The bathroom's
+3.8 m² became 6.8 m² in issue #67 (it took the service void behind its own
+south wall); before that this read 65.7 m² / 707 sq ft. Gross is *measured* off
+the built wall boxes by the scale selfTest and recorded in
 `docs/LEVEL_LAYOUT.md`; this table is the ruler, never the measurement.
 
 **One deliberate deviation from the issue's sketch:** the living room is
@@ -127,14 +129,24 @@ inside the target area.
          └────────┼──────╢    │  HALL 1.80 × 2.98          ║║              │
                   │      ║    │  console · hooks · mats    ║║              │
          ┌────────┴──────╨────╢         ╔════╤═════════════╬╝              │
-         │  BATHROOM 2.28×1.68║ open    ║    ║ ENTRY       ║               │
-         │  door-less (open)  ║  0.90   ║    ║ 1.38 × 1.68 ║               │
-         │  window sill 1.50  ╚═════════╛    ║ coat closet ║               │
-         └───────────────────────────────────╫ front door ║               │
-  z=3.90                                     ║ (E, closed)║               │
-  z=4.02                                     ╚════════════╛               │
-  z=5.20 ┌──────────────────────────────────────────────────┐             │
-         │  BEDROOM 3.80 × 4.00                             │             │
+         │ BATHROOM 2.28×2.98 ║console  ║    ║ENTRY        ║              │
+         │ door-less by plan: ║runner   ║    ║1.38 × 1.68  ║              │
+         │ an open doorway in ║         ║    ║mat · hooks  ║              │
+         │ its E wall, 0.90   ║         ║    ║console      ║              │
+         │ vanity · toilet (N)║         ║    ║front door   ║              │
+         │ W window, sill 1.50║         ║    ║(S, sealed)  ║              │
+  z=3.90 │ mat + tub along the║         ║    ║             ║              │
+  z=4.02 │ S wall · bin at SE ║         ║    ╚═════════════╝              │
+         │ +1.30 m of a sealed║E-hall-3 ║ ← the hall’s east band now      │
+         │ service void, once:║z 3.90 → ║ runs z 3.90 → 5.20. Before      │
+         │ no room’s. The tub ║5.20     ║ #67 it stopped at 3.90 —        │
+         │ now runs its length║         ║ open sky, the “dark nothing”.   │
+         │                    ║         ║ Now plaster, merged into        │
+         │                    ║         ║ the mesh: 0 extra draws         │
+  z=5.20 ╞════════════════════╪════╤════╪═══════════════════╡             │
+         │  BEDROOM 3.80 × 4.00 · this band IS the          │             │
+         │  bathroom’s south wall + the hall’s end ·        │             │
+         │  ╤ = the 0.90 bedroom door                       │             │
          │  bed (headboard flush W) · nightstand · dresser  │             │
          │  closet E · desk N (the keyboard moment) ·       │             │
          │  laundry basket · rug · plant                    │             │
@@ -148,10 +160,10 @@ Room rectangles (interior faces, x0 z0 → x1 z1):
 |---|---|---|---|---|
 | living | [−3.30, 2.40] | [−2.90, 2.10] | 28.5 m² | N window + the balcony glass door, E window, S doorway to the hall |
 | kitchen | [2.52, 5.52] | [−2.90, 0.60] | 10.5 m² | N window over the sink; doorway + pass-through to the living room |
-| hall | [−0.90, 0.90] | [2.22, 5.20] | 5.4 m² | the spine: living, bathroom, entry, bedroom |
-| entry (vestibule) | [1.02, 2.40] | [2.22, 3.90] | 2.3 m² | front door (E, closed) + coat closet (N) |
-| bathroom | [−3.30, −1.02] | [2.22, 3.90] | 3.8 m² | door-less on purpose (issue #31 rule): the player can never be trapped |
-| bedroom | [−2.60, 1.20] | [5.32, 9.32] | 15.2 m² | S window, closet, desk |
+| hall | [−0.90, 0.90] | [2.22, 5.20] | 5.4 m² | the spine: living, bathroom, entry, bedroom; east band built all the way to 5.20 since issue #67 |
+| entry (vestibule) | [1.02, 2.40] | [2.22, 3.90] | 2.3 m² | front door (S band, z 3.90, sealed) + the bench, hooks and console issue #67 drew |
+| bathroom | [−3.30, −1.02] | [2.22, 5.20] | 6.8 m² | was [2.22, 3.90] / 3.8 m²: took its service void (issue #67). Door-less on purpose (issue #31 rule): the player can never be trapped |
+| bedroom | [−2.60, 1.20] | [5.32, 9.32] | 15.2 m² | S window, closet, desk. Its N band (z 5.20 … 5.32) runs wider than the room, x −3.30 → 1.40: it is the bathroom's south face and the hall's end (issue #67) |
 | balcony | [0.55, 2.45] | [−4.40, −3.10] | 2.5 m² | outdoor decking, railing 1.00 m, glass door off the living room |
 
 **The 0.08 m rule, spelled out once.** Every walk rect sits 0.08 m off the
@@ -309,3 +321,17 @@ Status log (append one line per step; re-read this if context is lost):
   (`game/slice.html`, `game/level.js`, `game/apartment.js`, `src/room.js`) keeps
   shipping the Step-6 room byte-identically, which is what the style-test
   baselines prove, so the full flat can no longer share its builder.
+- 2026-11-16 — issue #67 reshaped two rooms and this file's §2 keeps the
+  record. The bathroom took the sealed service void behind its own south wall:
+  z ∈ [2.22, 5.20], **2.28 × 2.98 = 6.8 m²**, net interior **68.7 m² / 739 sq
+  ft**, still inside the 65–80 m² band. `S-bath-1` is deleted — the bedroom's
+  north band (`M-bed-1`, z 5.20) is the bathroom's south face now, so no new
+  plaster was needed (W-2 already ran to z 5.52 and E-bath-2 to 5.20, which is
+  how the void was sealed in the first place). The hall's "dark nothing" was a
+  building bug, not a plan bug: the plan always ran the corridor to z 5.20 and
+  `WALL_DEFS` only ever built its east band as far as the entry's south face,
+  so the last 1.30 m looked out through open sky; `E-hall-3` closes it and
+  merges into the existing plaster mesh, at no draw call. The front door's room
+  and the corridor also got the furniture their colliders had promised since
+  this plan was written (`coat-bench`, `hall-console`), which is what the ASCII
+  above has always claimed the hall had.
