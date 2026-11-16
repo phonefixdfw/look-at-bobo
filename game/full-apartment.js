@@ -296,6 +296,7 @@ export function buildFullApartment(scene) {
   const casings = [];
   const trimBoards = [];
   const leafBoards = []; // walnut: door leaves
+  const leafAabbs = []; // the same leaves as AABBs, for game/full.js's door checks
   const hardware = []; // metal: knobs, slider frames
   const frameBoards = []; // trim-painted: window frames
   const sillBoards = [];
@@ -308,6 +309,12 @@ export function buildFullApartment(scene) {
     axis === 'z'
       ? { geo: box(r1 - r0, y1 - y0, b1 - b0), at: [(r0 + r1) / 2, (y0 + y1) / 2, (b0 + b1) / 2] }
       : { geo: box(b1 - b0, y1 - y0, r1 - r0), at: [(b0 + b1) / 2, (y0 + y1) / 2, (r0 + r1) / 2] };
+
+  /** The same box as a plain {x0,x1,y0,y1,z0,z1} AABB, for the door checks. */
+  const bbBox = (axis, r0, r1, b0, b1, y0, y1) =>
+    axis === 'z'
+      ? { x0: r0, x1: r1, z0: b0, z1: b1, y0, y1 }
+      : { x0: b0, x1: b1, z0: r0, z1: r1, y0, y1 };
 
   for (const o of OPENINGS) {
     const b = openingBand(o);
@@ -370,21 +377,36 @@ export function buildFullApartment(scene) {
     }
 
     if (o.kind === 'door') {
-      // the leaf stays OPEN, swung flat against the room-side plaster — this
-      // flat has no door you can shut (issue #31's lesson, game/full-shell.js)
-      const c = faceIn - b.sign * 0.05;
-      leafBoards.push(bb(o.axis, o.lo + 0.02, o.lo + 0.02 + LEAF_W, c - 0.02, c + 0.02, 0.005, LEAF_H));
+      // the leaf stands OPEN at 90 degrees: a thin slab hinged at one jamb and
+      // parked flat ALONG the room-side plaster BESIDE the opening, a small gap
+      // off the trim, knob on the free edge (issue #31's lesson, game/full-
+      // shell.js). Before #65 the run started at the opening's own lo edge, so
+      // a 0.86 m leaf stood in front of the 0.90 m hole, 5 cm off the plaster,
+      // and photographed as a shut door from the usual approach. Which jamb and
+      // which room the leaf lies against is `swingHi`/`swingOut` on the opening
+      // (game/full-shell.js); `doors-read-open` proves no leaf touches a walk
+      // rectangle and `doorways-read-open` proves the hole shows the room
+      // beyond — docs/LEVEL_LAYOUT.md owns the door states.
+      const face = o.swingOut ? faceOut : faceIn; // the plaster it lies against
+      const inward = o.swingOut ? b.sign : -b.sign; // towards that room
+      const c = face + inward * 0.05; // leaf centre 5 cm off the plaster
+      const PARK_GAP = 0.02; // small gap off the trim's outer edge
+      const r0 = o.swingHi ? a1 + 0.06 + PARK_GAP : a0 - 0.06 - PARK_GAP - LEAF_W;
+      const leaf = bb(o.axis, r0, r0 + LEAF_W, c - 0.02, c + 0.02, 0.005, LEAF_H);
+      leafBoards.push(leaf);
+      leafAabbs.push({ id: o.id, open: true, box: bbBox(o.axis, r0, r0 + LEAF_W, c - 0.02, c + 0.02, 0.005, LEAF_H) });
       hardware.push({
         geo: cyl(0.02, 0.02, 0.03, 10),
-        rot: [Math.PI / 2, 0, 0],
+        rot: o.axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, Math.PI / 2],
         mat: metal,
         at:
           o.axis === 'z'
-            ? [o.hi - 0.06, 1.0, faceIn - b.sign * 0.08]
-            : [faceIn - b.sign * 0.08, 1.0, o.hi - 0.06],
+            ? [(o.swingHi ? r0 + LEAF_W - 0.08 : r0 + 0.08), 1.0, c + inward * 0.035]
+            : [c + inward * 0.035, 1.0, o.swingHi ? r0 + LEAF_W - 0.08 : r0 + 0.08],
       });
     } else if (o.kind === 'sealed') {
       leafBoards.push(bb(o.axis, leafLo, leafHi, mid - 0.025, mid + 0.025, 0.005, LEAF_H));
+      leafAabbs.push({ id: o.id, open: false, box: bbBox(o.axis, leafLo, leafHi, mid - 0.025, mid + 0.025, 0.005, LEAF_H) });
       hardware.push({
         geo: cyl(0.02, 0.02, 0.03, 10),
         rot: [Math.PI / 2, 0, 0],
@@ -442,7 +464,9 @@ export function buildFullApartment(scene) {
   mergedMesh(flat, trimBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
   mergedMesh(flat, frameBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
   mergedMesh(flat, sillBoards, { cast: false });
-  mergedMesh(flat, leafBoards.map((e) => ({ ...e, mat: walnut })));
+  const leafMeshes = mergedMesh(flat, leafBoards.map((e) => ({ ...e, mat: walnut })));
+  // tagged so `doorways-read-open` can raycast them out of the opening (game/full.js)
+  leafMeshes.forEach((m) => { m.userData.tag = 'door-leaf'; });
   mergedMesh(flat, hardware.map((e) => ({ ...e, mat: e.mat ?? metal })));
   mergedMesh(flat, panes.map((e) => ({ ...e, mat: glass })), { cast: false, receive: false });
 
@@ -619,5 +643,8 @@ export function buildFullApartment(scene) {
     // definitions that were actually built (src/reach.js measures the walls
     // you can actually see — floors are not walls and are deliberately out)
     wallBoxes: [...WALL_DEFS, ...CEILINGS].map((d) => slabAABB(d, d.id)),
+    // every door leaf as an AABB with whether it stands open, for the
+    // `doors-read-open` / `doorways-read-open` checks (issue #65)
+    doorLeaves: leafAabbs,
   };
 }

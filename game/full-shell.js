@@ -209,9 +209,16 @@ export const WALL_DEFS = [
  *  says "no room you can enter and never leave".
  *  ------------------------------------------------------------------------- */
 export const OPENINGS = [
-  { id: 'door-living-hall', kind: 'door', room: 'living', toRoom: 'hall', axis: 'z', fixed: 2.1, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD },
-  { id: 'door-living-kitchen', kind: 'door', room: 'living', toRoom: 'kitchen', axis: 'x', fixed: 2.4, lo: -0.6, hi: 0.3, sill: 0, head: DOOR_HEAD },
-  { id: 'door-hall-bedroom', kind: 'door', room: 'hall', toRoom: 'bedroom', axis: 'z', fixed: 5.2, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD },
+  // For the `door` kind, `swingHi` names the hinge jamb (true: the leaf lies
+  // along the plaster beyond `hi`, false: beyond `lo`) and `swingOut` lies the
+  // leaf against toRoom's plaster instead of o.room's. They are chosen so the
+  // leaf has a clear run of wall: living-hall west (open floor), living-kitchen
+  // north (clear to the window), hall-bedroom east AND bedroom-side — the hall
+  // has only 37 cm of plaster either side of that opening, and the bedroom's
+  // north face is clear east to the corner (issue #65, docs/LEVEL_LAYOUT.md).
+  { id: 'door-living-hall', kind: 'door', room: 'living', toRoom: 'hall', axis: 'z', fixed: 2.1, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD, swingHi: false },
+  { id: 'door-living-kitchen', kind: 'door', room: 'living', toRoom: 'kitchen', axis: 'x', fixed: 2.4, lo: -0.6, hi: 0.3, sill: 0, head: DOOR_HEAD, swingHi: true },
+  { id: 'door-hall-bedroom', kind: 'door', room: 'hall', toRoom: 'bedroom', axis: 'z', fixed: 5.2, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD, swingHi: true, swingOut: true },
   { id: 'open-hall-bath', kind: 'cased', room: 'hall', toRoom: 'bathroom', axis: 'x', fixed: -0.9, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
   { id: 'open-hall-entry', kind: 'cased', room: 'hall', toRoom: 'entry', axis: 'x', fixed: 0.9, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
   { id: 'slider-balcony', kind: 'slider', room: 'living', toRoom: 'balcony', axis: 'z', fixed: -2.9, lo: 0.85, hi: 2.15, sill: 0, head: SLIDER_HEAD },
