@@ -984,3 +984,52 @@ The `seedTag` was picked, not trusted: roll rate **17.7 %** (advertised 1-in-6),
 - `playtest:stress:full` (--checks 62 at that HEAD): **70 PASS / 0 FAIL**, incl. the new scenario 13 — off page never spawns and refuses the force; `LC.patriot(true)` dresses exactly the NEXT legal find (find 2, +3, score lands 4, find 3 plain); a live run on seed 23 matches `LC.patriotPlan(23)` find-for-find (`00000101`) and replays identical after `LC.restart()`. Scenarios 1/3 now play to the WIN (score ≥ 3) instead of a fixed catch count. Slice **65 PASS / 0 FAIL** — scenario 13 is inert without a spot pool.
 - Bots: `playtest:bot:full` on seed 11 unchanged — wins at 10/10, every delta +1, exactly one DAG!. New `playtest:bot:patriot:full` (`--patriot 3`, win at 5): scores 1, 2, 1, 2, **5** — costume true on find 3 only, `patriotCount` 1, ending `your did it! you wind`. Slice bot 5/5.
 - Juice: a patriot catch boosts the firework bursts ×1.35 and spills confetti early (plain catches pass boost 1 — every earlier frame unchanged); "+3!" is a single DAG-style ease-out-back pulse, full page only. Calm mode hides pop, confetti and bursts wholesale — `patriot-celebration-only-for-him` asserts both the leak and the rest.
+
+## 22. Issue #65 — doors that read open, and walnut without black dots
+
+**Asked for (issue #65):** every doorway photographs as a shut door, and the
+wood has black dots on it. Doors are **permanently open** in this flat — no
+open/close interactivity was added and none will be; the leaf was simply
+DRAWN across its own opening.
+
+**Fix:** `swingHi`/`swingOut` on each door opening parks the leaf flat along
+the plaster BESIDE the hole (2 cm off the trim, 5 cm off the wall, knob on
+the free edge; geometry owned by `docs/ISSUE_33_REBUILD.md`). The dots came
+from 220 near-black 1–3 px "open pores" in the walnut HEIGHT field, which
+`normalMapFrom`'s Sobel pass baked into pin-dots; `WOOD_H` is plank seams
+only now, with one soft radial knot per plank in the colour map (alpha ≤
+0.16, token colour untouched).
+
+**Checks (full 67 → 70; slice stays 46):** `doors-read-open` (one thin leaf
+per door, zero WALK_RECTS overlap), `wood-texture-clean` (`woodTextureAudit`
+near-black fraction < 0.001 in both the colour canvas and a re-paint of the
+height drawing — the old pore field measured 0.0022), `doorways-read-open`
+(per door: the hole pixel from its new standing-height `door-*` VIEWS camera
+is not leaf-coloured and is brighter than the leaf, and a ray down the hole
+pixel crosses the wall band without touching a `door-leaf` mesh — the exact
+render the old leaf failed). Regression proof: re-planting the old leaf run
+and the pore loop drops the page to 67/70 with all three failing by name
+(`door-living-hall stands in walk rect door-living-hall`, `height 0.0022`,
+`ray through the hole hits a leaf at 1.61 m`); restored, 70/70.
+
+### What the numbers are now (recorded at HEAD 2e1959d; base = origin/main feb2291 measured in the same session)
+- `capture:full` **507 frames** (13 stages × 13 views × 3 times — the three
+  new `door-*` views join `--views all`; base matrix: 390 frames, 67/67),
+  selfTest **70/70 every frame**, budget **PASS at 169 draws / 99,288 tris
+  — byte-for-byte the same worst frame as the base run**, pixels luma
+  41.8..137.1 · colours 74..230, console clean. Determinism **8/8
+  byte-identical**; `:weak` PASS; `:spots` PASS 70/70; `audio:fullcheck`
+  **23/23**.
+- `capture:slice` 144 frames **46/46** (98 draws ≤150), `capture:slice:determinism`
+  **8/8**, `capture:demo` 48 frames **37/37** (91 draws), `capture:demo:determinism`
+  **8/8**, `gate` **PASS**, `check:mobile` **PASS**, `build` dist/ stamped
+  `2e1959d-…` 52 files.
+- `playtest:stress:full` (--checks 70) **70 PASS / 0 FAIL**; `playtest:stress`
+  **65 PASS / 0 FAIL**; bots full **10/10**, patriot **5/5** (1+1+3), slice **5/5**.
+- Planted-fault suites still exit 1 naming `ending-text-exact` — `capture:planted`,
+  `capture:slice:planted`, `capture:full:planted`, `capture:demo:planted`.
+- **Flake fixed on the way in:** `doorways-read-open` rendered six frames per
+  selfTest call; selfTest runs per capture frame, and under the stress
+  suite's three-page load that starved the 150 ms window the `#reticleAim`
+  probe counts. Door frames now render **once per page** (static geometry;
+  a failing first pass keeps re-testing). stress:full green standalone after.

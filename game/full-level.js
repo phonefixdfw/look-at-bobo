@@ -464,6 +464,15 @@ export const VIEWS = {
   bathroom: { pos: [-1.3, 1.5, 3.55], yaw: 0.872, pitch: -0.376, fov: 55, hand: false }, // the vanity, from the cased opening
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
+  // The three doorways, from standing height, aimed through the hole at a
+  // point in the room beyond (issue #65). `doorways-read-open` in game/full.js
+  // keys off these ids — one per `kind:'door'` opening — and reads the pixel
+  // at the hole's centre from each. The pitch lands the sightline through the
+  // opening at y ~1.0 and on floor just past the wall, clear of trim, jambs
+  // and furniture (the geometry is worked in the comments of the check).
+  'door-living-hall': { pos: [-0.3, 1.62, 0.55], yaw: -3.0061, pitch: -0.6303, fov: 55, hand: false }, // standing in the living room, at the hall doorway
+  'door-living-kitchen': { pos: [1.5, 1.62, -0.6], yaw: -1.8717, pitch: -0.8178, fov: 55, hand: false }, // standing by the TV stand, at the kitchen doorway
+  'door-hall-bedroom': { pos: [0.28, 1.62, 3.8], yaw: -3.1416, pitch: -0.624, fov: 55, hand: false }, // standing in the hall, at the bedroom doorway
 };
 
 /** Issue #33's ruler as data (the table is docs/ISSUE_33_REBUILD.md §1). Every

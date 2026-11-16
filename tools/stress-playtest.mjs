@@ -54,6 +54,7 @@ const PAGE = arg('page', 'game/slice.html');
 // issue #58: full gained the seven Patriot Bobo checks (55 → 62); slice stays 46.
 // issue #59: merging the bedroom (#48, +1) and bathroom/balcony (#49, +1) rows onto the spot-pool base: 55 + 2 → 57.
 // issue #62: bath/balcony + bedroom rows onto merged main (kitchen #45 + Patriot #58): 65 + 2 → 67.
+// issue #65: full gained doors-read-open + wood-texture-clean + doorways-read-open (67 → 70); slice stays 46.
 const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });

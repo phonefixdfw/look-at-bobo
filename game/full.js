@@ -17,6 +17,8 @@ import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
+import { OPENINGS, ROOM_BY_ID, BAND_T } from './full-shell.js';
+import { woodTextureAudit } from '../src/polish.js';
 import { SPLASH } from './splash.js';
 
 /* ---- the ten moments, pose by pose ----
@@ -165,9 +167,14 @@ function batThePen(pen, supports, t) {
 /* ---- full-game checks the engine can't know on its own ----
  * Appended after the engine's own 48 (46 + the two spot-pool checks issue
  * #53 added) and the rest of the full page's stack (furniture scale, title
- * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, so
- * the full page reports 65. */
-function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, SPOTS = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
+ * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, and
+ * the three door/wood checks issue #65 added, so the full page reports 70. */
+/** Door frames are rendered ONCE per page by `doorways-read-open`: they
+ *  check static geometry, and selfTest runs per capture frame — re-rendering
+ *  six extra frames every time starves the live frame loop under load (the
+ *  stress suite's 150 ms reticle-soft window noticed on a busy machine). */
+const doorFramesDone = { v: false };
+function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], SPOTS = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -690,6 +697,196 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       twice && !offAny,
       'issue #58: the roll is a pure function of the seed; the kill switch is real',
     );
+  }
+
+  /* Issue #65 — three checks for "every door looks closed and the wood has
+   * black dots on it". Doors are PERMANENTLY OPEN on purpose in this flat
+   * (there is no door control and there never will be); what was broken is
+   * that the open leaves were DRAWN ACROSS their openings, so the flat
+   * photographed as a floorplan of shut doors. */
+  // 1. `doors-read-open`: the geometry of it, data-side. Every `door`
+  //    opening owns exactly one leaf, every leaf is a thin slab, and no
+  //    leaf overlaps a walk rectangle — a leaf across a walkway is a shut
+  //    door whether or not it photographs like one. (Knob hardware sticks
+  //    ~10 cm off the parked leaf on purpose; the hardware is not the
+  //    leaf, and this measures leaves.)
+  {
+    const doorIds = OPENINGS.filter((o) => o.kind === 'door').map((o) => o.id);
+    const byId = new Map(doorLeaves.map((l) => [l.id, l]));
+    const worst = { hit: null, thick: null, stray: null };
+    for (const id of doorIds) {
+      const l = byId.get(id);
+      if (!l || !l.open) { worst.hit = worst.hit ?? `${id} has no open leaf entry`; continue; }
+      const bx = l.box;
+      const thin = Math.min(bx.x1 - bx.x0, bx.z1 - bx.z0);
+      if (thin > 0.06 && worst.thick === null) worst.thick = `${id} is ${(thin * 100).toFixed(0)} cm thick, not a leaf`;
+      for (const r of LEVEL.WALK_RECTS) {
+        const pad = 0.005; // touching is overlapping: a leaf may not share plaster with a walkway
+        const hit =
+          bx.x1 > r.x0 + pad && bx.x0 < r.x1 - pad &&
+          bx.z1 > r.z0 + pad && bx.z0 < r.z1 - pad &&
+          bx.y1 > 0.05;
+        if (hit) { worst.hit = worst.hit ?? `${id} stands in walk rect ${r.id}`; break; }
+      }
+    }
+    for (const l of doorLeaves) {
+      if (!doorIds.includes(l.id) && l.open && worst.stray === null) worst.stray = `${l.id} is an open leaf with no door opening`;
+    }
+    const bad = [worst.hit, worst.thick, worst.stray].filter(Boolean);
+    add(
+      'doors-read-open',
+      bad.length ? bad.join('; ') : `all ${doorIds.length} doors parked flat along the plaster beside their openings`,
+      'one thin open leaf per door, clear of every walkway',
+      !bad.length,
+      'issue #65: the old leaf run started at the opening\'s own lo edge, so a 0.86 m leaf stood in front of the 0.90 m hole',
+    );
+  }
+
+  // 2. `wood-texture-clean`: the black dots were never in the colour map —
+  //    they lived in the walnut HEIGHT field as 220 near-black "open pores"
+  //    per tile, which normalMapFrom's Sobel pass baked into dark pin-dots.
+  //    So the audit measures the live colour canvas AND a re-paint of the
+  //    height drawing; the height fraction is the regression guard.
+  {
+    const audit = woodTextureAudit();
+    const LIMIT = 0.001; // 0.1% of the tile may be near-black (seams included)
+    add(
+      'wood-texture-clean',
+      `colour ${audit.colour.toFixed(4)}, height ${audit.height.toFixed(4)}`,
+      `near-black pixels < ${LIMIT} in both the walnut colour map and its height field`,
+      audit.colour < LIMIT && audit.height < LIMIT,
+      'issue #65: specks invisible in the colour map became black dots once baked through the normal map',
+    );
+  }
+
+  // 3. `doorways-read-open`: the pixels and the rays. Per door, two frames.
+  //    First from the door's VIEWS camera: the projected centre of the hole
+  //    must show the room beyond (not walnut), and a ray down that pixel
+  //    must cross the wall band without touching a leaf — this is the exact
+  //    render the OLD bug failed, the leaf stood in that ray. Second from a
+  //    camera with a clear run at the parked leaf's face: the leaf must be
+  //    actually visible where the layout says it is (a leaf hidden behind
+  //    trim or furniture would let a "fixed" scene hide the doorway-reads-
+  //    shut problem elsewhere). Renders two frames per door and restores the
+  //    camera in `finally`, exactly as the other camera-staging checks
+  //    restore the game.
+  if (renderer && camera) {
+    const canvas = renderer.domElement;
+    const gl = renderer.getContext();
+    const leafMeshes = [];
+    scene.traverse((m) => {
+      if (m.isMesh && m.userData?.tag === 'door-leaf') leafMeshes.push(m);
+    });
+    const raycaster = new THREE.Raycaster();
+    // one clear standing pose per parked leaf, aimed at the leaf's face
+    // centre (poses worked against the collider rects in docs/LEVEL_LAYOUT.md:
+    // living-hall from the open floor, living-kitchen from the dining gap —
+    // the ray passes over the 0.75 m table — bedroom from mid-room, over the
+    // desk chair and clear of the dresser).
+    const LEAF_CAMS = {
+      'door-living-hall': { pos: [-0.2, 1.5, 0.9], yaw: 2.510, pitch: -0.342, fov: 55 },
+      'door-living-kitchen': { pos: [1.35, 1.5, 0.9], yaw: -1.56, pitch: -0.471, fov: 55 },
+      'door-hall-bedroom': { pos: [-1.5, 1.45, 6.8], yaw: -1.065, pitch: -0.153, fov: 55 },
+    };
+    const readPatch = (ndc) => {
+      const x = Math.round(((ndc.x + 1) / 2) * canvas.width);
+      const y = Math.round(((1 - ndc.y) / 2) * canvas.height);
+      if (x < 5 || y < 5 || x > canvas.width - 6 || y > canvas.height - 6) return null;
+      const buf = new Uint8Array(4 * 9 * 9);
+      gl.readPixels(x - 4, y - 4, 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let i = 0; i < 81; i++) {
+        r += buf[i * 4];
+        g += buf[i * 4 + 1];
+        b += buf[i * 4 + 2];
+      }
+      return { r: r / 81, g: g / 81, b: b / 81, luma: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 81 };
+    };
+    // #reticleAim counts renderer.render frames to know the aim render drew
+    // (game/engine.js aimProbeAt): selfTest renders its own frames, so run
+    // the door frames ONCE per page, not on every selfTest call.
+    const shoot = (view, aimAt) => {
+      camera.position.set(view.pos[0], view.pos[1], view.pos[2]);
+      camera.rotation.set(view.pitch, view.yaw, 0);
+      camera.fov = view.fov;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+      return aimAt ? aimAt.clone().project(camera) : null;
+    };
+    const problems = [];
+    const savedPos = camera.position.clone();
+    const savedQuat = camera.quaternion.clone();
+    const savedFov = camera.fov;
+    try {
+      if (doorFramesDone.v) {
+        // second and later selfTest calls in this page: the frames were
+        // rendered and passed once; geometry cannot change between them
+      } else
+      for (const o of OPENINGS.filter((x) => x.kind === 'door')) {
+        const view = LEVEL.VIEWS[o.id]; // VIEWS carries one per door, keyed by the opening id
+        const leafCam = LEAF_CAMS[o.id];
+        if (!view || !leafCam) { problems.push(`${o.id}: no test camera (VIEWS/LEAF_CAMS)`); continue; }
+        const leaf = doorLeaves.find((l) => l.id === o.id && l.open)?.box;
+        if (!leaf) { problems.push(`${o.id}: no parked leaf to compare against`); continue; }
+        const b = ROOM_BY_ID[o.room];
+        const sign = o.fixed === (o.axis === 'z' ? b.z0 : b.x0) ? -1 : 1;
+        const bandCentre = o.fixed + sign * (BAND_T['wall-int'] / 2);
+        // frame 1: the hole, from the room it belongs to
+        const centre = new THREE.Vector3(
+          o.axis === 'z' ? (o.lo + o.hi) / 2 : bandCentre,
+          1.0,
+          o.axis === 'z' ? bandCentre : (o.lo + o.hi) / 2,
+        );
+        const pc = shoot(view, centre);
+        const hole = readPatch(pc);
+        // the ray, while the hole camera is still current: from its eye down
+        // the hole-centre pixel — does anything leaf-shaped stop it before
+        // the far side of the band? (the OLD bug: the leaf stood in this ray)
+        const camV = new THREE.Vector3(view.pos[0], view.pos[1], view.pos[2]);
+        const ndc = new THREE.Vector3(pc.x, pc.y, 0.5).unproject(camera);
+        raycaster.set(camV, ndc.sub(camV).normalize());
+        const hits = raycaster.intersectObjects(leafMeshes, false);
+        const bandDist = camV.distanceTo(centre);
+        const leafHitEarly = hits.length > 0 && hits[0].distance < bandDist + 0.1;
+        // the leaf's face that looks back at the hole camera, projected:
+        // a leaf standing IN the opening would fill that very pixel region —
+        // so the comparison pixel is that region's walnut, read live from
+        // the parked leaf's own face in frame 2
+        const facePt = new THREE.Vector3(
+          o.axis === 'z' ? (leaf.x0 + leaf.x1) / 2 : o.swingOut ? leaf.x1 : leaf.x0,
+          1.0,
+          o.axis === 'z' ? (o.swingOut ? leaf.z1 : leaf.z0) : (leaf.z0 + leaf.z1) / 2,
+        );
+        // frame 2: the parked leaf, from its clear standing pose
+        const pf = shoot(leafCam, facePt);
+        const leafPx = readPatch(pf);
+        if (!hole || !leafPx || pc.z > 1 || pf.z > 1) {
+          problems.push(`${o.id}: test points off-screen pc=(${pc.x.toFixed(2)},${pc.y.toFixed(2)}) pf=(${pf.x.toFixed(2)},${pf.y.toFixed(2)})`);
+          continue;
+        }
+        const colourDist = Math.hypot(hole.r - leafPx.r, hole.g - leafPx.g, hole.b - leafPx.b);
+        if (leafHitEarly) problems.push(`${o.id}: ray through the hole hits a leaf at ${hits[0].distance.toFixed(2)} m (hole is ${bandDist.toFixed(2)})`);
+        else if (colourDist <= 40) problems.push(`${o.id}: hole pixel is leaf-coloured (distance ${colourDist.toFixed(0)})`);
+        else if (hole.luma <= leafPx.luma + 8) problems.push(`${o.id}: hole not brighter than leaf (${hole.luma.toFixed(0)} vs ${leafPx.luma.toFixed(0)})`);
+      }
+      if (!problems.length) doorFramesDone.v = true;
+    } finally {
+      camera.position.copy(savedPos);
+      camera.quaternion.copy(savedQuat);
+      camera.fov = savedFov;
+      camera.updateProjectionMatrix();
+    }
+    add(
+      'doorways-read-open',
+      problems.length ? problems.join('; ') : 'all 3 doorways show the room beyond, leaves visible where parked',
+      'hole pixel ≠ leaf pixel, and no ray through a hole touches a leaf',
+      !problems.length,
+      'issue #65: proof in pixels that "permanently open" is what you actually see',
+    );
+  } else {
+    add('doorways-read-open', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
   }
 }
 

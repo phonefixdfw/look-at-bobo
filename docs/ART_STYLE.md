@@ -89,6 +89,13 @@ imports the tokens; nothing hard-codes a hex twice.
 - **Room PBR** — `MeshStandardMaterial` only; every surface gets a seeded
   procedural canvas texture (planks, plaster grain, rug weave, couch weave)
   built once at boot. No texture is generated inside the render path.
+- **Wood (issue #65)** — walnut's height field carries ONLY the plank seam.
+  Detail drawn smaller than a texel is a lie the Sobel normal pass amplifies:
+  the old 220 near-black "open pores" per 256 px tile became scattered
+  black pin-dots on every walnut surface. Pore/knot character belongs in
+  the colour map as soft low-alpha radial knots (alpha ≤ 0.16), and
+  `wood-texture-clean` counts near-black pixels in both canvases to keep
+  it that way.
 - **Sky / celebration** — `MeshBasicMaterial` with `toneMapped: false` so the
   window stays bright while the room stays filmic.
 - Rules: one material instance per visual kind, from the library; new material
