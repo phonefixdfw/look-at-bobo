@@ -277,9 +277,12 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'floor-lamp',
       'cardboard-box',
       // rows 52-59 (issue #49): the bathroom and the balcony. Same rule —
-      // a row nobody built fails the run. 'toilet', 'vanity', 'faucet',
-      // 'railing', 'side-table' and 'balcony-chair' already had rows; these
-      // four are new, and every one is tagged by full-bath-mesh.js.
+      // a row nobody built fails the run. 'toilet', 'vanity' and 'railing'
+      // already had rows and are re-tagged by full-bath-mesh.js (the faucet
+      // row stays the kitchen's and the side-table row the living drum's —
+      // the balcony's chair and bistro table are drawn at their sizes inside
+      // the railing chunk rather than claiming rows someone else owns).
+      // These four are new, and every one is tagged by full-bath-mesh.js.
       'tub',
       'bath-mirror',
       'towel-bar',

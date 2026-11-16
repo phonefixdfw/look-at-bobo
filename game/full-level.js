@@ -487,14 +487,13 @@ export const SCALE_RANGES = {
   wardrobe: { w: [1.1, 1.3], d: [0.55, 0.65], h: [1.95, 2.15], note: 'wardrobe 1.20 × 0.60 × 2.05' },
   'laundry-basket': { w: [0.36, 0.46], d: [0.36, 0.46], h: [0.5, 0.62], note: 'basket 0.40 × 0.40 × 0.55' },
   vanity: { w: [0.85, 0.95], d: [0.45, 0.55], h: [0.8, 0.9], note: 'vanity 0.90 × 0.50 × 0.85' },
-  toilet: { w: [0.62, 0.72], d: [0.35, 0.42], h: [0.36, 0.45], note: 'toilet 0.68 deep × 0.37 across (w is the check\'s long horizontal span)' },
+  toilet: { w: [0.62, 0.72], d: [0.35, 0.42], top: [0.72, 0.85], note: 'row 52: 0.68 deep × 0.37 across, tank top 0.78 — the ruler\'s toilet includes its tank, so the row measures its top, not h' },
   // rows 54-57 (issue #49): the tub, the mirror, the bar and the mat, drawn
   // by game/full-bath-mesh.js and measured back off the built boxes
   tub: { w: [1.5, 1.8], d: [0.7, 0.8], h: [0.5, 0.62], note: 'row 56: 1.60 × 0.75, rim 0.55' },
   'bath-mirror': { w: [0.6, 0.8], h: [0.8, 1.0], note: 'row 54: 0.70 × 0.90, bottom 1.10' },
-  'towel-bar': { w: [0.5, 0.7], h: [0.03, 0.1], note: 'row 55: 0.60 long, axis 1.15' },
-  'bath-mat': { w: [0.8, 1.0], d: [0.45, 0.7], h: [0.005, 0.05], note: 'row 57: 0.90 × 0.45 pile' },
-  'balcony-chair': { w: [0.5, 0.62], d: [0.55, 0.65], h: [0.75, 0.95], note: 'balcony chair 0.57 × 0.60 × 0.85' },
+  'towel-bar': { w: [0.5, 0.7], top: [1.12, 1.2], note: 'row 55: 0.60 long, bar top 1.165 — the draped towel hangs below the measured top by design' },
+  'bath-mat': { w: [0.8, 1.0], d: [0.45, 0.7], h: [0.005, 0.05], note: 'row 57: 0.90 × 0.55 pile (the brief\'s own mat, mid-range)' },
   'coat-bench': { w: [0.75, 0.85], d: [0.4, 0.5], h: [0.4, 0.5], note: 'hall bench 0.80 × 0.45 × 0.45' },
   'console-table': { w: [0.55, 0.65], d: [0.3, 0.36], h: [0.72, 0.8], note: 'hall console 0.60 × 0.32 × 0.76' },
 };
