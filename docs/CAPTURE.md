@@ -119,6 +119,11 @@ Checked on every frame, overridable with `--budget`:
 
 `drawCalls ≤ 150` · `triangles ≤ 150 000` · `passes ≤ 3` · `shadowLights ≤ 2` · `realLights ≤ 6`
 
+TEMPORARY exception (issue #59): `game/full.html` alone is checked against `drawCalls ≤ 180` —
+one named constant (`FULL_GAME_DRAW_CALLS` in `tools/capture.mjs`) — until the per-room
+culling/instancing pass brings the full game back inside 150. Every other page, every other
+number, an explicit `--budget drawCalls=…`, and the `?quality=low` path stay as written.
+
 (The intent is VISION.md: 60 fps at 1080p on a mid-range laptop. The build-a-game process
 also wants these numbers in `AGENTS.md`, which does not exist in this repo yet — see
 `docs/HANDOFF.md`, open question 1.)

@@ -269,6 +269,12 @@ actually gone; the player's fade is unchanged. Record: `docs/PLAYTEST_NOTES.md`
   photosensitivity probes, audio ducking while paused, and a wider weak-GL matrix.
 
 ### Next step — Step 9: polish (**in flight — see the banner; issue #19; no money**)
+- **Full flat budget 180 draws for `game/full.html` until the per-room
+  culling/instancing pass brings it back to 150; tracked as the next perf
+  issue** (issue #59, 2026-11-16: the merged kitchen + bedroom furniture is
+  159 worst-case; one named constant `FULL_GAME_DRAW_CALLS` in
+  `tools/capture.mjs`; recorded in `docs/ART_STYLE.md` §7 and
+  `docs/CAPTURE.md`; slice/demo unchanged at 150).
 Three chunks already landed or are up as PRs: realism pass + living cats (#20, merged), juice + comfort settings (#21), loading + performance + OS reduce-motion (part-3 PR). Deferred or open pieces, honestly listed: feel passes after Brandon's hands (item 15) land on `game/full.html` (pacing of the 10–15 min arc, hint copy, decoy tells at distance — the panel settings included); audio ducking while paused (not started — nothing ducks yet); freezing `snapshots/m1-full` (cheap, worth it once Step 9 is merged). What is *done* that this section used to defer: colour-blind/contrast probe → high-contrast mode + the no-colour-only-signal rule; photosensitivity probe → every juice curve is a single soft pulse and calm mode + `prefers-reduced-motion` kill all weather layers; weak-GPU path → `?quality=low` plus the existing `capture:full:weak` software-GL runs; loading screen → the ready-gated overlay. Step 8's data files (`game/full-level.js` moments/spots, `game/full.js` rig writes keyed by id) remain the swap surface for real Bobo details — polish must not invent them. **New baseline for re-runs: 47/47 selfTest (full), 43 slice, 37 demo, 36 style, 145 draws / 100,670 tris, 63/0 stress ×2, bot 5/5 + 10/10, audio 24/17/23/23, mobile 36/36 (`npm run check:mobile`, issue #25), build 34 files / 2.42 MB.** **Superseded for the game pages by issue #27 (playtest round 1: PR #31 layout/walls merged, cats PR following): 51/51 full, 46/46 slice (checks: walk-reachable, wall-camera-clearance, cats-face-the-room, lying-poses), stress `--checks` 51 full / 46 slice; demo 37 and style 36 unchanged.** **What Step 10 needs:** Brandon's host choice (xCloud was the #17 assumption — root already opens the full game and `npm run build` ships a verified static `dist/`), one deploy + a live-site check pass, and the m1 snapshot decision.
 
 ### Still standing from Step 1

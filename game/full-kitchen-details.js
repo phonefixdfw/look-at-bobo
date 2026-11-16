@@ -106,9 +106,12 @@ export const PIECES = [
   piece('dish-rack', 'steel', [3.58, 3.88], [KIT_D.WT + 0.004, KIT_D.WT + 0.004 + KIT_D.rackH], [-2.75, -2.35], ['dish-rack'], 'row 27: over the drainer', { parts: 'rack' }),
   // ── the east run's worktop (tile x 5.50-5.52, uppers from y 1.45) ───────
   piece('coffee-maker', 'dark', [5.24, 5.44], on(KIT_D.cofH), [-0.62, -0.36], ['coffee-maker'], 'row 26: under the uppers, clear of the hood lip'),
-  // ── the bin: beside the west return's south end (issue #44), 18 cm off the
-  //    west wall, clear of the doorway walk rect and both kitchen spawns ────
-  piece('trash-bin', 'dark', [2.7, 3.0], [0, KIT_D.binH], [-1.1, -0.8], ['trash-bin'], 'row 28: 0.30 dia × 0.42 beside the counter', { shape: 'cyl' }),
+  // ── the bin: the east run's south end corner (moved there in issue #59 —
+  //    at the old return-adjacent footprint its body-pad rotated the costumed
+  //    bobo's measured approach at the return loaf past the cats-face-the-room
+  //    limit once #56's rig landed on main; here it is clear of the doorway
+  //    walk rect, both kitchen spawns, and every cat approach) ──────────────
+  piece('trash-bin', 'dark', [5.19, 5.49], [0, KIT_D.binH], [0.28, 0.58], ['trash-bin'], 'row 28: 0.30 dia × 0.42 beside the counter', { shape: 'cyl' }),
   // ── the breakfast bar (row 31), where game/full-shell.js `barTop` says ──
   // Carcass 0.40 deep on the south wall; top 0.70 deep — the 0.30 overhang
   // runs north over the stools. Measured: the top's 1.05.
@@ -190,5 +193,5 @@ export const KITCHEN_DETAILS_COLLIDERS = [
   { id: 'kitchen-bar', x0: 3.3, z0: 0.2, x1: 4.9, z1: 0.6 },
   { id: 'bar-stool-a', x0: 3.55, z0: -0.15, x1: 3.91, z1: 0.21 },
   { id: 'bar-stool-b', x0: 4.29, z0: -0.15, x1: 4.65, z1: 0.21 },
-  { id: 'kitchen-bin', x0: 2.7, z0: -1.1, x1: 3, z1: -0.8 },
+  { id: 'kitchen-bin', x0: 5.19, z0: 0.28, x1: 5.49, z1: 0.58 }, // issue #59: east run's south end corner (was x 2.7-3.0, z -1.1--0.8)
 ];
