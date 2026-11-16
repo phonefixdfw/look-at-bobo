@@ -43,7 +43,8 @@
     "playtest:bot:patriot:full": "node tools/bot-playtest.mjs --page game/full.html --patriot 3",
     "capture:full:patriot": "node tools/capture.mjs game/full.html --times 1.2 --views diorama --moments couch-loaf.couch,window-bird.balcony-rail,sink-sit.sink,hall-chase.hall,desk-pen.desk,hall-chase.bath-mat --out captures/full-patriot --selftest --param gate=off --param patriot=on",
     "check:mobile": "node tools/mobile-check.mjs",
-    "playtest:stress:full": "node tools/stress-playtest.mjs --page game/full.html --checks 75"
+    "playtest:stress:full": "node tools/stress-playtest.mjs --page game/full.html --checks 75",
+    "seed:coverage": "node tools/seed-coverage.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.65.1",

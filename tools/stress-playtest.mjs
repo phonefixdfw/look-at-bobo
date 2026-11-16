@@ -674,7 +674,7 @@ try {
     src: window.LC.runSeed().source,
     live: window.LC.runSeed().live,
     cycle: window.LC.spotCycle ? window.LC.spotCycle() : [],
-    plan: window.LC.patriotPlan ? window.LC.patriotPlan(4242, window.LC.moments.length) : [],
+    plan: window.LC.patriotPlan ? window.LC.patriotPlan(4242, window.LC.state().target) : [],
   }));
   const pa = await pinOf(pinA);
   const pb = await pinOf(pinB);
