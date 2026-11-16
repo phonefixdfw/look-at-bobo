@@ -1288,7 +1288,7 @@ export function bootGame(cfg) {
         drawBad ?? '200 seeded draws: ten distinct, one per type, rooms alternate, decoys legal',
         'every draw legal',
         !drawBad,
-        'pickSpotCycle over the whole pool — same seed, same run (issue #53)',
+        'pickSpotCycle over the whole pool — same seed, same run (issue #53); a +3 win (issue #58) may end a run before the cycle is spent, never out of order',
       );
     }
 

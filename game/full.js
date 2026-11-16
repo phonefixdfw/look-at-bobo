@@ -459,8 +459,9 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
 
   // 4. Aim still lands on BOBO through the costume: from every compass
   //    angle a ray at his seated body resolves to cat-bobo (the costume is
-  //    his subtree, never orphaned scenery), some angles actually hit the
-  //    costume itself, and it detaches cleanly.
+  //    his subtree, never orphaned scenery), a ray aimed straight at the
+  //    hat hits the costume and still resolves to Bobo, and it detaches
+  //    cleanly.
   {
     const pc = buildCat('bobo'); // fresh probe; root.name is 'cat-bobo'
     const m = catRecords[0];
@@ -477,7 +478,7 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       while (o && !(o.name ?? '').startsWith('cat-')) o = o.parent;
       return o ? o.name : null;
     };
-    let stray = 0, costumeHits = 0, rayHits = 0;
+    let stray = 0, rayHits = 0;
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2;
       origin.set(target.x + Math.sin(a) * 1.4, target.y + 0.25, target.z + Math.cos(a) * 1.4);
@@ -486,15 +487,37 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       if (!first) continue;
       rayHits++;
       if (catOf(first.object) !== 'cat-bobo') stray++;
-      if (first.object.userData?.patriot) costumeHits++;
+    }
+    // The compass rays skim the BODY centre, where fur wins the near-side
+    // race; to prove the costume is aim-live (in the subtree, not invisible
+    // scenery) aim straight at the topmost costume piece — the fur hat —
+    // from above. Its first hit must be a costume mesh and must resolve to
+    // cat-bobo exactly like the body does.
+    pc.root.updateMatrixWorld(true);
+    const cm = [];
+    pc.root.traverse((o) => { if (o.isMesh && o.userData?.patriot) cm.push(o); });
+    let top = null;
+    for (const o of cm) {
+      const b = new THREE.Box3().setFromObject(o);
+      if (!top || b.max.y > top.max.y) top = b;
+    }
+    let hatResolves = false, hatOnCostume = false;
+    if (top) {
+      const c = top.getCenter(new THREE.Vector3());
+      const from = c.clone().add(new THREE.Vector3(0.35, 0.55, 0.35));
+      rc.set(from, c.clone().sub(from).normalize());
+      const hit = rc.intersectObjects([pc.root], true).find((h) => h.object.isMesh && h.object.visible);
+      hatResolves = !!hit && catOf(hit.object) === 'cat-bobo';
+      hatOnCostume = !!hit && !!hit.object.userData?.patriot;
     }
     removePatriotCostume(pc);
     const clean = !isPatriotAttached(pc);
+    const ok = rayHits >= 6 && stray === 0 && cm.length >= 5 && hatResolves && hatOnCostume && clean;
     add(
       'patriot-aim-hit',
-      costumeHits > 0 && stray === 0 && clean ? `${rayHits}/8 angles on cat-bobo, ${costumeHits} on the costume` : `${stray} stray, ${costumeHits} costume hits, detached=${clean}`,
-      'every angle resolves cat-bobo; costume hittable, detaches clean',
-      rayHits >= 6 && stray === 0 && costumeHits > 0 && clean,
+      ok ? `${rayHits}/8 angles on cat-bobo; hat aim lands on the costume, resolves Bobo` : `${rayHits}/8 ray hits, ${stray} stray, ${cm.length} costume meshes, hat: resolves=${hatResolves} costume=${hatOnCostume}, detached=${clean}`,
+      'every angle resolves cat-bobo; hat aim hits the costume; detaches clean',
+      ok,
       'issue #58: the hat is part of Bobo — pointing never hits loose scenery',
     );
   }
