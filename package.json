@@ -19,6 +19,7 @@
     "capture:weak": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview --moments default --out captures/testscene-weaklaptop --gpu swiftshader --selftest",
     "capture:planted": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview,contact --moments default,cardboard-box --out captures/testscene-planted --param plant=lift --selftest",
     "gate": "node tools/gate.mjs",
+    "logo:export": "node tools/export-logo.mjs",
     "capture:style": "node tools/capture.mjs design/style-test.html --times 0,2.4,5 --views diorama,first-person,cats-close,bobo-face --moments default,lineup,loaf-couch,hud-score,hud-dag,win --out captures/style-test --selftest",
     "capture:demo": "node tools/capture.mjs demo/talking-demo.html --times 0,1.2,2.4 --views diorama,first-person,bobo-face,decoy-face --moments idle,catch,wrong,win --out captures/talking-demo --selftest --param gate=off --param score=7",
     "capture:demo:determinism": "node tools/capture.mjs demo/talking-demo.html --times 1.2 --views diorama,first-person --moments idle,catch,wrong,win --out captures/talking-demo-determinism --determinism --param gate=off --param score=7",
