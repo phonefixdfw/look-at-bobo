@@ -1179,3 +1179,125 @@ green / 0 FAIL**, `audio:slicecheck` + `audio:fullcheck` **23/23**,
 `build` dist/ stamped **55 files** (+2: `src/music.js`,
 `src/music-score.js` ship with the `?v=` stamps; the build copies `src/`
 wholesale, so `docs/DEPLOY.md` needed no file-list change).
+
+## 25. Issue #61 — back under 150 draws on the full game (per-room culling + merged statics)
+
+**Asked for (issue #61, 2026-11-16):** the full game's worst frame sits at 169
+draw calls against `FULL_GAME_DRAW_CALLS = 150`; #59 raised the ceiling to 200
+purely to unblock the tool. Bring the worst frame back under 150 with per-room
+culling and/or merged geometry, restore the constant to 150, keep every other
+suite green, and change no look and no collider.
+
+**Where the draws actually go.** `tools/draw-report.mjs` is new and read-only:
+it boots any page, renders one frame with `renderer.info.autoReset = false`,
+and dumps every object the renderer submitted with its world AABB, material
+and signature (`--inventory`), or the same per-frame draw counts for every
+view/moment (`--views all --moments all --json`). At the worst frame the
+living room — the room the camera is standing in for the wide views — is 68
+draws on its own, the shell + sky that straddle every room is ~12, the shadow
+pass adds ~20, and the rest is rooms the camera cannot see. That is the real
+shape of the problem: culling can only remove what is not the camera's own
+room, and it can never remove geometry that spans rooms.
+
+**Merged statics (`game/full-merge.js`).** Siblings sharing a *shading
+signature* (program + every material field + uniforms + texture identity) are
+folded into one `BufferGeometry` with transforms baked in and `matrixWorld`
+identity, so the frustum test sees exactly the union AABB it saw before and
+the GPU gets one draw of the same triangles. A mesh is left alone when it is
+animated (`onTick`, the leash line), transparent, multi-material, named, or
+**locked** — locked meaning it carries any `userData` the checks read:
+`tag` (#41/#44/#62 probe lookups), `scale`/`scaleGroup` (#30 size checks),
+`fuzz` (#28), `eyes` (#31), `ell`/`baseScale`/`baseRotX`/`baseRotZ`/`noContact`
+/`contact` (#46 ruler), or `noMerge`. The ruler measures per-mesh AABBs, so
+anything it measures stays unmerged rather than loosening the check. Result:
+18 static meshes → 8 buffers (base cabinets, wall cabinets, doors, drawers,
+shelves, books, pens, boxes), and the sky's seven `MeshBasicMaterial` sheets —
+one shared unlit material, so folding cannot reorder any shading — → 1.
+`?merge=off` rebuilds the split flat.
+
+**Per-room culling (`game/full-cull.js`).** Hiding is done by setting
+`Object3D.visible` on the **room group**, which three.js honours in both the
+main and the shadow pass, and which leaves every child's own `visible` flag
+intact — the 77 selfTest checks and the bot probes filter on `o.visible` and
+still see the whole world. Chosen over `camera.layers` for exactly that
+reason: a layer-masked raycast silently changes what the checks see. Three
+conservative rules: a group is only ever hidden when its world AABB sits
+inside **exactly one** room rect (the shell, the sky and anything straddling a
+doorway are never touched); only the children `buildFullApartment` returned
+are fileable, so every actor, prop and confetti piece the engine adds later
+stays visible from wherever it is; and the visible set is the 2-hop
+neighbourhood of the camera's room in `OPENINGS`, **failing open** — a camera
+outside every rect (the win orbit, the diorama, a knockback) draws everything.
+`?cull=off` disables it, and `LC.selfTest()` runs with the cull disabled for
+its whole duration so no check can gain or lose coverage from a camera
+position.
+
+**Nothing changed in the picture — proof, not opinion.**
+`tools/draw-report.mjs --pixels` renders the *same* frame twice with two param
+sets and byte-compares the PNGs, with an A-vs-A control first to prove the
+harness itself is deterministic. Run over the full 13 views × 13 moments at
+t = 0, 1.2 and 2.4: **169/169 frames identical at each time, 507/507 overall**
+(control 169/169 each), merge+cull on vs both off. If a single pixel of the
+art had moved, this would have caught it.
+
+### Draws per view (`win` moment, `--views all --moments win`)
+| view | before | after | saved |
+|---|---:|---:|---:|
+| diorama | 108 | 104 | 4 |
+| first-person | 98 | 93 | 5 |
+| bobo | 66 | 62 | 4 |
+| **overview** | **155** | **147** | 8 |
+| over-shoulder | 64 | 60 | 4 |
+| low-angle | 77 | 71 | 6 |
+| kitchen | 103 | 95 | 8 |
+| bathroom | 92 | 88 | 4 |
+| **desk** | **163** | **123** | 40 |
+| balcony | 99 | 92 | 7 |
+| door-living-hall | 97 | 90 | 7 |
+| door-living-kitchen | 80 | 77 | 3 |
+| door-hall-bedroom | 70 | 62 | 8 |
+
+### Draws by room, same moment (main pass; the shadow pass adds 20 → 19)
+| room | from the desk | from the overview |
+|---|---:|---:|
+| living | 68 | 68 |
+| kitchen | — (hidden) | 10 |
+| bedroom | 12 | 27 |
+| bathroom | 8 | 9 |
+| balcony | 2 | 2 |
+| shell / straddling / outside | 14 | 15 |
+| **main pass** | **104** | **128** |
+
+The overview is the binding frame: the camera sits in the living room, and
+every room is within 2 hops of the living room, so nothing may be hidden there
+— 147 is what merging leaves. A room's count can go *up* one or two draws
+after merging (bedroom from the desk, 10 → 12): one fat buffer's AABB clips a
+frustum edge that several thin meshes each sat clear of, so one draw replaces
+zero. The totals are what the budget measures, and every total went down.
+
+### What the numbers are now
+- `capture:full` **507 frames** (13 stages × 13 views × 3 times), selfTest
+  **77/77 every frame**, budget **PASS at 147 draws / 98,656 tris** (was 169 /
+  99,288), pixels luma 42.6..135.7 · colours 72..237, console clean.
+  `FULL_GAME_DRAW_CALLS` is back to **150** in `tools/capture.mjs`, so the
+  budget check enforces the issue's requirement instead of excusing it.
+- Determinism unchanged: `capture:full:determinism` **8/8 byte-identical**,
+  `capture:full:weak` **77/77**, `capture:full:patriot` PASS, `capture:style`
+  PASS, `capture:patriot` PASS, `capture:all` **144/144**.
+- Slice and demo untouched — they never include the flat, and the cull hooks
+  are inert when there is no `apt.cull`: `capture:slice` **51/51 at 98 draws**,
+  `capture:slice:determinism` **8/8**, `capture:slice:weak` PASS,
+  `capture:demo` **37/37 at 91 draws**, `capture:demo:determinism` **8/8**.
+- Everything else green on this HEAD: `gate` **PASS** (planted-fault suites
+  still exit 1 naming `ending-text-exact` — that is their PASS condition),
+  `check:mobile` **92 PASS / 0 FAIL**, `playtest:stress:full` **77 PASS / 0
+  FAIL**, `playtest:stress` **72 PASS / 0 FAIL**, bots full **10/10** and
+  patriot **5/5** with unchanged replay hashes, `seed:coverage` unchanged
+  (83.4% of runs reach a find), `music:selftest` **29/29**, `music:check`
+  **28/28**, `audio:fullcheck` **23/23**, `build` dist/ stamped 57 files
+  (+2: `game/full-merge.js`, `game/full-cull.js`).
+- **Headroom left:** 147 of the 150, and the ceiling is 3 draws of it. The
+  binding frame is the camera standing *inside* the densest room, so the next
+  real cut is merging inside the living room's own clutter, which means
+  teaching the ruler (#46) to measure merged buffers — its own issue, not this
+  one.

@@ -56,12 +56,14 @@ const BUDGET = {
   realLights: 6,
 };
 
-// TEMPORARY (issue #59): the FULL GAME page alone gets this flat drawCalls
-// budget until the per-room culling/instancing pass (chunk 4) brings it back
-// to 150 — recorded in docs/ART_STYLE.md and docs/HANDOFF.md. The slice and
-// the demo keep BUDGET.drawCalls; an explicit --budget drawCalls=… overrides
-// this; the ?quality=low path is untouched (it lives in the page).
-const FULL_GAME_DRAW_CALLS = 180;
+// Issue #61: the FULL GAME page is back on the slice's 150. It had been given
+// 180 (issue #59) while the room furniture landed, and earned its 150 back
+// with the fold in game/full-merge.js and the per-room cull in
+// game/full-cull.js — the measured worst frame of the 507-frame matrix is in
+// docs/PLAYTEST_NOTES.md. It stays its own constant because the full flat is a
+// different page from the slice and the demo; an explicit
+// --budget drawCalls=… still overrides it.
+const FULL_GAME_DRAW_CALLS = 150;
 
 // A frame that averages this dark, or has no variation at all, is a broken capture
 // (WebGL fell over / nothing rendered), not an intentional look.
@@ -140,9 +142,8 @@ function parseArgs(argv) {
   if (rest.length > 1) fail(2, 'One page at a time, please.');
   if (rest.length === 1) opts.page = rest[0];
   if (!['default', 'swiftshader'].includes(opts.gpu)) fail(2, "--gpu takes 'swiftshader' or 'default'");
-  // TEMPORARY (issue #59) — see FULL_GAME_DRAW_CALLS above: the full game's
-  // merged furniture (living room, kitchen, bedroom) legitimately needs more
-  // than 150 draws until the culling/instancing pass lands.
+  // The full flat is its own page with its own worst frame — see
+  // FULL_GAME_DRAW_CALLS above.
   if (/game\/full\.html$/.test(opts.page) && !budgetOverridden.has('drawCalls')) {
     opts.budget.drawCalls = FULL_GAME_DRAW_CALLS;
   }
