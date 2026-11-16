@@ -15,6 +15,7 @@ import { livingGapReport } from './full-living.js';
 import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
+import { SPLASH } from './splash.js';
 
 /* ---- the ten moments, pose by pose ----
  * The engine runs the baseline idle right before this, only during `find`,
@@ -382,4 +383,5 @@ bootGame({
   winDefault: LEVEL.TARGET_DEFAULT, // 10 — the real target
   extraChecks: fullExtraChecks,
   hintFade: { fadeStart: 12, fadeEnd: 18 }, // the hint teaches, then gets out of the way
+  splash: SPLASH, // issue #57: the title screen; pause/win hand back to it
 });

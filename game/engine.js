@@ -331,10 +331,15 @@ export function bootGame(cfg) {
     gate: document.getElementById('gate'),
     gateBtn: document.getElementById('gate-btn'),
     pause: document.getElementById('pause'),
+    // rotate card: the id keeps a `-hint` suffix (the design system's name),
+    // resolved tolerantly so a rename can never hand the engine `undefined`.
+    rotate: document.getElementById('rotate-hint') || document.getElementById('rotate'),
     hint: document.getElementById('hint'),
     // Optional Step 8 extras — present only on the full-game page:
     pauseRestart: document.getElementById('pause-restart'),
     endingAgain: document.getElementById('ending-again'),
+    // Issue #57: "back to menu" in the pause card (only when cfg.splash is on).
+    pauseMenu: document.getElementById('pause-menu'),
   };
 
   /** What is on screen in each phase. The score pill is live state — except
@@ -602,6 +607,71 @@ export function bootGame(cfg) {
   }
 
   // ---------------------------------------------------------------------------
+  // 6b. The title screen (issue #57) — only when cfg.splash is passed.
+  //
+  // Per issue #57 the title card is a CSS screen (#gate, dressed by
+  // game/full.html + game/title.css) and `?gate=off` stays FULLY empty — no
+  // title screen, no camera moves, baselines byte-identical. What lives here
+  // is only the small runtime the card needs:
+  //
+  //   * while the card is up (the gate, un-started), nothing ticks: the page
+  //     paints the single boot frame and CSS does the drifting (its own
+  //     rAF, no second WebGL scene, no extra frames);
+  //   * the pause card's "back to menu" and the win's tap/space land on the
+  //     title screen (issue #57) instead of restarting in place;
+  //   * Play from the card then starts a fresh run exactly like the old gate
+  //     click did — same element, same user gesture unlocking audio and
+  //     touch mode.
+  //
+  // Pages without cfg.splash (the slice) never enter any of this — zero
+  // behaviour diff. The data (title, copy) is game/splash.js.
+  // ---------------------------------------------------------------------------
+  const SPLASH_CFG = cfg.splash || null;
+  let splashOn = false; // the title card is up (gate shown, un-started)
+  // One-gesture tail guard (issue #57): a finger tap is pointerdown → up →
+  // click as ONE sequence. Shout-on-win raises the card inside pointerdown,
+  // and the gate — now covering the screen — catches the click that ENDS the
+  // same tap, which would answer "Play" before the player ever saw the menu.
+  // Every pointerdown bumps a sequence number; the card remembers the one
+  // that raised it, and a gate click from that same sequence is swallowed.
+  // A later tap always carries a fresh number, so Play is never eaten.
+  let pointerSeq = 0;
+  let menuSeq = -1;
+  document.addEventListener('pointerdown', () => { pointerSeq++; }, true);
+
+  /** Show the title card again from the pause/win states. Play from here
+   *  starts a fresh run, so the card promises what it means. The page is
+   *  driven back to exactly its pre-start shape — gate up, gateOpen false,
+   *  started false — so the ONE unlockGate path (audio + touch fullscreen +
+   *  startGame) answers the next click, and the loop (which by now runs)
+   *  sleeps at stepGame's !started guard: nothing moves under the card,
+   *  exactly like the frozen boot frame under the first one. Returns false
+   *  (nothing changed) on pages the card was never offered. */
+  function backToMenu() {
+    if (!SPLASH_CFG || GATE_OFF || !started) return false; // the gate was never left
+    restartRun();
+    input.unlock(); // the card wants the pointer back
+    started = false; // next Play = startGame, a fresh run
+    gateOpen = false; // next Play = unlockGate, the same first-time door
+    resumePlay(); // the pause is over: the menu is not a pause card wearing a hat
+    el.pause.classList.remove('show'); // stepGame sleeps now; clear the card here
+    menuSeq = pointerSeq; // swallow the tail click of THIS gesture only
+    el.gate.classList.remove('hidden');
+    document.body.classList.add('splash');
+    updateLabel();
+    return true;
+  }
+
+  /** The win's "click / Space / tap" action: with a title screen the run
+   *  hands back to the menu (issue #57); pages without one — the slice, and
+   *  every ?gate=off page where the card was never offered — restart in
+   *  place, exactly as they always did. */
+  function winExit() {
+    if (game.winElapsed < WIN_RESTART_AFTER) return;
+    if (!backToMenu()) restartRun();
+  }
+
+  // ---------------------------------------------------------------------------
   // 7. The frame: everything below is a pure function of the state above.
   // ---------------------------------------------------------------------------
   let seekTime = 0;
@@ -851,6 +921,11 @@ export function bootGame(cfg) {
   let hintDone = !cfg.hintFade;
 
   function stepGame(dt) {
+    // The sim sleeps before the first Play — and again whenever the title
+    // card is back up (issue #57): the loop may already be running from a
+    // past run, but nothing moves or ticks under the card. (Every captured
+    // page boots with started already true, so this never fires there.)
+    if (!started) return;
     for (const action of input.consumeActions()) {
       // A "pause" out of src/input.js always means the same thing: the pointer
       // went away (Esc, a window blur, or the issue #29 switch that hands the
@@ -1496,6 +1571,76 @@ export function bootGame(cfg) {
       'click-to-begin before any sound; ?gate=off only for headless capture',
     );
 
+    // --- the title screen (issue #57) --------------------------------------------
+    // Only pages with cfg.splash have one (the full game); the slice has no title
+    // screen and gets none of these checks. They are state-aware because their
+    // callers arrive from both sides of the card: capture runs them with it
+    // fully absent, the stress run reads it after Play lifted it, and the
+    // mobile check watches it up. The card's contract: shown WITH its body
+    // class before the start, hidden without it after, and nowhere at all
+    // under ?gate=off — no class, no pixels, baselines untouched.
+    if (SPLASH_CFG) {
+      const splashClass = document.body.classList.contains('splash');
+      add(
+        'title-screen-state',
+        gateHidden ? (GATE_OFF ? 'absent' : 'hidden') : 'shown',
+        GATE_OFF ? 'absent (never offered)' : gateOpen ? 'hidden (Play lifted it)' : 'shown (card up)',
+        gateHidden ? (GATE_OFF ? !splashClass : !splashClass) : splashClass,
+        'the title card and its body class arrive and leave together; ?gate=off has neither',
+      );
+      const mark = el.gate.querySelector('svg.bobo');
+      const markOk =
+        Boolean(mark) &&
+        mark.getAttribute('role') === 'img' &&
+        mark.getAttribute('aria-label') === 'Look at Bobo' &&
+        mark.querySelector('title')?.textContent === 'Look at Bobo' &&
+        (gateHidden || mark.getBoundingClientRect().height > 0);
+      add('title-logo-name', mark ? `"${mark.getAttribute('aria-label') || ''}"` : 'no logo', 'named "Look at Bobo"', markOk, 'inline SVG in the page: role, aria-label and <title> agree');
+      const boxes = [];
+      for (const [name, sel] of [
+        ['mark', 'svg.bobo'],
+        ['word', '#title-word'],
+        ['tagline', '.title-tagline'],
+        ['hint', '.title-hint'],
+        ['start', '#gate-btn'],
+        ['row', '.title-row'],
+        ['panel', '#gate-howto-panel'],
+        ['note', '.gate-note'],
+        ['stamp', '#build-stamp'],
+      ]) {
+        const n = el.gate.querySelector(sel);
+        if (!n) continue;
+        const r = n.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) boxes.push({ name, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom });
+      }
+      let layoutMsg = 'n/a (card down)';
+      let layoutOk = true;
+      if (boxes.length) {
+        const cardEl = el.gate.querySelector('.gate-card');
+        const cr = cardEl ? cardEl.getBoundingClientRect() : null;
+        const card = cr && cr.width > 0 ? { top: cr.top, bottom: cr.bottom, left: cr.left, right: cr.right } : null;
+        const bad = [];
+        const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+        for (let i = 0; i < boxes.length; i++)
+          for (let j = i + 1; j < boxes.length; j++) {
+            // Bobo peeking OVER the lettering is the logo, not a collision.
+            if ((boxes[i].name === 'mark' && boxes[j].name === 'word') || (boxes[i].name === 'word' && boxes[j].name === 'mark')) continue;
+            if (hit(boxes[i], boxes[j])) bad.push(`${boxes[i].name}×${boxes[j].name}`);
+          }
+        for (const b of boxes) {
+          // Inside the viewport AND inside the card: the card clips with
+          // overflow:hidden, so a box that fits the screen but spills past
+          // the card is half-painted — the exact 740×360 failure #57 found.
+          const spill = card ? b.y1 > card.bottom + 1 || b.y0 < card.top - 1 || b.x1 > card.right + 1 || b.x0 < card.left - 1 : false;
+          if (spill) bad.push(`${b.name} out of card`);
+          else if (b.y0 < -1 || b.y1 > window.innerHeight + 1 || b.x0 < -1 || b.x1 > window.innerWidth + 1) bad.push(`${b.name} off-screen`);
+        }
+        layoutOk = bad.length === 0;
+        layoutMsg = layoutOk ? `${boxes.length} boxes clean at ${window.innerWidth}×${window.innerHeight}` : bad.join(', ');
+      }
+      add('title-layout-clean', layoutMsg, 'no overlaps, nothing off-screen or spilling the card', layoutOk, 'logo, instructions and START lay out side by side at this viewport');
+    }
+
     // --- celebration staging ---------------------------------------------------
     const fireworks = ['find', 'catch', 'wrong', 'win'].map((p) => {
       const saved = game.phase;
@@ -2044,6 +2189,7 @@ export function bootGame(cfg) {
     voices.unlock(); // inside the user gesture (autoplay rules)
     if (TOUCH) requestTouchFullscreen(); // also inside the gesture (issue #25)
     el.gate.classList.add('hidden');
+    document.body.classList.remove('splash'); // the card carried the title look (issue #57)
     if (!started) startGame();
   }
 
@@ -2086,7 +2232,12 @@ export function bootGame(cfg) {
   }
 
   function wireInput() {
-    el.gate.addEventListener('click', unlockGate);
+    // Issue #57: a gate click from the SAME gesture that raised the card is
+    // the tail of that tap, not a new "Play" — swallow it (see pointerSeq).
+    el.gate.addEventListener('click', () => {
+      if (pointerSeq === menuSeq) return;
+      unlockGate();
+    });
     el.pause.addEventListener('click', () => {
       if (game.phase === 'win') return;
       // Resume paths by situation: still holding the pointer (a blur paused
@@ -2104,6 +2255,23 @@ export function bootGame(cfg) {
         restartRun();
         if (GATE_OFF || input.isLocked() || TOUCH) resumePlay();
         else input.lock(); // the lock-change event clears the pause
+      });
+    }
+    // Issue #57: and a "back to menu" — the title screen again, Play from
+    // there starts a fresh run. Guarded like the restart button (the slice
+    // has neither). The M key is the same door; Esc while the card is UP
+    // means "I want out" (Esc while playing just pauses, via src/input.js).
+    if (SPLASH_CFG && el.pauseMenu) {
+      el.pauseMenu.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        backToMenu();
+      });
+      window.addEventListener('keydown', (ev) => {
+        if (window.__lcSettingsOpen) return;
+        if ((ev.code === 'KeyM' || ev.code === 'Escape') && gateOpen && started && game.paused && game.phase !== 'win') {
+          ev.preventDefault();
+          backToMenu();
+        }
       });
     }
     input.onLockChange((locked) => {
@@ -2124,7 +2292,7 @@ export function bootGame(cfg) {
       if (TOUCH) return; // issue #25: no pointer lock to grab — the drag zones
       // and the shout button own the screen on touch devices
       if (game.phase === 'win') {
-        tryRestartFromWin();
+        winExit(); // click-on-win: back to the menu with a title screen (issue #57)
         return;
       }
       if (input.isLocked()) input.queueAction('point');
@@ -2135,7 +2303,7 @@ export function bootGame(cfg) {
       if (window.__lcSettingsOpen) return;
       if (ev.code === 'Space' && gateOpen && !ev.repeat) {
         ev.preventDefault();
-        if (game.phase === 'win') tryRestartFromWin();
+        if (game.phase === 'win') winExit(); // Space-on-win: menu, or restart without one (issue #57)
         else input.queueAction('point');
       }
     });
@@ -2214,7 +2382,8 @@ export function bootGame(cfg) {
         if (!gateOpen) voices.unlock(); // ?gate=off phone page: a tap is a gesture too
         if (!started) return;
         if (game.phase === 'win') {
-          tryRestartFromWin(); // the shout button doubles as "play again"
+          winExit(); // the shout button doubles as "play again" — or, with a
+          // title screen, "back to the menu" (issue #57)
           return;
         }
         if (!game.paused) input.queueAction('point');
@@ -2227,9 +2396,11 @@ export function bootGame(cfg) {
     const psub = el.pause?.querySelector?.('.pause-sub');
     if (psub) psub.textContent = 'tap anywhere to keep looking';
     if (el.endingAgain) {
-      el.endingAgain.textContent = 'tap the shout button to look at them again';
+      el.endingAgain.textContent = SPLASH_CFG
+        ? 'tap the shout button to go back to the menu' // issue #57
+        : 'tap the shout button to look at them again';
       el.endingAgain.style.pointerEvents = 'auto'; // a tap target, not a caption
-      el.endingAgain.addEventListener('click', tryRestartFromWin);
+      el.endingAgain.addEventListener('click', () => (SPLASH_CFG ? winExit() : tryRestartFromWin()));
     }
     // Portrait: the game waits behind the rotate hint (its .show is pure CSS,
     // see full.html) — pausing here keeps the sim honest while upright.
@@ -2314,6 +2485,9 @@ export function bootGame(cfg) {
   function boot() {
     if (GATE_OFF) {
       el.gate.classList.add('hidden');
+      // The title screen is FULLY absent here — element, class, everything —
+      // so nothing it styles can reach a capture pixel (issue #57).
+      document.body.classList.remove('splash');
       // Capture mode (?gate=off): the stamp chrome must never reach a frame, so
       // it is hidden by CSS as well as skipped by renderStamp().
       document.body.classList.add('capture');
@@ -2330,6 +2504,13 @@ export function bootGame(cfg) {
     applyTime(0);
     resize();
     renderer.render(scene, camera);
+    // issue #57: the title screen lives the whole time the gate is up — the
+    // loading card is on top of the canvas until announceReady, and a rAF
+    // started here would put a game frame between the loading card and the
+    // title card (a flash, and not a byte-identical ?gate=off boot). So the
+    // title screen does NOT run the loop: the page paints this one first-
+    // person frame under #gate, and the drifting view the card asks for is
+    // CSS-only (title.css). The loop starts with the game (LC.play).
     installContract();
     initTouchUI(); // issue #25: no-op on desktop
     wireInput();
