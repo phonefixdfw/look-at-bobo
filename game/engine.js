@@ -116,10 +116,11 @@ export function bootGame(cfg) {
    *               the stress seeds draw none in their short (win=3) runs: the
    *               capture/bot baselines keep their pixels. Re-pick the tag if
    *               the spot pool or the chance changes — the checks say so.
-   *  URL: ?patriot=off disables him entirely; ?patriot=on (or =N) also DRESSES
-   *  staged finds, which is how his capture frames work; ?patriot=N forces him
-   *  on live find N (still never first, never consecutive, max two). Default:
-   *  live rolls on, staging undressed — capture:full stays byte-identical. */
+   *  URL: ?patriot=off disables him entirely; ?patriot=on ALSO dresses the
+   *  staged (capture) finds — that is how his capture frames work; ?patriot=N
+   *  forces him on live find N (staging stays undressed there, since the
+   *  boot-staged find is number zero and he is never first). Default: live
+   *  rolls on, staging undressed — capture:full stays byte-identical. */
   const PATRIOT_RAW = params.get('patriot');
   const PATRIOT = {
     chance: 1 / 6,
@@ -130,7 +131,10 @@ export function bootGame(cfg) {
     seedTag: 'patriot 16',
     mode: PATRIOT_RAW === 'off' ? 'off' : /^\d+$/.test(PATRIOT_RAW ?? '') ? `force:${PATRIOT_RAW}` : PATRIOT_RAW ? 'on' : 'default',
     enabled: PATRIOT_RAW !== 'off',
-    stageDress: POOL !== null && !!PATRIOT_RAW && PATRIOT_RAW !== 'off',
+    // Only ?patriot=on dresses STAGED finds (that is the capture showcase).
+    // ?patriot=N stays a live knob: the boot-staged find on a live page must
+    // never be the bonus cat — it is find zero, and he is never first.
+    stageDress: POOL !== null && PATRIOT_RAW !== null && PATRIOT_RAW !== 'off' && !/^\d+$/.test(PATRIOT_RAW),
     forceFind: /^\d+$/.test(PATRIOT_RAW ?? '') ? Number(PATRIOT_RAW) : null,
   };
 
@@ -544,7 +548,7 @@ export function bootGame(cfg) {
 
   /** Begin (or re-begin) the round: Bobo to his moment, decoy to a legal
    *  spot. Staging for the capture contract is canonical (no RNG, no queue);
-   *  live rounds draw from the run. Issue #58: on a `?patriot=on|N` page the
+   *  live rounds draw from the run. Issue #58: on a `?patriot=on` page the
    *  staged Bobo wears the costume too (his capture frames go through THIS
    *  path) — seated on the spot's own support, since that is the pose the
    *  costume is authored for. A plain page never touches the costume. */

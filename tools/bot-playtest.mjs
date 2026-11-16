@@ -14,6 +14,9 @@
 //
 //   npm run playtest:bot                    # slice
 //   npm run playtest:bot:full               # full game (win at 10)
+//   npm run playtest:bot:patriot:full       # full game with Patriot Bobo
+//                                         # forced on find 3 (?patriot=3&win=5,
+//                                         # issue #58: his +3 wins at 5 early)
 
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -27,6 +30,10 @@ const arg = (name, dflt) => {
   return i >= 0 ? argv[i + 1] : dflt;
 };
 const PAGE = arg('page', 'game/slice.html');
+// Issue #58: --patriot N plays a page that FORCES Patriot Bobo on live find
+// N (?patriot=N) with win=5, so his +3 ends the run early: 1 + 1 + 3 = 5.
+// Without the flag the page is whatever --page says, played normally.
+const PATRIOT_MODE = arg('patriot', null);
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(REPO, 'package.json'));
@@ -45,12 +52,14 @@ page.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
 page.on('pageerror', (e) => errs.push(String(e)));
 
 try {
-  await page.goto(`${server.url}${PAGE}?gate=off&seed=11`, { waitUntil: 'load' });
+  const url = `${server.url}${PAGE}?gate=off&seed=11${PATRIOT_MODE ? `&win=5&patriot=${PATRIOT_MODE}` : ''}`;
+  await page.goto(url, { waitUntil: 'load' });
   await page.waitForFunction(() => window.LC?.ready === true);
   await page.evaluate(() => window.LC.play());
-  const log = [`page: ${PAGE}`];
+  const log = [`page: ${PAGE}${PATRIOT_MODE ? ` — Patriot Bobo forced on find ${PATRIOT_MODE}, win at 5 (issue #58)` : ''}`];
   const st = () => page.evaluate(() => window.LC.state());
   const target = (await st()).target;
+  const reward = await page.evaluate(() => (window.LC.patriot ? window.LC.patriot().reward : 1));
   const moveHash = await page.evaluate(() => window.LC.simulate(600));
   log.push(`move-hash(600 steps): ${moveHash}`);
   log.push(`replay-hash:          ${await page.evaluate(() => window.LC.simulate(600))}`);
@@ -59,6 +68,7 @@ try {
   const spotSeen = []; // parallel to seen on pool pages only ({spot, room, d})
   const scores = [];
   const events = [];
+  const flags = []; // parallel to scores: {patriot, find, costume} per catch, null at the DAG! (issue #58)
   const waitPhase = (p, ms = 8000) => page.waitForFunction((ph) => window.LC.state().phase === ph, p, { timeout: ms });
   // the catch that reaches the target goes straight find -> win (no catch
   // phase to pause on), so a shout must wait for either arrival
@@ -95,11 +105,18 @@ try {
       dagged = true;
       events.push(`DAG! at "${s.momentId}" (ray ${await shout('decoy')})`);
       await waitPhase('wrong');
+      flags.push(null);
       scores.push((await st()).score);
       continue;
     }
-    events.push(`shout#${catchN + 1} at "${s.momentId}" (ray ${await shout('bobo')})`);
+    const pf = {
+      p: !!s.patriot,
+      find: s.findNum,
+      costume: await page.evaluate(() => (window.LC.patriot ? window.LC.patriot().costumeAttached : false)),
+    };
+    events.push(`shout#${catchN + 1} at "${s.momentId}" (ray ${await shout('bobo')})${pf.p ? ' [+3 PATRIOT!]' : ''}`);
     await waitCatchOrWin();
+    flags.push(pf);
     scores.push((await st()).score);
     catchN++;
   }
@@ -127,17 +144,48 @@ try {
     log.push(`spot cycle:     ${new Set(qs.map((r) => r.spot)).size}/${qs.length} distinct, rooms ${roomsAlternating ? 'alternate' : 'STAYED put somewhere'}, spawn→Bobo mean ${meanWalk.toFixed(2)} m (min ${Math.min(...qs.map((r) => r.d)).toFixed(2)}, max ${Math.max(...qs.map((r) => r.d)).toFixed(2)})`);
   }
   log.push(`scores:          ${scores.join(', ')}`);
-  log.push(`queue rounds:    ${q.join(' → ')} — ${queueDistinct}/${target} distinct (queue cycle; first round is boot-staged, DAG! re-sees its round)`);
+  if (reward > 1) log.push(`bonus reward:    +${reward} (Patriot Bobo — issue #58)`);
+  const patriotFinds = flags.filter((f) => f?.p);
+  if (patriotFinds.length) log.push(`patriot finds:   ${patriotFinds.map((f) => `find ${f.find} (costume ${f.costume})`).join(', ')}`);
+  log.push(`queue rounds:    ${q.join(' → ')} — ${queueDistinct}/${q.length} distinct (queue cycle; first round is boot-staged, DAG! re-sees its round)`);
   log.push(`final:           score ${fin.score}/${fin.target}, phase ${fin.phase}, ending "${ending}"`);
   log.push(`min score:       ${Math.min(...scores)} (never below 0)`);
   log.push(`console errors:  ${errs.length ? errs.join(' | ') : 'none'}`);
   console.log(log.join('\n'));
 
+  // Issue #58 made the scoreboard a little richer: a catch pays +1, or +
+  // `reward` when that find is Patriot Bobo, and the win fires on score ≥
+  // target — so a bonus can end the run early with fewer queue rounds. The
+  // invariants below hold for every page, slice (reward 1) included: each
+  // find draws a distinct type until the run ends, exactly one −1 rides the
+  // DAG!, and a +reward delta appears exactly on a patriot find.
+  const deltas = scores.map((v, i) => v - (i ? scores[i - 1] : 0));
+  const dagAt = events.findIndex((e) => e.startsWith('DAG!'));
+  const posSum = deltas.reduce((a, d, i) => a + (i === dagAt ? 0 : d), 0);
+  const ruleOk =
+    dagAt >= 0 &&
+    deltas.reduce((a, b) => a + b, 0) === fin.score &&
+    posSum - 1 === fin.score && // the one DAG! is the run's only subtraction
+    deltas.every((d, i) => (i === dagAt ? d === -1 : d === 1 || d === reward)) &&
+    deltas.every((d, i) => i === dagAt || d === (flags[i]?.p ? reward : 1));
+  // The default run never met Patriot on seed 11 — the plan says so, and
+  // --patriot mode proves the forced one behaves: once only, on find N,
+  // costume on exactly then, and his +3 closes the run (5 = 1+1+3).
+  const planQuiet = await page.evaluate(() => (window.LC.patriotPlan ? window.LC.patriotPlan(11, 10).every((x) => !x) : true));
+  const patriotOk =
+    !PATRIOT_MODE ||
+    (planQuiet &&
+      patriotFinds.length === 1 &&
+      patriotFinds[0].find === +PATRIOT_MODE &&
+      flags.every((f) => !f || f.p === f.costume) &&
+      fin.patriotCount === 1 &&
+      fin.score === target &&
+      fin.score === 2 + reward); // +1, the DAG! refund, and the +3: 1+1+3 = 5
   const ok =
-    fin.score === target && fin.phase === 'win' && ending === 'your did it! you wind' &&
-    queueDistinct === target && q.length === target &&
+    fin.score >= target && fin.phase === 'win' && ending === 'your did it! you wind' &&
+    queueDistinct === q.length && q.length >= 1 && q.length <= target &&
     (qs.length === 0 || (new Set(qs.map((r) => r.spot)).size === qs.length && roomsAlternating && qs.every((r) => r.d >= 1.2))) && // issue #53: distinct spots, rooms change, never wake on top of Bobo
-    events.filter((e) => !e.startsWith('DAG!')).length === target + 1 && // target points, one shout refunded by the DAG!
+    ruleOk && patriotOk &&
     events.every((e) => e.includes('ray cat-')) &&
     Math.min(...scores) >= 0 && errs.length === 0;
   process.exit(ok ? 0 : 1);
