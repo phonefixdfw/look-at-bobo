@@ -267,3 +267,32 @@ DOM, not geometry (crisp at any size, free for the render budget). Colors are
    the Step 6 tooling pass (with palette lint), per the Step 3 brief. The
    coral/ink worst-case 8.3:1 and dash-shape (not just color) tells are already
    de-facto safe.
+
+## 12. Patriot Bobo — the costume layer (issue #55)
+
+A joke costume, not a second cat: `src/patriot.js` adds meshes to the existing
+`buildCat` rig and removes them again. Everything the style rules care about
+stays fur-only — costume meshes carry `userData.patriot`, `src/measure.js`
+skips them in every scan, and they never join `cat.contacts`. The style test's
+`patriot-bobo` moment is the only thing that puts it on (`capture:patriot`);
+every other frame is the untouched cat, proven by `patriot-only-in-its-moment`.
+
+- **Pieces:** fur hat (deformed shell hugging the head ellipsoid, fuzz
+  silhouette + fur cards like the cats', cream horns merged one mesh) kept
+  clear of the dash and the eyes (`patriot-dash-unmasked`,
+  `patriot-hat-covers-ears`); merged face-paint decals — the §5 "rules, not
+  decals" law is about the *fur's* vertex-colour markings; paint sitting on
+  top of the head as geometry is the costume's own skin; tattered flag cape +
+  crossed webbing harness, with the bib and the `SAVE THE CAPITOL` button
+  unobstructed (`patriot-button-on-bib`); a little flag on a 0.30 m stick with
+  a vertex wave that is a pure function of `t` (rests flat in calm mode).
+- **Colours:** cloth flag red `#b22234` / blue `#3c3b6e` / off-white `#f4f0e6`,
+  fur hat browns `#5c4630 / #8a6a45 / #382a1c`, cream horns `#ead9b8`, webbing
+  `#4a4a3a`. These live in `PAT` inside `src/patriot.js`, **not** in
+  `src/tokens.js` — they are one gag's cloth colours, not the design system.
+- **Cost:** ≤12 extra draw calls (10 merged meshes in practice) and ≤4.5k
+  extra triangles, measured live by re-rendering with the rig hidden
+  (`patriot-draw-budget`, `patriot-triangle-budget`); `?quality=low` halves
+  every grid. Textures are canvas-made (flag, cape, button, cheeks), nothing
+  is downloaded, and the build is hash1-only, so the costume is determinism-
+  clean inside `measured()`.
