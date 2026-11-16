@@ -456,9 +456,11 @@ try {
   const times = opts.times ?? defaultTimes(contract.duration);
   const views = pick('views', opts.views, contract.views);
   // --moments accepts moment ids AND (issue #53) spot ids — LC.setMoment
-  // stages either; the default matrix stays the declared moments.
-  const storable = [...contract.moments, ...(contract.spots || [])];
-  const moments = contract.hasMoments ? pick('moments', opts.moments, storable) : [null];
+  // stages either — but the default matrix and `all` stay the declared
+  // moments, so `capture:full` keeps shooting exactly the canonical ten and
+  // no existing baseline can shift; spot frames only appear when a command
+  // names spot ids explicitly (see capture:full:spots).
+  const moments = contract.hasMoments ? pickMoments(opts.moments, contract) : [null];
 
   // 4. Jump, render, capture, measure. Always re-assert moment+time+view so every
   //    frame is reachable in any order (random-order-compatible by construction).
@@ -689,6 +691,19 @@ function pick(what, wanted, available) {
   const unknown = wanted.filter((w) => !available.includes(w));
   if (unknown.length) {
     fail(2, `Unknown ${what}: ${unknown.join(', ')}. The page declares: ${available.join(', ')}`);
+  }
+  return wanted;
+}
+
+/** Moments resolve against the declared moments (the default matrix and
+ *  `all`), but spot-pool pages also accept spot ids when a command asks for
+ *  them by name (issue #53). Typos of either stay an error, not a skip. */
+function pickMoments(wanted, contract) {
+  if (!wanted || wanted.includes('all')) return contract.moments;
+  const storable = [...contract.moments, ...(contract.spots || [])];
+  const unknown = wanted.filter((w) => !storable.includes(w));
+  if (unknown.length) {
+    fail(2, `Unknown moments: ${unknown.join(', ')}. The page declares: ${storable.join(', ')}`);
   }
   return wanted;
 }
