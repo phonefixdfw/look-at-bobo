@@ -29,7 +29,7 @@ A realistic modern apartment, with believable lighting, materials and furniture.
 The game opens on a modern title screen (issue #57): a "LOOK AT BOBO!" logo — Bobo's black head peeking over gold lettering, his yellow-green eyes and white dash in the mark — above plain instructions and a START button. It's drawn in code (inline SVG and CSS, no downloaded fonts or images in the page), it shares its card style with the pause menu and the ending, and it names itself "Look at Bobo" to a screen reader. Pause and win both lead back to it, so the menu is the front door of the game.
 
 ## The feel
-Joyful and silly. No game over and no timers; the only setback is a gentle one-point penalty for pointing at the wrong cat. Finding Bobo is the reward, and the fireworks make every catch feel like a win.
+Joyful and silly. No game over and no timers; the only setback is a gentle one-point penalty for pointing at the wrong cat. Finding Bobo is the reward, and the fireworks make every catch feel like a win. An original happy-gothic "bardcore" soundtrack, composed for this game and synthesized live in the browser, swings quietly under it all (`docs/MUSIC.md`).
 
 ## Platform
 A desktop web browser, playable from one shareable link. Keyboard and mouse. Phones are not a goal.
