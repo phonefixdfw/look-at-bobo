@@ -190,7 +190,7 @@ export const SPOTS = [
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
   spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71),
   spot('window-bird', 'e-window', 'living', 'sit', [1.72, 'floor', 0.55], 1.51),
-  spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], -0.1),
+  spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], 3.04), // #53: was yaw −0.1 — the pool facing sweep caught him staring at the balcony (96° off the only approach); a cat sitting in the doorway looking back into the room is the same moment, readable
   spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
   // ── balcony (2) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md) ──
   spot('window-bird', 'balcony-rail', 'balcony', 'sit', [1.35, 'floor', -3.85], -2.9),

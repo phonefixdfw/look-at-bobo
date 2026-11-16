@@ -1094,7 +1094,7 @@ export function bootGame(cfg) {
 
     let decoyOk = true;
     let decoyWorst = null;
-    for (const m of MOMENTS) {
+    for (const m of POOL ? SPOTS : MOMENTS) {
       for (let seed = 1; seed <= 12; seed++) {
         const spot = chooseDecoySpot(m, mulberry32(seed * 7 + 1));
         const d = spot ? Math.hypot(spot.pos[0] - m.spot[0], spot.pos[2] - m.spot[2]) : -1;
@@ -1104,14 +1104,55 @@ export function bootGame(cfg) {
         }
       }
     }
-    add('decoy-never-shares-spot', decoyOk ? `≥${DECOY_MIN_DIST} m, all moments × 12 seeds` : decoyWorst, `≥${DECOY_MIN_DIST} m, never Bobo's spot`, decoyOk, 'the whole game is "is it Bobo?" — so a DAG! must always be findable-and-wrong');
+    add('decoy-never-shares-spot', decoyOk ? `≥${DECOY_MIN_DIST} m, all ${(POOL ? SPOTS : MOMENTS).length} ${POOL ? 'spots' : 'moments'} × 12 seeds` : decoyWorst, `≥${DECOY_MIN_DIST} m, never Bobo's spot`, decoyOk, 'the whole game is "is it Bobo?" — so a DAG! must always be findable-and-wrong');
     // and the live round right now:
     const liveD = Math.hypot(decoy.root.position.x - bobo.root.position.x, decoy.root.position.z - bobo.root.position.z);
     add('live-round-decoy-legal', liveD, `≥${DECOY_MIN_DIST} m`, liveD >= DECOY_MIN_DIST, `decoy ${game.decoyId} vs ${game.momentId}`);
 
+    // --- the spot pool (issue #53; only exists when the level ships one) --------
+    if (POOL) {
+      const coverBad = [];
+      for (const room of Object.keys(ROOM_LABELS ?? {})) {
+        const n = SPOTS.filter((s) => s.room === room).length;
+        if (n < 2) coverBad.push(`${room}:${n}`);
+      }
+      add(
+        'spot-pool-covers-rooms',
+        coverBad.length ? `thin rooms: ${coverBad.join(', ')}` : `${SPOTS.length} spots, ≥ 2 in each of ${Object.keys(ROOM_LABELS).length} rooms`,
+        '≥ 2 spots per room',
+        !coverBad.length,
+        'every room can come up in a run without a back-to-back visit (docs/LEVEL_LAYOUT.md)',
+      );
+
+      let drawBad = null;
+      for (let k = 1; k <= 200 && !drawBad; k++) {
+        const draw = pickSpotCycle(mulberry32(k * 977 + 13));
+        const rooms = draw.map((id) => POOL.get(id)?.room);
+        const types = draw.map((id) => POOL.get(id)?.type);
+        if (draw.length !== MOMENT_IDS.length || new Set(draw).size !== draw.length) drawBad = `seed ${k}: not ${MOMENT_IDS.length} distinct spots`;
+        else if (rooms.some((r) => !r)) drawBad = `seed ${k}: drew an id outside the pool`;
+        else if (new Set(types).size !== MOMENT_IDS.length) drawBad = `seed ${k}: a moment type played twice`;
+        else for (let i = 1; i < draw.length && !drawBad; i++) if (rooms[i] === rooms[i - 1]) drawBad = `seed ${k}: ${draw[i - 1]}|${draw[i]} same room back to back`;
+        for (const id of draw) {
+          if (drawBad) break;
+          const rec = POOL.get(id);
+          const d = chooseDecoySpot(rec, mulberry32(k * 7 + 3));
+          const dist = d ? Math.hypot(d.pos[0] - rec.spot[0], d.pos[2] - rec.spot[2]) : -1;
+          if (!d || dist < DECOY_MIN_DIST) drawBad = `seed ${k}: decoy illegal at ${id} (${d?.id ?? 'none'} @${dist.toFixed(2)} m)`;
+        }
+      }
+      add(
+        'run-draw-legal',
+        drawBad ?? '200 seeded draws: ten distinct, one per type, rooms alternate, decoys legal',
+        'every draw legal',
+        !drawBad,
+        'pickSpotCycle over the whole pool — same seed, same run (issue #53)',
+      );
+    }
+
     const inUnion = (x, z) => WALK_RECTS.some((r) => x >= r.x0 - 0.01 && x <= r.x1 + 0.01 && z >= r.z0 - 0.01 && z <= r.z1 + 0.01);
     let spotsOk = true;
-    for (const m of MOMENTS) if (!inUnion(m.spot[0], m.spot[2])) spotsOk = false;
+    for (const m of POOL ? SPOTS : MOMENTS) if (!inUnion(m.spot[0], m.spot[2])) spotsOk = false;
     for (const s of DECOY_SPOTS) if (!inUnion(s.pos[0], s.pos[2])) spotsOk = false;
     for (const s of SPAWNS) if (!inUnion(s.pos[0], s.pos[1])) spotsOk = false;
     add('spots-walkable', spotsOk ? 'all inside' : 'outside walk area', 'every spot/spawn inside the walk rects', spotsOk, null);
@@ -1154,7 +1195,11 @@ export function bootGame(cfg) {
     const bodyGrid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
     const reachShared = bodyGrid.flood(bodyGrid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1])); // NB a spawn's pos is [x, z] (two numbers); a moment spot is [x, support, z].
     const catSpots = [
-      ...MOMENTS.map((m) => ({
+      // Issue #53: in pool mode every spot is a place a round is played, so
+      // the reach and facing sweeps below run over the WHOLE pool — a spot a
+      // run can draw is a spot a player must be able to walk to, see, and
+      // read the direction of.
+      ...(POOL ? SPOTS : MOMENTS).map((m) => ({
         id: m.id,
         kind: 'Bobo',
         x: m.spot[0],
@@ -1312,13 +1357,15 @@ export function bootGame(cfg) {
     add('respawn-changes-room', respawnOk ? 'different room, every case' : 'same room as Bobo', 'spawn room ≠ Bobo\'s new room', respawnOk, '"respawn elsewhere" after each catch (issue #11)');
 
     // --- step 7 (issue #13): never wake up inside a cat, never inside furniture.
-    // Every legal (moment × decoy × prev-room × cycle) respawn combination,
+    // Every legal (spot × decoy × prev-room × cycle) respawn combination,
     // through the REAL pickSpawn (cat-avoiding) and the REAL world.resolve the
     // game runs at spawn — measuring where the player ACTUALLY ends up standing.
+    // Issue #53: the full game sweeps the WHOLE pool, not just the ten
+    // canonical spots, because any spot can be the round you respawn into.
     let wakeOk = true;
     let wakeWorst = Infinity;
     let wakeCase = null;
-    for (const m of MOMENTS) {
+    for (const m of POOL ? SPOTS : MOMENTS) {
       for (const d of DECOY_SPOTS) {
         if (Math.hypot(d.pos[0] - m.spot[0], d.pos[2] - m.spot[2]) < DECOY_MIN_DIST) continue; // that pair never coexists
         for (const prev of ['living', 'hall', 'bedroom']) {
