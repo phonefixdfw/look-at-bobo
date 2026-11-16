@@ -58,8 +58,7 @@ function bathMaterials() {
       emissiveIntensity: 0.55,
     }),
     pot: SURFACES.pot(), // the balcony's floor pot and railing planter
-    leaf: SURFACES.leaf(), // the pot's spiral, DoubleSide
-    bird: surface(0x3a3f45, { uvTile: 0.4, roughness: 0.8 }), // the sparrow on the rail
+    leaf: SURFACES.leaf(), // the pots' spiral, DoubleSide
   };
 }
 
@@ -128,15 +127,6 @@ function buildCurtain(bath, mats) {
   }
   const meshes = mergedMesh(bath, folds.map((b) => ({ geo: boxGeo(b), mat: mats.curtain })), { cast: false });
   for (const m of meshes) m.name = 'shower-curtain';
-
-  // the rod itself, chrome, into brackets at both ends
-  mergedMesh(
-    bath,
-    [{ geo: cylGeo({ rt: 0.011, rb: 0.011, len: C.x1 - C.x0 + 0.06, rotZ: Math.PI / 2, at: [(C.x0 + C.x1) / 2, C.rodY, C.rodZ] }), mat: mats.chrome },
-      { geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [C.x0 - 0.02, C.rodY, C.rodZ] }), mat: mats.chrome },
-      { geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [C.x1 + 0.02, C.rodY, C.rodZ] }), mat: mats.chrome }],
-    { cast: false },
-  ).forEach((m) => { m.name = 'shower-rod'; });
 }
 
 /** The wall-tile band: 1.2 m of tile on every bathroom wall, 1.2 cm proud —
@@ -192,86 +182,66 @@ function buildDecking(bath, mats) {
     .forEach((m) => { m.name = 'balcony-decking'; });
 }
 
-/** The floor pot and the railing planter, on the living room's leaf rig —
- *  the same `plantLeaves` spiral, seeded by name, so both are deterministic. */
-function buildPlants(bath, mats) {
+/** The dressing pass: every plant and detail in ONE merged call, because
+ *  `mergedMesh` groups by material — one draw per material across the whole
+ *  bath-balcony group, and the draw-call budget is the flat's scarcest room.
+ *  Nothing here is measured, tagged or a collider: the same policy as the
+ *  living room's DETAILS. The plants ride the living room's `plantLeaves`
+ *  spiral, seeded by name, so both pots are deterministic. */
+function buildDressing(bath, mats) {
+  const D = DETAILS;
   const P = BALCONY_PLANT;
-  mergedMesh(bath, [{ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0, y1: P.y0 + P.pot.h, rt: P.pot.r1, rb: P.pot.r0 }), mat: mats.pot }], { cast: false })
-    .forEach((m) => { m.name = 'balcony-pot'; });
-  const leaves = [];
-  const spec = { name: 'balcony-floor-pot', pot: P.pot, leaf: { n: P.count } };
+  const C = CURTAIN;
+  const entries = [];
+
+  // porcelain: the tank and its lid stand behind the tagged bowl
+  for (const b of [D.tank, D.tankLid]) entries.push({ geo: boxGeo(b), mat: mats.porcelain });
+  // dark: the bowl's water shadow, the pot's soil, the sparrow on the rail
+  entries.push({ geo: boxGeo(D.bowlWell), mat: mats.dark });
+  entries.push({ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0 + P.pot.h - 0.012, y1: P.y0 + P.pot.h, rt: P.pot.r1 - 0.012, rb: P.pot.r1 - 0.012 }), mat: mats.dark });
+  const B = BIRD; // facing the glass door, body / head / tail
+  entries.push({ geo: boxGeo({ x0: B.x - 0.035, y0: 1.145, z0: B.z - 0.03, x1: B.x + 0.035, y1: 1.185, z1: B.z + 0.03 }), mat: mats.dark });
+  entries.push({ geo: boxGeo({ x0: B.x - 0.02, y0: 1.185, z0: B.z + 0.0, x1: B.x + 0.015, y1: 1.215, z1: B.z + 0.035 }), mat: mats.dark });
+  entries.push({ geo: boxGeo({ x0: B.x + 0.03, y0: 1.15, z0: B.z - 0.055, x1: B.x + 0.045, y1: 1.165, z1: B.z - 0.03 }), mat: mats.dark });
+  // chrome: mirror glass, paper arm, every fitting — and the curtain's rod,
+  // which hangs here rather than with the cloth so the rod is not a draw
+  entries.push({ geo: boxGeo(D.mirrorGlass), mat: mats.chrome });
+  entries.push({ geo: boxGeo(D.paperArm), mat: mats.chrome });
+  for (const c of [D.tubSpout, D.tapW, D.tapE, D.showerArm, D.showerHead]) entries.push({ geo: cylGeo(c), mat: mats.chrome });
+  entries.push({ geo: cylGeo({ rt: 0.011, rb: 0.011, len: C.x1 - C.x0 + 0.06, rotZ: Math.PI / 2, at: [(C.x0 + C.x1) / 2, C.rodY, C.rodZ] }), mat: mats.chrome });
+  for (const bx_ of [C.x0 - 0.02, C.x1 + 0.02]) {
+    entries.push({ geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [bx_, C.rodY, C.rodZ] }), mat: mats.chrome });
+  }
+  // towel, paper, bin: one material each
+  for (const b of [D.towel, D.towelBack]) entries.push({ geo: boxGeo(b), mat: mats.towel });
+  entries.push({ geo: cylGeo(D.paperRoll), mat: mats.paper });
+  entries.push({ geo: boxGeo(D.bin), mat: mats.bin });
+  // pots: the floor pot and the railing's trough planter
+  entries.push({ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0, y1: P.y0 + P.pot.h, rt: P.pot.r1, rb: P.pot.r0 }), mat: mats.pot });
+  const tr = BIRD.pot;
+  entries.push({ geo: boxGeo({ x0: tr.x - 0.16, y0: tr.y, z0: tr.z - 0.055, x1: tr.x + 0.16, y1: tr.y + 0.145, z1: tr.z + 0.055 }), mat: mats.pot });
+  // leaves: the floor pot's spiral and the trough's blades, UVs kept as drawn
   const base = broadLeafGeo(P.leaf);
-  for (const lf of plantLeaves(spec)) {
+  for (const lf of plantLeaves({ name: 'balcony-floor-pot', pot: P.pot, leaf: { n: P.count } })) {
     const g = base.clone();
     g.scale(lf.scale, lf.scale, lf.scale);
     g.rotateY(lf.yaw);
     g.rotateX(-lf.tilt);
     g.translate(P.x + lf.at[0], P.y0 + lf.at[1], P.z + lf.at[2]);
-    leaves.push(g);
+    entries.push({ geo: g, mat: mats.leaf, keepUV: true });
   }
-  mergedMesh(bath, leaves.map((geo) => ({ geo, mat: mats.leaf, keepUV: true })), { cast: false });
-
-  // soil, so the spiral emerges from earth and not from the pot's lid
-  mergedMesh(
-    bath,
-    [{ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0 + P.pot.h - 0.012, y1: P.y0 + P.pot.h, rt: P.pot.r1 - 0.012, rb: P.pot.r1 - 0.012 }), mat: mats.dark }],
-    { cast: false },
-  );
-
-  // the railing planter: a trough on the cap rail, three blades in it
-  const tr = BIRD.pot;
-  mergedMesh(
-    bath,
-    [{ geo: boxGeo({ x0: tr.x - 0.16, y0: tr.y, z0: tr.z - 0.055, x1: tr.x + 0.16, y1: tr.y + 0.145, z1: tr.z + 0.055 }), mat: mats.pot }],
-    { cast: false },
-  ).forEach((m) => { m.name = 'railing-planter'; });
-  const trough = [];
-  const tspec = { name: 'railing-planter', pot: { h: 0.145 }, leaf: { n: 5 } };
   const tbase = broadLeafGeo({ len: 0.16, wid: 0.11, bend: 0.05 });
+  const tspec = { name: 'railing-planter', pot: { h: 0.145 }, leaf: { n: 5 } };
   for (const [i, lf] of [...plantLeaves(tspec)].entries()) {
     const g = tbase.clone();
     g.scale(0.85, 0.85, 0.85);
     g.rotateY(lf.yaw);
     g.rotateX(-lf.tilt);
     g.translate(tr.x - 0.10 + i * 0.05, tr.y + lf.at[1], tr.z + lf.at[2] * 0.4);
-    trough.push(g);
+    entries.push({ geo: g, mat: mats.leaf, keepUV: true });
   }
-  mergedMesh(bath, trough.map((geo) => ({ geo, mat: mats.leaf, keepUV: true })), { cast: false });
-}
 
-/** The DETAILS pass: dressing, merged per material, never measured, never a
- *  collider — the same policy as the living room. */
-function buildDetails(bath, mats) {
-  const D = DETAILS;
-  const porcelain = [D.tank, D.tankLid];
-  mergedMesh(bath, porcelain.map((b) => ({ geo: boxGeo(b), mat: mats.porcelain })), { cast: false });
-  mergedMesh(bath, [{ geo: boxGeo(D.bowlWell), mat: mats.dark }], { cast: false });
-  mergedMesh(bath, [{ geo: boxGeo(D.mirrorGlass), mat: mats.chrome }], { cast: false });
-  mergedMesh(
-    bath,
-    [D.towel, D.towelBack].map((b) => ({ geo: boxGeo(b), mat: mats.towel })),
-    { cast: false },
-  );
-  mergedMesh(bath, [{ geo: boxGeo(D.paperArm), mat: mats.chrome }], { cast: false });
-  mergedMesh(bath, [{ geo: cylGeo(D.paperRoll), mat: mats.paper }], { cast: false });
-  mergedMesh(
-    bath,
-    [D.tubSpout, D.tapW, D.tapE, D.showerArm, D.showerHead].map((c) => ({ geo: cylGeo(c), mat: mats.chrome })),
-    { cast: false },
-  );
-  mergedMesh(bath, [{ geo: boxGeo(D.bin), mat: mats.bin }], { cast: false });
-
-  // the sparrow on the cap rail: two boxes, facing the glass door
-  const B = BIRD;
-  mergedMesh(
-    bath,
-    [
-      { geo: boxGeo({ x0: B.x - 0.035, y0: 1.145, z0: B.z - 0.03, x1: B.x + 0.035, y1: 1.185, z1: B.z + 0.03 }), mat: mats.bird },
-      { geo: boxGeo({ x0: B.x - 0.02, y0: 1.185, z0: B.z + 0.0, x1: B.x + 0.015, y1: 1.215, z1: B.z + 0.035 }), mat: mats.bird },
-      { geo: boxGeo({ x0: B.x + 0.03, y0: 1.15, z0: B.z - 0.055, x1: B.x + 0.045, y1: 1.165, z1: B.z - 0.03 }), mat: mats.bird }, // tail
-    ],
-    { cast: false },
-  ).forEach((m) => { m.name = 'balcony-bird'; });
+  mergedMesh(bath, entries, { cast: false });
 }
 
 /** Everything the data describes, hung under one group. */
@@ -286,8 +256,7 @@ export function buildFullBath(parent) {
   buildTileBand(bath, mats);
   buildWindow(bath, mats);
   buildDecking(bath, mats);
-  buildPlants(bath, mats);
-  buildDetails(bath, mats);
+  buildDressing(bath, mats);
 
   // standing policy of both built rooms: nothing casts, everything receives.
   bath.traverse((o) => {

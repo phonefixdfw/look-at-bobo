@@ -94,7 +94,7 @@ export const FOOT = {
   // tub: 1.60 × 0.75 along the south wall, rim 0.55 (row 56, see the header)
   tub: F(-3.30, 3.15, -1.70, 3.90),
   // the mat gets a FOOT for the walkway report but NO collider (2 cm of pile)
-  mat: F(-2.65, 2.68, -1.75, 3.13),
+  mat: F(-2.65, 2.67, -1.75, 3.13),
   // small bin in the doorway field's south corner
   bin: F(-1.52, 3.66, -1.28, 3.90),
   // balcony chair: the placeholder's footprint, kept verbatim so the
@@ -165,8 +165,9 @@ export const PIECES = [
       bx(V.x0 + 0.02, 0.06, V.z0, V.x1 - 0.02, 0.82, 2.66), // cabinet body
       bx(V.x0 + 0.02, 0, V.z0, V.x1 - 0.02, 0.06, 2.64), // toe, darker below
     ],
-    'vanity',
+    null,
     'row 53: 0.90 × 0.48, counter top 0.86 (inside the 0.80…0.92 allowed)',
+    'vanity',
   ),
   piece(
     'vanity-counter',
@@ -291,7 +292,7 @@ export const PIECES = [
     'mat',
     [bx(FOOT.mat.x0, 0, FOOT.mat.z0, FOOT.mat.x1, 0.022, FOOT.mat.z1)],
     'bath-mat',
-    'row 57: 0.90 long × 0.45 wide (the allowed 0.45 at the pinched end of its range)',
+    'row 57: 0.90 long × 0.46 wide (a centimetre inside the allowed 0.45 at the pinched end of its range)',
   ),
 
   /* ── shower curtain: the hide-behind piece. Its own named mesh, no scale

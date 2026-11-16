@@ -207,7 +207,7 @@ export const SPOTS = [
   spot('sink-sit', 'bar', 'kitchen', 'side', [4.1, 'barTop', 0.4], -0.14, { open: true }),
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
   // ── hall + entry + bathroom (5) ─────────────────────────────────────────
-  spot('hall-chase', 'hall', 'hall', 'loaf', [-0.35, 'floor', 3.3], -0.19),
+  spot('hall-chase', 'hall', 'hall', 'loaf', [-0.35, 'floor', 3.3], 0.585), // turns to the bathroom door as well as the dash north (issue #49: the room's east band is a nearer vantage than the hall's middle now)
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
   spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 3.1], 1.9),
@@ -487,7 +487,7 @@ export const SCALE_RANGES = {
   wardrobe: { w: [1.1, 1.3], d: [0.55, 0.65], h: [1.95, 2.15], note: 'wardrobe 1.20 × 0.60 × 2.05' },
   'laundry-basket': { w: [0.36, 0.46], d: [0.36, 0.46], h: [0.5, 0.62], note: 'basket 0.40 × 0.40 × 0.55' },
   vanity: { w: [0.85, 0.95], d: [0.45, 0.55], h: [0.8, 0.9], note: 'vanity 0.90 × 0.50 × 0.85' },
-  toilet: { w: [0.35, 0.42], d: [0.62, 0.72], h: [0.36, 0.45], note: 'toilet 0.38 × 0.68 × 0.40' },
+  toilet: { w: [0.62, 0.72], d: [0.35, 0.42], h: [0.36, 0.45], note: 'toilet 0.68 deep × 0.37 across (w is the check\'s long horizontal span)' },
   // rows 54-57 (issue #49): the tub, the mirror, the bar and the mat, drawn
   // by game/full-bath-mesh.js and measured back off the built boxes
   tub: { w: [1.5, 1.8], d: [0.7, 0.8], h: [0.5, 0.62], note: 'row 56: 1.60 × 0.75, rim 0.55' },
