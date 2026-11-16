@@ -150,30 +150,32 @@ function worldUV(geo, tile = 0.6) {
 // 3. The surfaces (colour + normal + roughness, one object each)
 // ---------------------------------------------------------------------------
 
-/** Walnut: plank seams, wandering grain, cathedral figure, open-pore specks,
- *  and edges a shade worn. Tile = 0.6 m. */
+/** Walnut: plank seams and a shade of wear, and NOTHING else. The height
+ *  field exists only to give the plank seams their relief. Tile = 0.6 m.
+ *
+ *  It used to scatter 220 near-black 1-3 px "open pores" across the tile,
+ *  and the Sobel pass in normalMapFrom baked each one into a steep dark
+ *  pin-dot every time a surface brought the map near a pixel (issue #65:
+ *  "the wood has black dots on it"). Real open pores are smaller than a
+ *  texel at this tile size; drawing them at 256 px only draws artefacts.
+ *  Pore character now lives in the colour map as a few soft knots.
+ *
+ *  Grain grooves are also absent on purpose: tested with them, the game's
+ *  low raking sun turns every parallel micro-groove into a black bar
+ *  (perturbed normals face away from a near-tangent light — this is plain
+ *  Lambert, not shadow acne, so no bias trick fixes it). Grain lives in
+ *  the colour map, where it reads the way real varnished wood does: as
+ *  pigment, not relief. Only the plank seam stays a groove, and shallow. */
 const WOOD_H = (ctx, s) => {
   ctx.fillStyle = '#808080';
   ctx.fillRect(0, 0, s, s);
   const plank = s / 3;
   for (let p = 0; p < 3; p++) {
-    // No grain grooves in the height field. Tested with them: the game's
-    // low raking sun turns every parallel micro-groove into a black bar
-    // (perturbed normals face away from a near-tangent light — this is
-    // plain Lambert, not shadow acne, so no bias trick fixes it). Grain
-    // lives in the colour map, where it reads the same way real varnished
-    // wood does: as pigment, not relief. Only the plank seam stays a
-    // groove, and it is shallow.
     // seam between planks: a soft groove, not a trench
     ctx.fillStyle = 'rgba(88,88,88,0.65)';
     ctx.fillRect(0, (p + 1) * plank - 2, s, 3);
     ctx.fillStyle = 'rgba(250,250,250,0.16)';
     ctx.fillRect(0, (p + 1) * plank + 1.4, s, 1);
-  }
-  for (let i = 0; i < 220; i++) {
-    // open pores
-    ctx.fillStyle = `rgba(18,18,18,${0.25 + hash1(i * 1.7) * 0.4})`;
-    ctx.fillRect(hash1(i * 3.1) * s, hash1(i * 5.3) * s, 1 + hash1(i) * 2, 1);
   }
 };
 // NOTE on colour bases: every map here is WHITE-based with translucent
@@ -210,6 +212,18 @@ const woodMap = colourMap(256, (ctx, s) => {
       for (let x = 1; x <= 4; x++) ctx.lineTo((x / 4) * s, gy + Math.sin(x * 1.7 + k) * 3);
       ctx.stroke();
     }
+    // one soft knot per plank: the pore character the height field used to
+    // fake with hard black specks (issue #65), drawn the way a knot actually
+    // looks — a warm dark centre fading out, never below the walnut token.
+    const kx = (0.15 + hash1(p * 17 + 3) * 0.7) * s;
+    const ky = p * plank + (0.3 + hash1(p * 7 + 9) * 0.4) * plank;
+    const kr = 5 + hash1(p * 11 + 1) * 6;
+    const kg = ctx.createRadialGradient(kx, ky, 0, kx, ky, kr);
+    kg.addColorStop(0, 'rgba(52,33,19,0.16)');
+    kg.addColorStop(0.6, 'rgba(52,33,19,0.07)');
+    kg.addColorStop(1, 'rgba(52,33,19,0)');
+    ctx.fillStyle = kg;
+    ctx.fillRect(kx - kr, ky - kr, kr * 2, kr * 2);
     ctx.fillStyle = 'rgba(46,29,17,0.30)'; // plank seam — a shade line, not a gap
     ctx.fillRect(0, (p + 1) * plank - 2, s, 3);
   }
@@ -231,6 +245,30 @@ const woodRough = dataMap(256, (ctx, s) => {
   }
 });
 const woodNormal = normalMapFrom(256, WOOD_H, { strength: 0.14 });
+
+/** Count near-black pixels in the walnut maps — `wood-texture-clean` in
+ *  game/full.js measures this (issue #65: "the wood has black dots on it").
+ *  The colour canvas is read straight off the live texture; the height
+ *  drawing is re-painted to an offscreen canvas, because the normal map
+ *  bakes WOOD_H through a Sobel pass and a dark speck anywhere in the
+ *  height field is what became a pin-dot on screen. The roughness map is
+ *  mid-grey noise and paints no colour, so it is not audited. */
+function woodTextureAudit() {
+  const darkFraction = (canvas) => {
+    const s = canvas.width;
+    const d = canvas.getContext('2d').getImageData(0, 0, s, s).data;
+    let dark = 0;
+    for (let i = 0; i < s * s; i++) {
+      const luma = 0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2];
+      if (luma < 90) dark++;
+    }
+    return dark / (s * s);
+  };
+  return {
+    colour: darkFraction(woodMap.image),
+    height: darkFraction(paintCanvas(256, WOOD_H)),
+  };
+}
 
 /** Marble/quartz worktop: cool white body, grey veins, fine sparkle, and a
  *  roughness map so the polished field differs from the sanded edge. */
@@ -854,6 +892,7 @@ export {
   colourMap,
   dataMap,
   normalMapFrom,
+  woodTextureAudit,
   worldUV,
   surface,
   fabric,
