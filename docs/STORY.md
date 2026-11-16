@@ -41,6 +41,8 @@ Brandon answered: use **"normal cat stuff"** — everyday cat behaviour such as 
 
 **Moment order:** **RANDOM** each playthrough, with **no repeats within a run** and still **exactly 10 points** (10 moments). Layout/respawn logic must therefore support any moment appearing from any valid location under the accepted provisional layout (real apartment layout remains TBD if not supplied).
 
+**Where Bobo hides (issue #53):** in the full flat, each run also draws *where* every moment happens. The level ships a pool of 28 authored spots (`SPOTS` in `game/full-level.js`); a run takes one spot per moment type — all ten types, exactly once — in an order with **never two catches in the same room back to back**, so ten points means touring the whole flat instead of camping one sofa. The draw is seeded: the same seed replays the same hiding places in the same order (`capture --determinism` proves it). The decoy cat likewise prefers a room other than Bobo's new spot, while keeping its iron rule: never Bobo's spot, always ≥ 1.2 m away, always findable. See `docs/LEVEL_LAYOUT.md` ("The spot pool") for the table and the draw's mechanics.
+
 ## Story rules / truths (constraints for later steps)
 - Bobo is the star and is always cute, never a villain or a prop.
 - Bobo is never in danger. There is no game over and no timers; the only setback is the gentle one-point wrong-cat penalty, and the score floors at 0.
