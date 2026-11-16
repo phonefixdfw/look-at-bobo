@@ -41,6 +41,7 @@ import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
+import { resolveRunSeed, randomRunSeed } from '../src/run-seed.js';
 
 /**
  * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
@@ -96,7 +97,21 @@ export function bootGame(cfg) {
 
   const GATE_OFF = params.get('gate') === 'off';
   const TARGET = clamp(Number.parseInt(params.get('win') ?? String(WIN_DEFAULT), 10) || WIN_DEFAULT, 1, 20);
-  const SEED = Number.parseInt(params.get('seed') ?? '11', 10) || 11;
+  /** The run's seed (issue #66). A live page — the gate up, no ?seed= in the
+   *  url — draws a fresh random one at load and again at every new run, so two
+   *  visits are not the same ten spots; that fixed default was the bug: seed 11
+   *  draws the identical cycle every time, and the Patriot rule was calibrated
+   *  so seed 11 draws NO Patriot, so a player could never find him.
+   *  Tools are untouched: ?gate=off and every tool page, bot and stress run
+   *  still get seed 11 (or the ?seed=N they asked for), and `?seed=N` stays the
+   *  override that reproduces a run exactly — read it off the gear panel or the
+   *  ?stamp=on line and a bug report replays. Mutable on purpose: it is the
+   *  CURRENT run's seed, re-drawn by `reseedForNewRun()` before each run's
+   *  seeded streams exist, never from inside gameplay. */
+  const RUN_SEED = resolveRunSeed(params, GATE_OFF);
+  const LIVE_SEED = RUN_SEED.live; // re-draw on every new run? (live play only)
+  const SEED_SOURCE = RUN_SEED.source;
+  let SEED = RUN_SEED.seed;
   const INITIAL_SCORE = clamp(Number.parseInt(params.get('score') ?? '0', 10) || 0, 0, TARGET);
 
   /** Patriot Bobo (issue #58, part of #35): the rare costume bonus cat. Every
@@ -497,6 +512,22 @@ export function bootGame(cfg) {
     game.patriot = false;
   }
 
+  /** THE SEED OF A NEW RUN (issue #66). Live play re-draws it here — once per
+   *  new run, always BEFORE that run's seeded streams exist — so "play again",
+   *  the pause card's restart and the win's click hand out different spots every
+   *  time. A tool page (?gate=off) and a pinned ?seed=N keep theirs, so every
+   *  baseline, the determinism proofs and the bot replays are untouched. From
+   *  here on the run is a pure function of this number — replays included
+   *  (`mulberry32(SEED + 991)` rides the run's seed, not a fresh draw) — which
+   *  is why the draw lives here and never inside gameplay. `measured()` and the
+   *  render guard never wrap this call, so the determinism guard sees no
+   *  unseeded call from it. The stamp line follows the run. */
+  function reseedForNewRun() {
+    if (!LIVE_SEED) return;
+    SEED = randomRunSeed();
+    renderStamp(); // the gear panel / start card / ?stamp=on line carry the seed
+  }
+
   const player = { x: SPAWNS[0].pos[0], z: SPAWNS[0].pos[1], yaw: SPAWNS[0].yaw, pitch: 0, bob: 0 };
 
   /** The decoy pick, plant-aware so ?plant=decoy-share can make the
@@ -707,6 +738,7 @@ export function bootGame(cfg) {
   }
 
   function restartRun() {
+    reseedForNewRun(); // issue #66: a live restart is a NEW run, so a new seed
     rng = mulberry32(SEED + 991); // replays are still seeded runs, never Math.random
     refills = 0;
     queue = [];
@@ -2372,6 +2404,7 @@ export function bootGame(cfg) {
 
   function startGame() {
     started = true;
+    reseedForNewRun(); // issue #66: pressing START is a new run, so a new seed
     rng = mulberry32(SEED);
     refills = 0;
     queue = [];
