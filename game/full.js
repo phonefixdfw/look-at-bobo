@@ -174,7 +174,7 @@ function batThePen(pen, supports, t) {
  *  six extra frames every time starves the live frame loop under load (the
  *  stress suite's 150 ms reticle-soft window noticed on a busy machine). */
 const doorFramesDone = { v: false };
-function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], SPOTS = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
+function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -696,6 +696,54 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'same seed = same plan; ?patriot=off draws none, ever',
       twice && !offAny,
       'issue #58: the roll is a pure function of the seed; the kill switch is real',
+    );
+  }
+
+  /* Issue #66 — live play now draws a RANDOM seed, so the question that
+   * matters is no longer "what does seed 11 draw" (it drew the same ten spots
+   * for every player ever, and no Patriot at all) but "what does a random run
+   * look like". 500 pseudo-random 31-bit seeds — drawn from a fixed base, so
+   * the check itself stays deterministic — through the two pure functions the
+   * engine actually plays with: pickSpotCycle and runPatriotPlan. Measured
+   * over 500 random seeds: every one of the 28 spots lands in 12%…100% of
+   * runs, the balcony is reached by ~49% of runs, 83% of runs find at least
+   * one Patriot, 1.24 finds per run. tools/seed-coverage.mjs prints the
+   * per-spot table this one summarises. */
+  {
+    const N = 500;
+    const dice = mulberry32(0x6c6b6f62); // 'lob' — a fixed base: random-shaped seeds, a check that never flaps
+    const seeds = Array.from({ length: N }, () => 1 + Math.floor(dice() * (2 ** 31 - 1)));
+    const roomOf = new Map((SPOTS ?? []).map((s) => [s.id, s.room]));
+    const spotRuns = new Map((SPOT_IDS ?? []).map((id) => [id, 0]));
+    const roomRuns = new Map();
+    let patriotRuns = 0;
+    let totalFinds = 0;
+    for (const s of seeds) {
+      const rooms = new Set();
+      for (const id of pickSpotCycle(mulberry32(s))) {
+        spotRuns.set(id, (spotRuns.get(id) ?? 0) + 1);
+        rooms.add(roomOf.get(id) ?? '?');
+      }
+      for (const r of rooms) roomRuns.set(r, (roomRuns.get(r) ?? 0) + 1);
+      const hits = runPatriotPlan(s, MOMENT_IDS.length, { enabled: true }).filter(Boolean).length;
+      if (hits > 0) patriotRuns++;
+      totalFinds += hits;
+    }
+    let rarest = null;
+    for (const [id, n] of spotRuns) if (!rarest || n < rarest.n) rarest = { id, n };
+    const rareShare = rarest ? rarest.n / N : 0;
+    const patriotShare = patriotRuns / N;
+    const perRun = totalFinds / N;
+    const never = [...spotRuns].filter(([, n]) => n === 0).map(([id]) => id);
+    const ok = never.length === 0 && rareShare >= 0.08 && patriotShare > 0.7 && patriotShare < 0.95 && perRun > 1 && perRun < 1.5;
+    add(
+      'pool-coverage-over-random-seeds',
+      `rarest spot ${(rareShare * 100).toFixed(1)}% (${rarest?.id}), balcony in ${((roomRuns.get('balcony') ?? 0) / N * 100).toFixed(0)}% of runs, Patriot in ${(patriotShare * 100).toFixed(1)}% of runs, ${perRun.toFixed(2)} finds/run`,
+      'every spot in ≥8% of runs; a Patriot in 70…95% of runs; ≈1.2 finds/run',
+      ok,
+      never.length
+        ? `issue #66: ${N} random live seeds, but never drawn: ${never.join(', ')}`
+        : `issue #66: ${N} random live seeds through pickSpotCycle + runPatriotPlan. The issue guessed 40…55% Patriot runs; the measured rate is ${(patriotShare * 100).toFixed(1)}% — the 1-in-6 dice get nine legal rolls a run, so the honest band is 70…95%.`,
     );
   }
 

@@ -26,6 +26,20 @@ performance.now = () => {
   if (rendering) throw new Error('performance.now() called during render: the frame is not deterministic');
   return REAL_NOW();
 };
+// Issue #66: live play takes its RUN SEED from crypto (src/run-seed.js), so a
+// count that only watched Math.random and Date.now could go green while a stray
+// dice roll hid inside gameplay. Same rule for the platform RNG: counted inside
+// the measured region, refused during a render. The seed itself is picked at
+// boot and at a run restart, both outside any measured() call, so the count
+// stays 0 the way it was before.
+if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function') {
+  const REAL_GET_RANDOM_VALUES = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+  globalThis.crypto.getRandomValues = (...args) => {
+    if (measuring) unseededCalls++;
+    if (rendering) throw new Error('crypto.getRandomValues() called during render: the frame is not deterministic');
+    return REAL_GET_RANDOM_VALUES(...args);
+  };
+}
 const measured = (fn) => {
   measuring++;
   try {
