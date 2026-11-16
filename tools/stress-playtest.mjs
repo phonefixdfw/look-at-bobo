@@ -24,6 +24,9 @@
 //      decoy, and a shout at nothing nudges instead of saying nothing at all
 //  13  Patriot Bobo (issue #58): the off switch, the forced +3 find, and a
 //      live run that matches LC.patriotPlan and replays it after restart
+//  14  the run seed (issue #66): live boots play different seeds, ?seed=N
+//      reproduces one, a live restart re-seeds, ?gate=off stays on 11, and the
+//      seed is readable on the gear panel and the ?stamp=on line
 //
 // Free and local: starts its own static server, uses the installed Chrome.
 //
@@ -618,6 +621,90 @@ try {
   }
 } catch (err) {
   check('patriot-bobo-run', false, String(err).split('\n')[0]);
+}
+
+// ---------------------------------------------------------------------------
+// 14. Issue #66: live play is RANDOM, the tools are not. Two live boots (the
+//     gate up, no ?seed) must play two different runs; ?seed=N must hand back
+//     the same run twice; a live restart must re-seed; ?gate=off must stay on
+//     the fixed seed 11; and the seed must be readable on the page. The rule
+//     itself lives in src/run-seed.js and is checked inside the page by the
+//     engine's selfTest — this is the boots-and-restarts half of it.
+// ---------------------------------------------------------------------------
+try {
+  const READ = `(() => {
+    const s = window.LC.seed();
+    const panel = document.getElementById('settings-build');
+    const corner = document.getElementById('build-corner');
+    return {
+      seed: s, info: window.LC.seedInfo(),
+      cycle: window.LC.spotCycle(s).join(','),
+      plan: window.LC.patriotPlan(s, 10).map((x) => (x ? 1 : 0)).join(''),
+      hasPanel: Boolean(panel), panelText: panel?.textContent ?? '',
+      hasCorner: Boolean(corner), cornerText: corner?.textContent ?? '',
+    };
+  })()`;
+  const read = (page) => page.evaluate(READ);
+  const wantSeed = (r) => `seed ${r.seed}`;
+
+  const tool = await newPage('?gate=off');
+  const t = await read(tool);
+  check('#66 ?gate=off boots on the fixed seed 11', t.info.gateOff === true && t.seed === 11 && t.info.live === false, `seed ${t.seed}, live=${t.info.live}`);
+  await tool.close();
+
+  const liveA = await newPage('');
+  const a = await read(liveA);
+  const liveB = await newPage('');
+  const b = await read(liveB);
+  check(
+    '#66 a live boot (gate up, no ?seed) plays a random seed',
+    a.info.live === true && a.info.pinned === null && a.seed !== 11 && b.seed !== 11 && Number.isInteger(a.seed),
+    `boot A plays ${a.seed}, boot B plays ${b.seed}`,
+  );
+  check(
+    '#66 two live boots play different runs',
+    a.seed !== b.seed && (a.cycle === '' || a.cycle !== b.cycle),
+    `A ${a.seed} [${a.plan}] vs B ${b.seed} [${b.plan}]`,
+  );
+
+  const reseeded = await liveA.evaluate(() => {
+    const before = window.LC.seed();
+    window.LC.restart(); // play again / the pause card / the win all end here
+    return { before, after: window.LC.seed(), cycle: window.LC.spotCycle(window.LC.seed()).join(',') };
+  });
+  check('#66 play again / restart re-seeds a live run', reseeded.after !== reseeded.before, `seed ${reseeded.before} → ${reseeded.after}`);
+  await liveA.close();
+  await liveB.close();
+
+  const pinA = await newPage('?seed=4242');
+  const r1 = await read(pinA);
+  await pinA.close();
+  const pinB = await newPage('?seed=4242');
+  const r2 = await read(pinB);
+  check(
+    '#66 ?seed=N hands back the same run on every boot',
+    r1.seed === 4242 && r2.seed === 4242 && r1.cycle === r2.cycle && r1.plan === r2.plan && r1.info.live === false,
+    `cycle A ${r1.cycle.slice(0, 34) || '(no pool)'}… / plan ${r1.plan} vs ${r2.plan}`,
+  );
+  await pinB.close();
+
+  const stamped = await newPage('?seed=4242&stamp=on');
+  const s = await read(stamped);
+  check(
+    '#66 the seed is readable on the gear panel and the ?stamp=on line',
+    (s.hasPanel || s.hasCorner)
+      && (!s.hasPanel || s.panelText.includes(wantSeed(s)))
+      && (!s.hasCorner || s.cornerText.includes(wantSeed(s))),
+    `panel: ${s.panelText || '(no panel)'} | corner: ${s.cornerText || '(none)'}`,
+  );
+  await stamped.close();
+
+  const capturePage = await newPage('?gate=off&stamp=on');
+  const c = await read(capturePage);
+  check('#66 capture mode still keeps every stamp out of the frame', c.hasCorner === false && c.panelText === '', `corner=${c.hasCorner} panel="${c.panelText}"`);
+  await capturePage.close();
+} catch (err) {
+  check('#66 live-seed scenario ran', false, String(err).split('\n')[0]);
 }
 
 // ---------------------------------------------------------------------------
