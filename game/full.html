@@ -27,7 +27,9 @@
     Audio check:    npm run audio:fullcheck
     Phone check:    npm run check:mobile  (headless mobile emulation)
 
-    Parameters:  ?gate=off   skip the click gate (headless capture only)
+    Parameters:  ?gate=off   skip the title screen (headless capture only —
+                            the title screen is fully hidden and empty there,
+                            so every capture baseline is byte-identical)
                  ?win=N      points to win (default 10)
                  ?seed=N     the moment-order seed (default 11)
                  ?score=N    start at N points
@@ -40,6 +42,8 @@
                  ?quality=low|high  weak-GPU path; auto-low on phones,
                                     ?quality=high forces the full look back
                  ?touch=on|off      force touch controls on / off (QA)
+                 ?motion=off        calm: no logo blink/ear-flick/bob, no rain
+                 ?contrast=high     high-contrast UI
     Faults to prove the checks bite (selfTest / budget must FAIL):
       ?plant=text | audio | score | repeats | decoy-share | over-budget |
       no-collision   (the same seven faults the slice proves)
@@ -49,11 +53,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
     <title>Look at Bobo — the full game (all ten moments, win at ten)</title>
-    <!-- Inline placeholder icon: no extra request, so a 404 can never hide in a capture. -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1e26'/%3E%3Crect x='14' y='7' width='4' height='9' rx='2' fill='%23f1ece1'/%3E%3Ccircle cx='16' cy='21' r='6' fill='%23f1ece1'/%3E%3C/svg%3E" />
+    <!-- Favicon: the logo mark (assets/logo/logo.svg) as a data URI — no extra
+         request, so a 404 can never hide in a capture. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b1e26'/%3E%3Cpath d='M16.5 23.5 20.5 6.5 31 16.5Z' fill='%23f1ece1'/%3E%3Cpath d='M47.5 23.5 43.5 6.5 33 16.5Z' fill='%23f1ece1'/%3E%3Cellipse cx='32' cy='34.5' rx='17' ry='15.5' fill='%23f1ece1'/%3E%3Crect x='30.4' y='20.5' width='3.2' height='7.4' rx='1.6' fill='%23e8b04a'/%3E%3Cpath d='M22.2 35.5q3.2 2.7 6.4 0' fill='none' stroke='%231b1e26' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M35.4 35.5q3.2 2.7 6.4 0' fill='none' stroke='%231b1e26' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M32 40.2 34 42.6h-4Z' fill='%231b1e26'/%3E%3C/svg%3E" />
     <script type="importmap">
       { "imports": { "three": "/vendor/three/three.module.js" } }
     </script>
+    <!-- issue #57: the title screen's look and the shared card vocabulary.
+         A file, not an import: a stylesheet link cannot break the module
+         graph, and under ?gate=off nothing in here matches anything that
+         paints (the gate is display:none). -->
+    <link rel="stylesheet" href="./title.css" />
     <style>
       /* UI rules are part of the design system — docs/ART_STYLE.md §8, and the
          exact same vocabulary as the style test and the Step 5 demo: score
@@ -428,13 +438,6 @@
         background: rgba(16, 21, 28, 0.86);
         border: 1px solid rgba(247, 244, 238, 0.14);
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
-      }
-      .gate-eyebrow {
-        color: var(--ui-mustard);
-        font-weight: 800;
-        letter-spacing: 0.22em;
-        font-size: 12px;
-        margin-bottom: 14px;
       }
       #gate-btn {
         pointer-events: auto;
@@ -1013,7 +1016,11 @@
       }
     </style>
   </head>
-  <body>
+  <body class="splash">
+    <!-- issue #57: body starts carrying .splash (the title card is up, the
+         game chrome is beneath it) so there is no class-less first frame;
+         unlockGate() removes it in the same click that hides the gate, and
+         ?gate=off pages never show a gate at all, hidden or otherwise. -->
     <canvas id="view"></canvas>
 
     <!-- Phone controls (issue #25): invisible unless the engine adds .touch.
@@ -1059,19 +1066,59 @@
       <div id="wrong-flash"></div>
       <div id="ending-veil"></div>
       <div id="ending">your did it! you wind</div>
-      <div id="ending-again">click or press space to play again</div>
+      <div id="ending-again">click or press space to go back to the menu</div>
     </div>
 
     <div id="gate">
       <div class="gate-card">
-        <div class="gate-eyebrow">LOOK AT BOBO — THE FULL GAME</div>
-        <button id="gate-btn" type="button">click to start</button>
+        <!-- The logo (issue #57): "LOOK AT BOBO!" drawn in code — the word is
+             HTML text (bold system stack, layered outlines: no downloaded
+             fonts), Bobo is this inline SVG peeking OVER the lettering, his
+             bib slipping behind the word. Eyes open, watching, ready to be
+             found; blink / ear-flick / bob are the idle life (game/title.css,
+             off under calm). <title> gives it the accessible name. -->
+        <div class="title-logo" id="title-logo">
+          <svg class="bobo" viewBox="0 0 120 96" role="img" aria-label="Look at Bobo">
+            <title>Look at Bobo</title>
+            <!-- bib (the white chest, sized in em so it always meets the word;
+                 class hooks are added after first paint by game/title.js) -->
+            <rect class="bib" x="46" y="72" width="28" height="3.4em" rx="1.7em" fill="#f1ece1" />
+            <!-- ears behind the head, black like a real tuxedo cat -->
+            <g class="ear-l"><path d="M20 42 26 8 48 25Z" fill="#14161c" /><path d="M26 16 27 34 40 27Z" fill="#e8a1a1" opacity="0.6" /></g>
+            <path d="M100 42 94 8 72 25Z" fill="#14161c" />
+            <path d="M94 16 93 34 80 27Z" fill="#e8a1a1" opacity="0.6" />
+            <ellipse cx="60" cy="50" rx="42" ry="34" fill="#14161c" />
+            <!-- yellow-green eyes, watching; the blink squashes this pair -->
+            <g class="eyes" fill="#b8e04f">
+              <ellipse cx="45" cy="44" rx="5.2" ry="6.4" />
+              <ellipse cx="75" cy="44" rx="5.2" ry="6.4" />
+            </g>
+            <g fill="#14161c">
+              <ellipse cx="45.7" cy="44.2" rx="1.7" ry="4.6" />
+              <ellipse cx="75.7" cy="44.2" rx="1.7" ry="4.6" />
+            </g>
+            <!-- the white forehead dash — his name tag -->
+            <rect x="57.9" y="22" width="4.2" height="10" rx="2.1" fill="#f1ece1" />
+            <!-- and the muzzle -->
+            <ellipse cx="60" cy="63" rx="12" ry="8" fill="#f1ece1" />
+            <path d="M60 59.6 62.5 62.4h-5Z" fill="#d98f8f" />
+          </svg>
+          <div class="title-word" id="title-word">LOOK AT BOBO!</div>
+        </div>
+        <div class="title-tagline">a cat is doing cute things somewhere in the flat. find him, put the dot on him, and shout “LOOK AT BOBO!”</div>
+        <div class="title-hint">psst — not every black cat is Bobo. read his forehead.</div>
+        <button id="gate-btn" type="button">START</button>
+        <div class="title-row">
+          <button id="gate-howto" class="title-mini" type="button" aria-expanded="false">how to play</button>
+          <span class="title-comfort">the gear at the corner holds the cozy switches — motion, sound, contrast</span>
+        </div>
+        <div id="gate-howto-panel">
+          <span class="only-desktop"><b>WASD</b> walk · <b>mouse</b> look · <b>Shift</b> run · <b>click / Space</b> shout · <b>Esc</b> pause · <b>M</b> from the pause card back to this screen<br /></span>
+          <span class="only-touch"><b>left thumb</b> stick · <b>right side</b> drag to look · <b>yellow button</b> shout · turn your phone sideways for the best view<br /></span>
+          ten moments, living room to bathroom — find Bobo (forehead dash, chest bib),
+          put the dot on him, shout. ten finds wins it; the wrong cat earns a DAG! and a point off.
+        </div>
         <div class="gate-note">
-          <span class="only-desktop"><b>WASD</b> walk · <b>mouse</b> look · <b>Shift</b> run · <b>click / Space</b> shout · <b>Esc</b> pause<br /></span>
-          <span class="only-touch"><b>left thumb</b> stick · <b>right side</b> drag to look · <b>yellow button</b> shout<br /></span>
-          find Bobo (forehead dash, chest bib) somewhere in the flat — ten moments,<br />
-          living room to bathroom — put the dot on him, and shout <b>"LOOK AT BOBO!"</b>.<br />
-          ten finds wins it; the wrong cat earns a DAG! and a point off.<br />
           sound on, the takes are real · <span class="only-desktop">desktop (keyboard + mouse) — phones too</span><span class="only-touch">phones: turn your phone sideways for the best view</span>
         </div>
         <!-- issue #29: which build, which control mode, which quality. Filled by
@@ -1084,7 +1131,10 @@
       <div class="pause-card">
         <div class="pause-title">paused</div>
         <div class="pause-sub">click anywhere to grab the pointer back</div>
-        <div><button id="pause-restart" type="button">restart</button></div>
+        <div class="pause-actions">
+          <button id="pause-restart" type="button">restart</button>
+          <button id="pause-menu" type="button">back to menu</button>
+        </div>
       </div>
     </div>
 
@@ -1159,5 +1209,11 @@
       })();
     </script>
     <script type="module" src="./full.js"></script>
+    <!-- issue #57: the title screen's player-only extras (logo class hook,
+         calm mirror, how-to-play toggle). A separate classic-ish module
+         loaded AFTER the game module, so its DOM class writes can never land
+         before the first painted frame — which is what keeps ?gate=off
+         captures byte-identical: a capture is over before this runs. -->
+    <script type="module" src="./title.js"></script>
   </body>
 </html>

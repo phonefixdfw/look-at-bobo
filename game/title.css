@@ -1,0 +1,395 @@
+/* ============================================================================
+ * game/title.css — the title screen's look, and the card vocabulary the whole
+ * game shares (issue #57: "make the pause menu and the ending screen share
+ * the same styling so the UI feels like one game").
+ *
+ * Loaded ONLY by game/full.html, and only on top of its own card CSS: the
+ * rules here RE-decorate #gate / #pause / the win veil in the title's voice —
+ * warm gold display lettering with a dark outline and a soft drop, one pill
+ * button vocabulary, one card material. Under `?gate=off` the gate is
+ * display:none and nothing else here matches, so capture pixels are untouched.
+ *
+ * The logo animation lives with the .bobo-mark keyframes at the bottom: all
+ * of it switches off for calm players (body with ?motion=off, set by
+ * game/title.js) and for the OS "reduce motion" preference.
+ * ==========================================================================*/
+
+/* ---------- the title card ------------------------------------------------ */
+#gate .gate-card {
+  width: min(660px, calc(100vw - 24px));
+  max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 30px 16px;
+  background: radial-gradient(130% 120% at 50% 0%, rgba(31, 26, 19, 0.92), rgba(13, 16, 22, 0.93));
+  border: 1px solid rgba(232, 176, 74, 0.28);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(247, 244, 238, 0.08);
+}
+
+/* The logo: sized like a title, laid out like one line of type. The wordmark
+   is HTML text (bold system stack + layered outlines — no downloaded fonts),
+   the cat above it is inline SVG; both live in full.html. */
+.title-logo {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: rotate(-1.5deg); /* the slight tilt; a wrapper, so the bob below never fights it */
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.5));
+  pointer-events: none; /* the card's click still starts the game */
+}
+.title-mark {
+  width: clamp(84px, 15vh, 128px);
+  height: auto;
+  overflow: visible;
+  margin-bottom: -0.42em; /* he peeks OVER the lettering: the head's bib slips behind the word */
+  font-size: clamp(34px, 6.4vh, 58px); /* the mark's em — the bib rect below sizes in it */
+}
+.title-word {
+  font-family: "Arial Black", "Arial Bold", Impact, "Franklin Gothic Heavy", system-ui, sans-serif;
+  font-size: clamp(30px, 5.6vh, 64px);
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  line-height: 0.96;
+  color: #f0c25c; /* warm gold */
+  transform: skewX(-4deg); /* a hair of gothic slant */
+  -webkit-text-stroke: 2px rgba(16, 21, 28, 0.95);
+  text-shadow:
+    2px 2px 0 rgba(16, 21, 28, 0.95),
+    5px 7px 16px rgba(0, 0, 0, 0.45);
+}
+body.hc .title-word {
+  color: #ffd97a;
+  -webkit-text-stroke: 2px #000;
+}
+
+/* Instructions — the game in one joyful breath, then the one hint. */
+.title-tagline {
+  max-width: 46ch;
+  text-align: center;
+  color: var(--ui-paper);
+  font-size: clamp(13px, 1.9vh, 16px);
+  line-height: 1.5;
+  text-shadow: 0 1px 3px rgba(10, 13, 18, 0.8);
+}
+.title-hint {
+  text-align: center;
+  color: var(--ui-mustard);
+  font-size: clamp(12px, 1.7vh, 14px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transform: rotate(-0.6deg);
+  text-shadow: 0 1px 2px rgba(10, 13, 18, 0.8);
+}
+
+/* START — the one pill; the card vocabulary's button, enlarged. */
+#gate-btn {
+  flex: none;
+  margin-top: 2px;
+  padding: clamp(10px, 1.6vh, 16px) clamp(34px, 6vw, 54px);
+  font-size: clamp(17px, 2.8vh, 24px);
+  letter-spacing: 0.06em;
+}
+
+/* The little row under START: how-to-play toggle + comfort note. (Settings
+   is deliberately NOT here: the comfort gear already floats in a corner
+   above the card at all times, and a second door to one room is not modern,
+   it's a mistake.) */
+.title-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.title-mini {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid rgba(247, 244, 238, 0.28);
+  border-radius: 999px;
+  padding: 6px 16px;
+  background: rgba(247, 244, 238, 0.06);
+  color: var(--ui-paper);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.title-mini:hover {
+  border-color: var(--ui-mustard);
+  color: var(--ui-mustard);
+}
+body.hc .title-mini {
+  border: 2px solid var(--ui-paper);
+}
+.title-comfort {
+  color: rgba(247, 244, 238, 0.62);
+  font-size: 11.5px;
+}
+
+/* How to play: the full controls, folded until asked for. */
+#gate-howto-panel {
+  display: none;
+  width: 100%;
+  max-width: 52ch;
+  border: 1px dashed rgba(232, 176, 74, 0.4);
+  border-radius: 12px;
+  padding: 9px 14px;
+  text-align: center;
+  color: rgba(247, 244, 238, 0.88);
+  font-size: 13px;
+  line-height: 1.65;
+}
+body.howto-open #gate-howto-panel {
+  display: block;
+}
+
+/* The full-game explainer line keeps living (players read it, mobile-check
+   reads it) — it just stops shouting: the tagline is the headline now. */
+.gate-note {
+  font-size: 11.5px;
+  color: rgba(247, 244, 238, 0.55);
+  margin-top: 2px;
+}
+
+/* ---------- one card vocabulary for pause and the win --------------------- */
+#pause {
+  background: radial-gradient(120% 90% at 50% 35%, rgba(20, 24, 31, 0.6), rgba(10, 13, 18, 0.92));
+}
+.pause-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: radial-gradient(130% 120% at 50% 0%, rgba(31, 26, 19, 0.92), rgba(13, 16, 22, 0.93));
+  border: 1px solid rgba(232, 176, 74, 0.28);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(247, 244, 238, 0.08);
+}
+.pause-title {
+  font-family: "Arial Black", "Arial Bold", Impact, "Franklin Gothic Heavy", system-ui, sans-serif;
+  color: #f0c25c;
+  text-shadow:
+    1px 1px 0 rgba(16, 21, 28, 0.95),
+    3px 4px 10px rgba(0, 0, 0, 0.45);
+}
+.pause-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#pause-menu {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid rgba(247, 244, 238, 0.28);
+  border-radius: 999px;
+  padding: 10px 26px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  background: rgba(247, 244, 238, 0.06);
+  color: var(--ui-paper);
+}
+#pause-menu:hover {
+  border-color: var(--ui-mustard);
+  color: var(--ui-mustard);
+}
+#pause-restart {
+  margin-top: 0;
+  box-shadow: 0 6px 18px rgba(232, 176, 74, 0.22);
+}
+
+/* The win keeps its exact words and its veil; the card it lives on just
+   wears the same coat as its siblings. */
+#ending {
+  font-family: "Arial Black", "Arial Bold", Impact, "Franklin Gothic Heavy", system-ui, sans-serif;
+  color: #f0c25c;
+  -webkit-text-stroke: 1px rgba(16, 21, 28, 0.9);
+  text-shadow:
+    2px 2px 0 rgba(16, 21, 28, 0.9),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- the card's backdrop: dim, vignette, drifting dust, no second
+   WebGL scene (issue #57). The canvas keeps its one painted first-person
+   frame behind; everything the eye reads as "atmosphere" is CSS: a darker
+   veil, a slow 1.5% scale drift on the veil's radial gradient, a soft
+   vignette, and two layers of warm lamp-dust specks on long, gentle
+   journeys. The gate fades out opacity-only, so the canvas pixels never
+   move — captures could not see any of this even if they looked. ---------- */
+#gate {
+  background: radial-gradient(115% 95% at 50% 38%, rgba(16, 20, 27, 0.78), rgba(8, 10, 15, 0.95));
+  transition: opacity 0.45s ease;
+}
+#gate.hidden {
+  opacity: 0;
+}
+#gate::before {
+  /* the vignette */
+  content: "";
+  position: absolute;
+  inset: -4%;
+  background: radial-gradient(90% 80% at 50% 45%, transparent 55%, rgba(4, 6, 10, 0.55) 100%);
+  pointer-events: none;
+}
+#gate::after {
+  /* the dust: two sparse dot fields at different depths, drifting apart */
+  content: "";
+  position: absolute;
+  inset: -16% -16% -16% -16%;
+  background-image:
+    radial-gradient(rgba(247, 232, 200, 0.5) 1.2px, transparent 2.4px),
+    radial-gradient(rgba(232, 176, 74, 0.4) 1px, transparent 2px);
+  background-size: 340px 290px, 210px 250px;
+  opacity: 0.13;
+  animation: gate-dust 46s linear infinite alternate;
+  pointer-events: none;
+}
+#gate > * {
+  position: relative; /* the card sits on the backdrop layers */
+}
+@keyframes gate-dust {
+  0% {
+    transform: translate3d(-2.5%, -1%, 0) scale(1.01) rotate(0.15deg);
+  }
+  100% {
+    transform: translate3d(2.5%, 1.5%, 0) scale(1.04) rotate(-0.2deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #gate::after {
+    animation: none;
+  }
+}
+body.calm #gate::after {
+  animation: none;
+}
+body.calm #gate {
+  transition: none; /* calm means the fade is a cut, not a drift */
+}
+
+/* While the card is up the game chrome waits beneath it (issue #57): the
+   score chip, the hint line and the prompt sit under a near-opaque veil
+   anyway, but a title screen keeps them from flickering at the edges of a
+   bright room. Touch chrome deliberately keeps its OLD behaviour here —
+   #38's ring resting in view at the gate, the rotate card in portrait,
+   the teaching chips waking with the first frame of play (touch.js's own
+   gate watcher) — those promises outrank a tidier card. */
+body.splash #hud,
+body.splash #hint,
+body.splash #prompt,
+body.splash #moment-label {
+  opacity: 0;
+}
+
+/* ---------- phones: the card fits a landscape pocket ---------------------- */
+@media (max-height: 500px) {
+  #gate .gate-card {
+    gap: 6px;
+    padding: 10px 18px 10px;
+  }
+  .gate-note {
+    display: none; /* the how-to panel carries the controls on phones */
+  }
+}
+/* A landscape pocket ~360–420 px tall (the phone cases #38 cares about):
+   the whole card — logo, instructions, START, the how-to row and the build
+   stamp — must FIT, not just clip. Every size here steps down so the column
+   stays inside `max-height`; title-layout-clean and check:mobile 13c prove
+   it at the real numbers rather than trusting the arithmetic. */
+@media (max-height: 420px) {
+  #gate .gate-card {
+    gap: 3px;
+    padding: 6px 16px;
+  }
+  .title-mark {
+    width: 52px;
+    font-size: 24px;
+    margin-bottom: -0.5em;
+  }
+  .title-word {
+    font-size: 24px;
+  }
+  .title-tagline {
+    font-size: 11px;
+    line-height: 1.4;
+    max-width: 100%; /* wide pocket, short height: the copy reads as ONE line */
+  }
+  .title-hint {
+    font-size: 10.5px;
+  }
+  #gate-btn {
+    padding: 6px 28px;
+    font-size: 15px;
+    margin-top: 0;
+  }
+  .title-mini {
+    padding: 4px 12px;
+    font-size: 11px;
+  }
+  .title-comfort {
+    font-size: 10px;
+  }
+  #build-stamp {
+    margin-top: 0;
+    font-size: 10px;
+  }
+}
+@supports (padding: env(safe-area-inset-left)) {
+  #gate .gate-card {
+    padding-left: max(30px, env(safe-area-inset-left));
+    padding-right: max(30px, env(safe-area-inset-right));
+  }
+}
+
+/* ---------- the mark's idle life (issue #57: blink, ear flick, logo bob) --
+   All three are gentle, all of them are for players only: calm (?motion=off
+   → body.calm, set by game/title.js) and the OS reduce-motion preference
+   switch them off. A capture never renders the gate, so baselines never see
+   any of it. */
+@keyframes bobo-blink {
+  0%, 90%, 100% { transform: scaleY(0.04); }
+  93.5%, 96.5% { transform: scaleY(1); }
+}
+@keyframes bobo-flick {
+  0%, 72%, 86%, 100% { transform: rotate(0deg); }
+  77% { transform: rotate(-11deg); }
+  81% { transform: rotate(5deg); }
+}
+@keyframes bobo-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.bobo-mark .eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bobo-blink 5.2s ease-in-out infinite;
+}
+.bobo-mark .ear-l {
+  transform-box: fill-box;
+  transform-origin: 80% 100%;
+  animation: bobo-flick 7.4s ease-in-out infinite;
+}
+body:not(.calm) .title-logo {
+  animation: bobo-bob 5.4s ease-in-out infinite;
+}
+body.calm .bobo-mark .eyes,
+body.calm .bobo-mark .ear-l {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bobo-mark .eyes,
+  .bobo-mark .ear-l,
+  .title-logo {
+    animation: none;
+  }
+}

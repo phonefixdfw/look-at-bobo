@@ -21,6 +21,7 @@
 
 import { MOVE } from './level.js';
 import { KITCHEN_COLLIDERS } from './full-kitchen.js';
+import { KITCHEN_DETAILS_COLLIDERS } from './full-kitchen-details.js';
 import { LIVING_COLLIDERS } from './full-living.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
@@ -90,12 +91,12 @@ export const COLLIDERS = [
   //    the east run, the fridge in the north-east corner. The aisle in front of
   //    the run is 1.80 m (issue #33 asks for ~1 m); in front of the fridge it is
   //    the 0.85 m pocket between its door and the range, which the fridge-floor
-  //    spot needs and a 0.30 m body fits. The breakfast bar and its stools are
-  //    the old placeholders — the bar is a later issue. ──
+  //    spot needs and a 0.30 m body fits. The bar, its stools and the bin are
+  //    the pieces game/full-kitchen-details.js draws — the bar's footprint is
+  //    the placeholder this list carried, value for value (issue #44), so no
+  //    walk rect, spot or spawn moved when the bar became real. ──
   ...KITCHEN_COLLIDERS,
-  { id: 'kitchen-bar', x0: 3.3, z0: 0.2, x1: 4.9, z1: 0.6 },
-  { id: 'bar-stool-a', x0: 3.55, z0: -0.15, x1: 3.91, z1: 0.21 },
-  { id: 'bar-stool-b', x0: 4.29, z0: -0.15, x1: 4.65, z1: 0.21 },
+  ...KITCHEN_DETAILS_COLLIDERS,
   // ── hall + entry: a console table in the hall and a shallow coat bench in
   //    the vestible, so the space in front of the front door stays real ──
   { id: 'hall-console', x0: 0.58, z0: 4.0, x1: 0.9, z1: 4.6 },
@@ -515,6 +516,15 @@ export const SCALE_RANGES = {
   hood: { w: [0.5, 0.75], d: [0.5, 0.75], note: 'row 20: 0.60 wide × 0.50 deep over the range' },
   fridge: { w: [0.6, 0.85], h: [1.65, 1.95], note: 'row 21: 1.80 tall, 0.70 across' },
   dishwasher: { w: [0.55, 0.65], d: [0.55, 0.66], top: [0.85, 0.92], note: 'row 22: 0.60 front under the counter' },
+  // the small pieces on and beside it (ruler rows 23-28 and 33, issue #44);
+  // rows 31-32 keep the `bar-height` / `bar-stool` rows already in this table
+  'microwave': { w: [0.45, 0.6], h: [0.24, 0.36], note: 'row 23: 0.52 × 0.38 × 0.30 on the worktop' },
+  kettle: { h: [0.14, 0.22], note: 'row 24: body 0.20 high (the knob is dressing); 0.17 across' },
+  toaster: { h: [0.15, 0.24], note: 'row 25: 0.26 × 0.18 × 0.19' },
+  'coffee-maker': { h: [0.28, 0.45], note: 'row 26: 0.36 tall against the east tile' },
+  'dish-rack': { h: [0.1, 0.22], note: 'row 27: 0.40 × 0.30 × 0.15 over the drainer' },
+  'trash-bin': { h: [0.28, 0.5], note: 'row 28: 0.30 dia × 0.42 beside the counter' },
+  'rug-runner': { d: [0.6, 0.85], note: 'row 33: the runner is 0.70 wide (w is its 2.00 length)' },
   'bar-height': { top: [1.0, 1.1], note: 'breakfast bar top 1.05' },
   'bar-stool': { w: [0.3, 0.4], d: [0.3, 0.4], h: [0.6, 0.7], note: 'stool 0.36 × 0.36 × 0.65' },
   'bed-queen': { w: [1.95, 2.1], d: [1.45, 1.65], note: 'queen 2.03 long × 1.53 wide' },

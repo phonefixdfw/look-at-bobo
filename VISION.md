@@ -25,6 +25,9 @@ Loafing on the couch; stretching on the bed; staring at a bird from the balcony 
 ## The look
 A realistic modern apartment, with believable lighting, materials and furniture. Bobo is a softly stylized, fur-shaded cat built from reference photos, so he reads clearly as Bobo without trying to be a photograph. The decoy cat is built the same way and reads similarly at a glance — mostly black with white feet — so the tells matter: no forehead dash (Bobo's key tell), Bobo's white bib with no neck band on the decoy, and a much bigger, very fat 22 lb body against Bobo's ~15 lb. The whole game is built in code, with no downloaded models or scans.
 
+## The title screen
+The game opens on a modern title screen (issue #57): a "LOOK AT BOBO!" logo — Bobo's black head peeking over gold lettering, his yellow-green eyes and white dash in the mark — above plain instructions and a START button. It's drawn in code (inline SVG and CSS, no downloaded fonts or images in the page), it shares its card style with the pause menu and the ending, and it names itself "Look at Bobo" to a screen reader. Pause and win both lead back to it, so the menu is the front door of the game.
+
 ## The feel
 Joyful and silly. No game over and no timers; the only setback is a gentle one-point penalty for pointing at the wrong cat. Finding Bobo is the reward, and the fireworks make every catch feel like a win.
 

@@ -15,6 +15,7 @@ import { livingGapReport } from './full-living.js';
 import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
+import { SPLASH } from './splash.js';
 
 /* ---- the ten moments, pose by pose ----
  * The engine runs the baseline idle right before this, only during `find`,
@@ -161,8 +162,9 @@ function batThePen(pen, supports, t) {
 
 /* ---- full-game checks the engine can't know on its own ----
  * Appended after the engine's own 48 (46 + the two spot-pool checks issue
- * #53 added), then the seven Patriot Bobo checks issue #58 added, so the
- * full page reports 62. */
+ * #53 added) and the rest of the full page's stack (furniture scale, title
+ * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, so
+ * the full page reports 65. */
 function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, SPOTS = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
@@ -277,6 +279,17 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'hood',
       'fridge',
       'dishwasher',
+      // ...and the small pieces of issue #44 (ruler rows 23-33): every one of
+      // them must be present and measured, bar and stools included.
+      'microwave',
+      'kettle',
+      'toaster',
+      'coffee-maker',
+      'dish-rack',
+      'trash-bin',
+      'bar-height',
+      'bar-stool',
+      'rug-runner',
       // rows 34-41 and 60: the living room (issue #46). Every one of these is
       // tagged by a mesh game/full-living-mesh.js builds — a row nobody built
       // fails the run, which is the whole point.
@@ -599,4 +612,5 @@ bootGame({
   winDefault: LEVEL.TARGET_DEFAULT, // 10 — the real target
   extraChecks: fullExtraChecks,
   hintFade: { fadeStart: 12, fadeEnd: 18 }, // the hint teaches, then gets out of the way
+  splash: SPLASH, // issue #57: the title screen; pause/win hand back to it
 });
