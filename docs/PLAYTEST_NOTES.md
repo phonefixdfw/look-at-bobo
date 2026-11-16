@@ -1111,3 +1111,71 @@ something to slip into a seed fix — it is raised in the PR, not done.
   they replayed before. Audio: `audio:selftest` 23/23, `audio:pagecheck`
   24/24, `audio:slicecheck` + `audio:fullcheck` **23/23**, `audio:democheck`
   17/17.
+
+---
+
+## 24. Issue #71 — the game gets a soundtrack (original bardcore, synthesized in code)
+
+**Asked for (Brandon, 2026-11-15):** "Let's also add some MIDI music,
+something bardcore style, like happy Gothic you'd hear in the Addams
+Family." Original composition only — evoke the genre, quote nothing.
+
+**What shipped:** `src/music-score.js` (the whole 32-bar A-minor tune as
+data — Am–F–C–G with major lifts, 110 BPM, swing 0.57, six synth recipes,
+the thin `calm` pause arrangement and the once-only win `flourish`) and
+`src/music.js` (a lookahead scheduler + tiny synth: plucked harpsichord
+lead, lute arpeggios, vibrato pipe, pizzicato bass, hand drum + tambourine,
+ornament trills). It starts only inside the START-gesture that already
+unlocks the voices, ducks **0.631 (≈ −4 dB, 12 ms in / 400 ms out)** under
+the voice lines via `lc-voice` events `src/audio.js` now announces, plays
+`calm` under the pause menu, freezes mid-loop when the tab hides, hands the
+win a fanfare, and composes `master = ?volume × ?musicvol` with `?mute` /
+`?musicmute` / `?music=off`. `?quality=low` mutes drum/ornament/pipe; no
+reverb anywhere. Full contract + edit knobs + listening checklist:
+**[`docs/MUSIC.md`](MUSIC.md)**.
+
+**The honest limit:** nobody on the team can hear anything here — every
+claim below is *measured*, none is *listened*. The PR lists exactly what
+Brandon should check with real ears (tempo feel, loudness vs the yell, the
+loop seam at ~70 s, the mood) and which knobs answer what.
+
+**How it is proved without ears:** two new suites, in the existing audio
+check style (real Chrome, NO autoplay flags, a trusted click on the gate):
+
+- `npm run music:selftest` — **29/29** in pure Node: score validation,
+  32 bars / 512 steps / 69.82 s, step-time periodicity (the loop CANNOT
+  drift — every step recurs exactly one loop-length later), swing mapping
+  (k=1→0.285, k=3→0.785 of a beat), plan determinism, duck shape (0.631,
+  12 ms / 390 ms, ≥95 % recovered by 400 ms), analyser sanity, and the
+  originality guardrails (minor piece + major lift, flourish resolves to
+  Am, no fetch/mp3/wav/ogg/decodeAudio anywhere in the music modules).
+- `npm run music:check` — **28/28** in Chrome with the AudioContext
+  constructor wrapped and COUNTED: `?gate=off` boots with **0 live
+  AudioContexts** and `present:false`, yet `LC.musicRender()` still renders
+  (3 OfflineAudioContexts, 0 live); `?music=off` clicks play with 0
+  contexts; before the gate click 0 contexts, after exactly **1**, running,
+  stepping; a REAL yell measured **duckLevel 0.631** mid-line and 0.96+
+  after; pause → `calm` at level < 0.75 still running, resume → `main`; a
+  1 s main-thread stall advanced the step a bounded 11 with 8 live voices
+  and no errors; win → `flourish`; hidden tab froze the step for 700 ms and
+  showing resumed it; `?volume=0.5&musicvol=0.5` → master **0.25**, `?mute=1`
+  → 0, `?musicmute=1` → 0 with `?quality=low` → lighter set. Offline render
+  of the REAL synth paths: main **rms 0.1637 / peak 0.8192** (calm
+  0.1167/0.7546, flourish 0.1695/0.9126 — no arrangement clips), band
+  energy bass **4.14** / lead **0.029** (a 110 Hz reference tone reads
+  2.7e-5 lead / strong bass, so the bands really separate).
+
+**Everything earlier stayed green** (this HEAD, same machine): `gate` PASS
+(all five planted faults still caught, tool selftest 23/23),
+`capture:full` **507 frames / 77 checks every frame / PASS**,
+`capture:full:determinism` + `capture:slice:determinism` +
+`capture:demo:determinism` all **8/8 byte-identical** (music is silent and
+context-free under `?gate=off`, and the determinism suites did not move),
+`capture:slice` **51/51**, `capture:demo` **37/37**, `check:mobile` **92
+green / 0 FAIL**, `audio:slicecheck` + `audio:fullcheck` **23/23**,
+`audio:democheck` **17/17**, `audio:pagecheck` **24/24**, bots slice
+**5/5** + full **10/10** (replay-hashes stable),
+`playtest:stress:full` **77 PASS / 0 FAIL**, `capture:full:weak` PASS,
+`build` dist/ stamped **55 files** (+2: `src/music.js`,
+`src/music-score.js` ship with the `?v=` stamps; the build copies `src/`
+wholesale, so `docs/DEPLOY.md` needed no file-list change).

@@ -948,4 +948,5 @@ bootGame({
   extraChecks: fullExtraChecks,
   hintFade: { fadeStart: 12, fadeEnd: 18 }, // the hint teaches, then gets out of the way
   splash: SPLASH, // issue #57: the title screen; pause/win hand back to it
+  music: true, // issue #71: the original bardcore soundtrack plays on this page
 });
