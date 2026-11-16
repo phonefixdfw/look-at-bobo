@@ -56,6 +56,13 @@ const BUDGET = {
   realLights: 6,
 };
 
+// TEMPORARY (issue #59): the FULL GAME page alone gets this flat drawCalls
+// budget until the per-room culling/instancing pass (chunk 4) brings it back
+// to 150 — recorded in docs/ART_STYLE.md and docs/HANDOFF.md. The slice and
+// the demo keep BUDGET.drawCalls; an explicit --budget drawCalls=… overrides
+// this; the ?quality=low path is untouched (it lives in the page).
+const FULL_GAME_DRAW_CALLS = 180;
+
 // A frame that averages this dark, or has no variation at all, is a broken capture
 // (WebGL fell over / nothing rendered), not an intentional look.
 const BLANK = { minMeanLuma: 2, minStdDev: 1, maxMeanLuma: 253 };
@@ -63,6 +70,7 @@ const BLANK = { minMeanLuma: 2, minStdDev: 1, maxMeanLuma: 253 };
 // ---------------------------------------------------------------- args
 
 function parseArgs(argv) {
+  const budgetOverridden = new Set(); // keys given explicitly via --budget
   const opts = {
     page: 'tools/testscene.html',
     times: null,
@@ -110,6 +118,7 @@ function parseArgs(argv) {
           const [k, v] = pair.split('=');
           if (!(k in BUDGET)) fail(2, `Unknown budget key "${k}". Known: ${Object.keys(BUDGET).join(', ')}`);
           opts.budget[k] = num('--budget', v);
+          budgetOverridden.add(k);
         }
         break;
       case '--param': opts.params.push(take()); break;
@@ -131,6 +140,12 @@ function parseArgs(argv) {
   if (rest.length > 1) fail(2, 'One page at a time, please.');
   if (rest.length === 1) opts.page = rest[0];
   if (!['default', 'swiftshader'].includes(opts.gpu)) fail(2, "--gpu takes 'swiftshader' or 'default'");
+  // TEMPORARY (issue #59) — see FULL_GAME_DRAW_CALLS above: the full game's
+  // merged furniture (living room, kitchen, bedroom) legitimately needs more
+  // than 150 draws until the culling/instancing pass lands.
+  if (/game\/full\.html$/.test(opts.page) && !budgetOverridden.has('drawCalls')) {
+    opts.budget.drawCalls = FULL_GAME_DRAW_CALLS;
+  }
   return opts;
 }
 
