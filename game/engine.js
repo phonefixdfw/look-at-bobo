@@ -1521,6 +1521,9 @@ export function bootGame(cfg) {
       let layoutMsg = 'n/a (card down)';
       let layoutOk = true;
       if (boxes.length) {
+        const cardEl = el.gate.querySelector('.gate-card');
+        const cr = cardEl ? cardEl.getBoundingClientRect() : null;
+        const card = cr && cr.width > 0 ? { top: cr.top, bottom: cr.bottom, left: cr.left, right: cr.right } : null;
         const bad = [];
         const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
         for (let i = 0; i < boxes.length; i++)
@@ -1530,12 +1533,17 @@ export function bootGame(cfg) {
             if (hit(boxes[i], boxes[j])) bad.push(`${boxes[i].name}×${boxes[j].name}`);
           }
         for (const b of boxes) {
-          if (b.y0 < -1 || b.y1 > window.innerHeight + 1 || b.x0 < -1 || b.x1 > window.innerWidth + 1) bad.push(`${b.name} off-screen`);
+          // Inside the viewport AND inside the card: the card clips with
+          // overflow:hidden, so a box that fits the screen but spills past
+          // the card is half-painted — the exact 740×360 failure #57 found.
+          const spill = card ? b.y1 > card.bottom + 1 || b.y0 < card.top - 1 || b.x1 > card.right + 1 || b.x0 < card.left - 1 : false;
+          if (spill) bad.push(`${b.name} out of card`);
+          else if (b.y0 < -1 || b.y1 > window.innerHeight + 1 || b.x0 < -1 || b.x1 > window.innerWidth + 1) bad.push(`${b.name} off-screen`);
         }
         layoutOk = bad.length === 0;
         layoutMsg = layoutOk ? `${boxes.length} boxes clean at ${window.innerWidth}×${window.innerHeight}` : bad.join(', ');
       }
-      add('title-layout-clean', layoutMsg, 'no overlaps, nothing off-screen', layoutOk, 'logo, instructions and START lay out side by side at this viewport');
+      add('title-layout-clean', layoutMsg, 'no overlaps, nothing off-screen or spilling the card', layoutOk, 'logo, instructions and START lay out side by side at this viewport');
     }
 
     // --- celebration staging ---------------------------------------------------

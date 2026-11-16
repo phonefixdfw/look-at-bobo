@@ -301,6 +301,49 @@ body.splash #moment-label {
     display: none; /* the how-to panel carries the controls on phones */
   }
 }
+/* A landscape pocket ~360–420 px tall (the phone cases #38 cares about):
+   the whole card — logo, instructions, START, the how-to row and the build
+   stamp — must FIT, not just clip. Every size here steps down so the column
+   stays inside `max-height`; title-layout-clean and check:mobile 13c prove
+   it at the real numbers rather than trusting the arithmetic. */
+@media (max-height: 420px) {
+  #gate .gate-card {
+    gap: 3px;
+    padding: 6px 16px;
+  }
+  .title-mark {
+    width: 52px;
+    font-size: 24px;
+    margin-bottom: -0.5em;
+  }
+  .title-word {
+    font-size: 24px;
+  }
+  .title-tagline {
+    font-size: 11px;
+    line-height: 1.4;
+    max-width: 100%; /* wide pocket, short height: the copy reads as ONE line */
+  }
+  .title-hint {
+    font-size: 10.5px;
+  }
+  #gate-btn {
+    padding: 6px 28px;
+    font-size: 15px;
+    margin-top: 0;
+  }
+  .title-mini {
+    padding: 4px 12px;
+    font-size: 11px;
+  }
+  .title-comfort {
+    font-size: 10px;
+  }
+  #build-stamp {
+    margin-top: 0;
+    font-size: 10px;
+  }
+}
 @supports (padding: env(safe-area-inset-left)) {
   #gate .gate-card {
     padding-left: max(30px, env(safe-area-inset-left));

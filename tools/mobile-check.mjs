@@ -913,7 +913,12 @@ try {
         if ((boxes[i].name === 'mark' && boxes[j].name === 'word') || (boxes[i].name === 'word' && boxes[j].name === 'mark')) continue; // the peek is the logo
         if (hit(boxes[i], boxes[j])) bad.push(`${boxes[i].name}×${boxes[j].name}`);
       }
-    for (const b of boxes) if (b.y0 < -1 || b.y1 > innerHeight + 1 || b.x0 < -1 || b.x1 > innerWidth + 1) bad.push(`${b.name} off-screen`);
+    const cr = (() => { const e = document.querySelector('#gate .gate-card'); if (!e) return null; const r = e.getBoundingClientRect(); return r.width > 0 ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : null; })();
+    for (const b of boxes) {
+      const spill = cr && (b.y1 > cr.bottom + 1 || b.y0 < cr.top - 1 || b.x1 > cr.right + 1 || b.x0 < cr.left - 1);
+      if (spill) bad.push(`${b.name} out of card`);
+      else if (b.y0 < -1 || b.y1 > innerHeight + 1 || b.x0 < -1 || b.x1 > innerWidth + 1) bad.push(`${b.name} off-screen`);
+    }
     const word = boxes.find((b) => b.name === 'word');
     return { n: boxes.length, bad, wordW: word ? word.x1 - word.x0 : 0, vw: innerWidth, vh: innerHeight };
   };
@@ -923,11 +928,10 @@ try {
   // and the title checks see the card shown.
   {
     const page = await desktopPage('?seed=11');
-    const before = await page.evaluate((fn) => {
-      const lay = fn();
+    const lay = await page.evaluate(TITLE_LAY);
+    const before = await page.evaluate(() => {
       const r = document.getElementById('gate').getBoundingClientRect();
       return {
-        lay,
         covers: r.width >= innerWidth - 1 && r.height >= innerHeight - 1,
         start: document.getElementById('gate-btn').textContent,
         logo: (() => {
@@ -936,7 +940,8 @@ try {
         })(),
         st: window.LC.selfTest(),
       };
-    }, TITLE_LAY);
+    });
+    before.lay = lay;
     const tc = before.st.checks.filter((c) => c.name.startsWith('title-'));
     check('#57 desktop: title screen up before the start — logo named, START ready', before.lay.n >= 6 && before.lay.bad.length === 0 && before.covers && before.start === 'START' && before.logo.label === 'Look at Bobo' && before.logo.title === 'Look at Bobo' && before.logo.w > 60, JSON.stringify({ bad: before.lay.bad, start: before.start, logo: before.logo }));
     check('#57 desktop: selfTest runs from behind the title card', before.st.pass && tc.length === 3 && tc.every((c) => c.pass && c.value !== 'n/a (card down)'), tc.map((c) => `${c.name}=${c.value}${c.pass ? '' : ' FAIL'}`).join(' | ') || before.st.checks.filter((c) => !c.pass).map((c) => c.name).join(', '));
@@ -976,10 +981,12 @@ try {
       gateHidden: document.getElementById('gate').classList.contains('hidden'),
       gateShown: getComputedStyle(document.getElementById('gate')).display !== 'none',
       splash: document.body.classList.contains('splash'),
-      word: getComputedStyle(document.getElementById('title-word')).display,
+      // "nothing painted" = NOT RENDERED: children of a display:none subtree
+      // keep their own computed display, so offsetParent is the honest test.
+      word: document.getElementById('title-word').offsetParent === null ? 'unpainted' : 'painted',
       st: window.LC.selfTest().checks.filter((c) => c.name.startsWith('title-')).map((c) => ({ n: c.name, v: c.value, p: c.pass })),
     }));
-    check('#57 ?gate=off: title screen fully absent — no splash class, nothing painted', off.gateHidden && !off.gateShown && !off.splash && off.word === 'none', JSON.stringify({ gateShown: off.gateShown, splash: off.splash, word: off.word }));
+    check('#57 ?gate=off: title screen fully absent — no splash class, nothing painted', off.gateHidden && !off.gateShown && !off.splash && off.word === 'unpainted', JSON.stringify({ gateShown: off.gateShown, splash: off.splash, word: off.word }));
     check('#57 ?gate=off: the title checks say "absent" and pass', off.st.length === 3 && off.st.every((c) => c.p) && off.st[0].v === 'absent', JSON.stringify(off.st));
     check('#57 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
