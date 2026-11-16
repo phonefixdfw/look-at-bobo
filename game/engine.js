@@ -580,6 +580,16 @@ export function bootGame(cfg) {
   // ---------------------------------------------------------------------------
   const SPLASH_CFG = cfg.splash || null;
   let splashOn = false; // the title card is up (gate shown, un-started)
+  // One-gesture tail guard (issue #57): a finger tap is pointerdown → up →
+  // click as ONE sequence. Shout-on-win raises the card inside pointerdown,
+  // and the gate — now covering the screen — catches the click that ENDS the
+  // same tap, which would answer "Play" before the player ever saw the menu.
+  // Every pointerdown bumps a sequence number; the card remembers the one
+  // that raised it, and a gate click from that same sequence is swallowed.
+  // A later tap always carries a fresh number, so Play is never eaten.
+  let pointerSeq = 0;
+  let menuSeq = -1;
+  document.addEventListener('pointerdown', () => { pointerSeq++; }, true);
 
   /** Show the title card again from the pause/win states. Play from here
    *  starts a fresh run, so the card promises what it means. The page is
@@ -587,26 +597,30 @@ export function bootGame(cfg) {
    *  started false — so the ONE unlockGate path (audio + touch fullscreen +
    *  startGame) answers the next click, and the loop (which by now runs)
    *  sleeps at stepGame's !started guard: nothing moves under the card,
-   *  exactly like the frozen boot frame under the first one. */
+   *  exactly like the frozen boot frame under the first one. Returns false
+   *  (nothing changed) on pages the card was never offered. */
   function backToMenu() {
-    if (!SPLASH_CFG || GATE_OFF || !started) return; // the gate was never left
+    if (!SPLASH_CFG || GATE_OFF || !started) return false; // the gate was never left
     restartRun();
     input.unlock(); // the card wants the pointer back
     started = false; // next Play = startGame, a fresh run
     gateOpen = false; // next Play = unlockGate, the same first-time door
     resumePlay(); // the pause is over: the menu is not a pause card wearing a hat
+    el.pause.classList.remove('show'); // stepGame sleeps now; clear the card here
+    menuSeq = pointerSeq; // swallow the tail click of THIS gesture only
     el.gate.classList.remove('hidden');
     document.body.classList.add('splash');
     updateLabel();
+    return true;
   }
 
   /** The win's "click / Space / tap" action: with a title screen the run
-   *  hands back to the menu (issue #57); pages without one restart in place,
-   *  as they always did. */
+   *  hands back to the menu (issue #57); pages without one — the slice, and
+   *  every ?gate=off page where the card was never offered — restart in
+   *  place, exactly as they always did. */
   function winExit() {
     if (game.winElapsed < WIN_RESTART_AFTER) return;
-    if (SPLASH_CFG) backToMenu();
-    else restartRun();
+    if (!backToMenu()) restartRun();
   }
 
   // ---------------------------------------------------------------------------
@@ -2089,7 +2103,12 @@ export function bootGame(cfg) {
   }
 
   function wireInput() {
-    el.gate.addEventListener('click', unlockGate);
+    // Issue #57: a gate click from the SAME gesture that raised the card is
+    // the tail of that tap, not a new "Play" — swallow it (see pointerSeq).
+    el.gate.addEventListener('click', () => {
+      if (pointerSeq === menuSeq) return;
+      unlockGate();
+    });
     el.pause.addEventListener('click', () => {
       if (game.phase === 'win') return;
       // Resume paths by situation: still holding the pointer (a blur paused
