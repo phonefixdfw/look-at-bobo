@@ -11,6 +11,7 @@
  *   Capture it:  npm run capture:full
  */
 import * as LEVEL from './full-level.js';
+import { livingGapReport } from './full-living.js';
 import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
@@ -261,6 +262,19 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'hood',
       'fridge',
       'dishwasher',
+      // rows 34-41 and 60: the living room (issue #46). Every one of these is
+      // tagged by a mesh game/full-living-mesh.js builds — a row nobody built
+      // fails the run, which is the whole point.
+      'sofa',
+      'seat-height',
+      'sofa-back',
+      'coffee-table',
+      'side-table',
+      'tv-screen',
+      'tv-stand',
+      'bookshelf',
+      'floor-lamp',
+      'cardboard-box',
     ];
     const boxes = new Map(); // row -> [[label, Box3]]
     const groups = new Map(); // group -> [label, Box3] to union
@@ -323,7 +337,24 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       bad.length ? bad.join(', ') : `${n} boxes across ${boxes.size} ruler rows`,
       `every tagged box inside docs/ISSUE_33_REBUILD.md §1 (+${REQUIRED.length} rows required)`,
       bad.length === 0,
-      'issue #41: the kitchen measures what the ruler says, not what it was handed',
+      'issues #41/#46: kitchen and living room measure what the ruler says, not what they were handed',
+    );
+  }
+
+  /* Issue #46 — row 58 through the living room: the routes between the real
+   * furniture, measured off the footprints the pieces were drawn from. The
+   * walk graph (walk-reachable, above) already drags a 0.30 m body through
+   * them on a grid; this is the same claim stated in the ruler's own units,
+   * so "≥ 0.90 m anywhere" is a printed number and not a vibe. */
+  {
+    const rows = livingGapReport();
+    const short = rows.filter((r) => r.min != null && !(r.m >= r.min));
+    add(
+      'living-walkways',
+      short.length ? short.map((r) => `${r.name} ${r.m.toFixed(2)} < ${r.min}`).join(', ') : rows.map((r) => `${r.name} ${r.m.toFixed(2)} m`).join(' · '),
+      'row 58: ≥ 0.90 m on every route; the sofa→coffee gap is a reach, not a walkway',
+      short.length === 0,
+      'issue #46: the gaps between real furniture, measured between the footprints',
     );
   }
 }
