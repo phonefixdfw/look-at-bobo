@@ -46,7 +46,7 @@ export function bandEnergy(samples, sampleRate, loHz, hiHz, bins = 24) {
       s2 = s1;
       s1 = s0;
     }
-    sum += (s1 * s1 + s2 * s2 - coeff * s1 * s2) / (total * total);
+    sum += (s1 * s1 + s2 * s2 - coeff * s1 * s2) / total;
   }
   return sum / bins;
 }

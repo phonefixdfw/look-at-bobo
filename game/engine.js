@@ -2152,10 +2152,13 @@ export function bootGame(cfg) {
         return game.paused;
       },
       /** Render `seconds` of an arrangement through the REAL synth graph
-       *  (OfflineAudioContext) and report RMS, peak and band energy. */
+       *  (OfflineAudioContext) and report RMS, peak and band energy. Works
+       *  even where no live soundtrack exists (?gate=off, ?music=off): the
+       *  render builds its own offline context on demand and never starts
+       *  live playback or touches an AudioContext. */
       musicRender(seconds = 20, arrangement = 'main') {
-        if (!music) return null;
-        return music.renderOffline(seconds, arrangement).then((s) => ({
+        const m = music ?? createMusicEngine({ score: MUSIC_SCORE, muted: true });
+        return m.renderOffline(seconds, arrangement).then((s) => ({
           rms: Number(s.rms.toFixed(4)),
           peak: Number(s.peak.toFixed(4)),
           bass: Number(s.bass.toExponential(3)),

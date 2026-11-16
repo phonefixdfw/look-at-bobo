@@ -60,7 +60,7 @@ export const instruments = {
     filter: { freq: 2400, q: 1.2, envFall: 1000 }, // pluck: opens then falls
     env: { attack: 0.004, decay: 0.34, hold: 0.9 },
     gate: 0.16, // seconds of "note held" per step, scaled by tie length
-    gain: 0.5,
+    gain: 0.29, // (the whole mix must peak under 1.0 — see docs/MUSIC.md)
     octave: 1, // the tune sits an octave above the tonic
     charKind: 'degree',
   },
@@ -73,7 +73,7 @@ export const instruments = {
     filter: { freq: 1500, q: 0.8, envFall: 500 },
     env: { attack: 0.003, decay: 0.22, hold: 0.9 },
     gate: 0.14,
-    gain: 0.32,
+    gain: 0.21,
     octave: 0,
     charKind: 'chord',
   },
@@ -85,7 +85,7 @@ export const instruments = {
     env: { attack: 0.05, decay: 0.1, hold: 0.75, release: 0.09 },
     gate: 0.16,
     sustain: true, // notes hold across '.' steps instead of re-plucking
-    gain: 0.26,
+    gain: 0.21,
     octave: 0,
     charKind: 'degree',
   },
@@ -98,15 +98,15 @@ export const instruments = {
     filter: { freq: 420, q: 0.9, envFall: 150 },
     env: { attack: 0.004, decay: 0.26, hold: 0.9 },
     gate: 0.16,
-    gain: 0.5,
+    gain: 0.34,
     octave: -1,
     charKind: 'chord',
   },
   drum: {
     // hand drum: pitch-dropping sine; tambourine: a bright short tick
-    membrane: { startFreq: 150, endFreq: 52, decay: 0.16, gain: 0.5 },
-    tick: { decay: 0.06, gain: 0.16, highpass: 4200 },
-    gain: 0.4,
+    membrane: { startFreq: 150, endFreq: 52, decay: 0.16, gain: 0.46 },
+    tick: { decay: 0.06, gain: 0.14, highpass: 4200 },
+    gain: 0.27,
     charKind: 'drum',
   },
   ornament: {
@@ -115,7 +115,7 @@ export const instruments = {
     filter: { freq: 3000, q: 1, envFall: 1200 },
     env: { attack: 0.003, decay: 0.12, hold: 0.9 },
     gate: 0.1,
-    gain: 0.2,
+    gain: 0.16,
     octave: 1,
     charKind: 'degree',
   },
