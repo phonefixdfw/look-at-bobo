@@ -37,6 +37,8 @@ import { addPatriotCostume, removePatriotCostume, isPatriotAttached, patriotIdle
 import { scanMarkings, contactGap } from '../src/measure.js';
 import { buildHand } from '../src/hand.js';
 import { VOICE_LINES, audioPlanFor, createVoiceEngine } from '../src/audio.js';
+import { createMusicEngine } from '../src/music.js'; // issue #71: the bardcore soundtrack
+import { MUSIC_SCORE } from '../src/music-score.js';
 import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
@@ -172,8 +174,10 @@ export function bootGame(cfg) {
   // exactly as the suites captured it. The settings panel writes these same
   // params into the URL, so a choice survives refresh and shares as a link:
   // ?sens=0.5..3  ?invertY=1  ?motion=off  ?volume=0..1  ?mute=1  ?contrast=high
+  // ?musicvol=0..1  ?musicmute=1  ?music=off  (issue #71: the soundtrack)
   const sensRaw = Number.parseFloat(params.get('sens') ?? '');
   const volRaw = Number.parseFloat(params.get('volume') ?? '');
+  const musicVolRaw = Number.parseFloat(params.get('musicvol') ?? '');
   // OS-level "reduce motion" is the default for calm mode; the url overrides
   // both ways (?motion=off forces calm, ?motion=full forces the juice back).
   const OS_REDUCE = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -197,6 +201,12 @@ export function bootGame(cfg) {
     highContrast: params.get('contrast') === 'high',
     volume: Number.isFinite(volRaw) ? clamp(volRaw, 0, 1) : 1,
     muted: params.get('mute') === '1',
+    // Issue #71: the soundtrack rides under the master volume, with its own
+    // level/mute and an off switch. ?music=off is checked separately (it
+    // stops the module from ever loading a context).
+    musicVolume: Number.isFinite(musicVolRaw) ? clamp(musicVolRaw, 0, 1) : 1,
+    musicMute: params.get('musicmute') === '1',
+    musicOff: params.get('music') === 'off',
     // Weak-GPU path: ?quality=low|high, else auto-low on phones (?quality=low).
     quality: qualityParam === 'low' || (qualityParam !== 'high' && AUTO_LOW) ? 'low' : 'full',
   };
@@ -404,6 +414,22 @@ export function bootGame(cfg) {
       }
     });
   }
+
+  // Issue #71: the original bardcore soundtrack, synthesized in code. Built
+  // ONLY on pages that opt in (game/full.js sets cfg.music) and NEVER under
+  // ?gate=off (capture/determinism must stay silent and AudioContext-free)
+  // or ?music=off. Even when built it stays dark — no AudioContext exists —
+  // until the START tap runs unlockGate() and calls music.start(true).
+  const music =
+    cfg.music && !GATE_OFF && !SETTINGS.musicOff
+      ? createMusicEngine({
+          score: MUSIC_SCORE,
+          lowQuality: SETTINGS.quality === 'low', // phones: the lighter arrangement
+          volume: SETTINGS.volume * SETTINGS.musicVolume, // composes with the voice volume
+          muted: SETTINGS.muted || SETTINGS.musicMute,
+          isPaused: () => game.paused, // the pause menu plays the calm arrangement
+        })
+      : null;
 
   // ---------------------------------------------------------------------------
   // 4. HUD (design system §8 — the demo's exact vocabulary, same CSS)
@@ -695,6 +721,8 @@ export function bootGame(cfg) {
       nudgeUntil = 0;
       applyStage();
     });
+    // Issue #71: the win earns its fanfare (once), then the calm loop.
+    if (game.phase === 'win' && music) music.setScene('win');
   }
 
   /** Circles for the player's push-out resolve, in the shape
@@ -812,6 +840,7 @@ export function bootGame(cfg) {
     el.gate.classList.remove('hidden');
     document.body.classList.add('splash');
     updateLabel();
+    if (music) music.setScene('title'); // issue #71: the menu keeps the calm tune, quietly
     return true;
   }
 
@@ -2110,6 +2139,30 @@ export function bootGame(cfg) {
       /** Comfort settings in force (Step 9): the parsed url params, for tools. */
       comfort: () => ({ ...SETTINGS }),
 
+      // --- music layer (issue #71) -------------------------------------------
+      /** Live state of the soundtrack module — or why it isn't there at all. */
+      music: () => (music ? music.debug() : { present: false, gateOff: GATE_OFF, off: SETTINGS.musicOff }),
+      /** Tool pause/resume: the very same flag the pause card uses, so the
+       *  music module's calm-arrangement swap is exercised through the game's
+       *  real pause, not a fake one. */
+      setPaused(v = true) {
+        if (!started) return false;
+        game.paused = !!v && game.phase !== 'win';
+        el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
+        return game.paused;
+      },
+      /** Render `seconds` of an arrangement through the REAL synth graph
+       *  (OfflineAudioContext) and report RMS, peak and band energy. */
+      musicRender(seconds = 20, arrangement = 'main') {
+        if (!music) return null;
+        return music.renderOffline(seconds, arrangement).then((s) => ({
+          rms: Number(s.rms.toFixed(4)),
+          peak: Number(s.peak.toFixed(4)),
+          bass: Number(s.bass.toExponential(3)),
+          lead: Number(s.lead.toExponential(3)),
+        }));
+      },
+
       // --- moment layer
       moments: ALL_STAGE_IDS.slice(),
       moment() {
@@ -2500,6 +2553,7 @@ export function bootGame(cfg) {
     if (gateOpen) return;
     gateOpen = true;
     voices.unlock(); // inside the user gesture (autoplay rules)
+    if (music) music.start(true); // issue #71: the soundtrack starts in THIS gesture
     if (TOUCH) requestTouchFullscreen(); // also inside the gesture (issue #25)
     el.gate.classList.add('hidden');
     document.body.classList.remove('splash'); // the card carried the title look (issue #57)
@@ -2527,6 +2581,7 @@ export function bootGame(cfg) {
         rotatePaused = true;
       }
     } else input.lock();
+    if (music) music.setScene('play'); // issue #71: a run plays the 32-bar tune
     window.LC?.play();
   }
 
@@ -2640,9 +2695,11 @@ export function bootGame(cfg) {
       const q = (id) => sPanel.querySelector(id);
       q('#set-sens').value = String(SETTINGS.sens);
       q('#set-volume').value = String(SETTINGS.volume);
+      q('#set-musicvol').value = String(SETTINGS.musicVolume);
       q('#set-invertY').checked = SETTINGS.invertY;
       q('#set-motion').checked = SETTINGS.reducedMotion;
       q('#set-mute').checked = SETTINGS.muted;
+      q('#set-musicmute').checked = SETTINGS.musicMute;
       q('#set-contrast').checked = SETTINGS.highContrast;
       const apply = () => {
         const p = new URLSearchParams(location.search);
@@ -2656,6 +2713,10 @@ export function bootGame(cfg) {
         else p.delete('motion');
         setOr('mute', '1', q('#set-mute').checked);
         setOr('volume', String(vol), vol !== 1);
+        // issue #71: music keeps its own two knobs on top of the master pair
+        const mv = Number(q('#set-musicvol').value);
+        setOr('musicvol', String(mv), mv !== 1);
+        setOr('musicmute', '1', q('#set-musicmute').checked);
         setOr('contrast', 'high', q('#set-contrast').checked);
         location.search = p.toString(); // reload: every setting is a URL param
       };

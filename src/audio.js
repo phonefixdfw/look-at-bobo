@@ -74,6 +74,7 @@ export function createVoiceEngine({ resolve = (f) => f, volume, muted } = {}) {
       });
       a.addEventListener('ended', () => {
         st.ended++;
+        announceVoice(lineKeyFor(file), 'end');
       });
       a.addEventListener('error', () => {
         st.error = 'decode-or-load-error';
@@ -85,6 +86,19 @@ export function createVoiceEngine({ resolve = (f) => f, volume, muted } = {}) {
   }
 
   let unlocked = false;
+
+  /** Issue #71: tell the page a voice line started/ended, so the music can
+   *  duck under it (a CustomEvent on document — no coupling, no import).
+   *  Pure announcement: pages that don't listen behave exactly as before. */
+  function announceVoice(lineKey, ev) {
+    try {
+      if (typeof document !== 'undefined' && typeof CustomEvent === 'function')
+        document.dispatchEvent(new CustomEvent('lc-voice', { detail: { line: lineKey, event: ev } }));
+    } catch {
+      /* a page without CustomEvent simply never ducks */
+    }
+  }
+  const lineKeyFor = (file) => Object.keys(VOICE_LINES).find((k) => VOICE_LINES[k].file === file) ?? null;
 
   return {
     /** Call from a real user gesture: primes every element so later fire()s
@@ -121,6 +135,7 @@ export function createVoiceEngine({ resolve = (f) => f, volume, muted } = {}) {
       st.requested++;
       const a = els.get(use);
       a.currentTime = 0;
+      announceVoice(lineKeyFor(use), 'start');
       const p = a.play();
       if (p && p.catch) {
         p.catch((err) => {
