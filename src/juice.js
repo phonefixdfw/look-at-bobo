@@ -73,19 +73,22 @@ function createConfetti(scene) {
 /** One call per frame from applyTime. Writes ONLY pure f(phase, t) values —
  *  each branch has a defined resting value every other frame. `calm` is the
  *  comfort setting (motion=off): every juice branch rests, every value is
- *  still written, so the frame stays deterministic either way. */
-function juiceFrame({ phase, t, renderer, els, confetti, baseExposure, calm }) {
+ *  still written, so the frame stays deterministic either way. `bonus` marks
+ *  a Patriot Bobo catch (issue #58): a deeper pill punch and the confetti
+ *  rains early, for him only. */
+function juiceFrame({ phase, t, renderer, els, confetti, baseExposure, calm, bonus = false }) {
   // 1. Respawn smoothing: a 0.26 s blink when a new round begins. dip(0) = 0,
   //    so captured t=0 frames sit at the base exposure; the sink is at 0.13 s.
   const blink = !calm && phase === 'find' && t < 0.26 ? 0.4 * Math.sin((t / 0.26) * Math.PI) : 0;
   renderer.toneMappingExposure = baseExposure * (1 - blink);
   // 2. Score pop: the pill punches once at the catch, settles by t=0.5 (all
-  //    captured catch frames at t>=1.2 are at rest).
+  //    captured catch frames at t>=1.2 are at rest). Patriot's catch (issue
+  //    #58) punches deeper — the "+3!" text pop rides the pill from the page.
   if (els.score) {
     let s = 1;
     if (!calm && phase === 'catch') {
       const u = clamp(t / 0.5, 0, 1);
-      if (u < 1) s = 1 + 0.22 * Math.sin(u * Math.PI) * (1 - u * 0.4);
+      if (u < 1) s = 1 + (bonus ? 0.34 : 0.22) * Math.sin(u * Math.PI) * (1 - u * 0.4);
     }
     els.score.style.transform = `scale(${s.toFixed(4)})`;
   }
@@ -99,11 +102,13 @@ function juiceFrame({ phase, t, renderer, els, confetti, baseExposure, calm }) {
     }
     els.wrongFlash.style.opacity = o.toFixed(4);
   }
-  // 4. Confetti rides the win only; win's own t drives the fall. (Calm mode
-  //    hides it; the engine disables it outright on ?quality=low. HUD_SPEC in
-  //    the engine also gates the rain and fireworks.)
+  // 4. Confetti rides the win — and a Patriot catch (issue #58), where it is
+  //    the extra layer over the regular pop. Win's own t drives the fall.
+  //    (Calm mode hides it; the engine disables it outright on ?quality=low.
+  //    HUD_SPEC in the engine also gates the rain and fireworks.)
   if (confetti) {
-    confetti.points.visible = !calm && confetti.enabled !== false && phase === 'win';
+    const raining = phase === 'win' || (bonus && phase === 'catch');
+    confetti.points.visible = !calm && confetti.enabled !== false && raining;
     if (confetti.points.visible) confetti.update(t);
   }
 }

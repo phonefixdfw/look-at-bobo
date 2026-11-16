@@ -16,6 +16,7 @@ import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
+import { SPLASH } from './splash.js';
 
 /* ---- the ten moments, pose by pose ----
  * The engine runs the baseline idle right before this, only during `find`,
@@ -162,8 +163,10 @@ function batThePen(pen, supports, t) {
 
 /* ---- full-game checks the engine can't know on its own ----
  * Appended after the engine's own 48 (46 + the two spot-pool checks issue
- * #53 added), so the full page reports 55. */
-function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, SPOTS = null }) {
+ * #53 added) and the rest of the full page's stack (furniture scale, title
+ * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, so
+ * the full page reports 65. */
+function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes, SPOTS = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -443,6 +446,222 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'issue #48: the headboard is flat on the west wall, not near it',
     );
   }
+
+  /* ---- Patriot Bobo (issue #58) — the rare +3 costume cat ---- */
+
+  // 1. THE SPAWN RULE, proven as data: the pure planner over 500 seeds ×
+  //    10 finds obeys every invariant exactly — never the first find, never
+  //    back-to-back, never more than the cap — and lands near its advertised
+  //    odds. The live roll in the engine is the same function on one seed.
+  {
+    const invBad = [];
+    let hit = 0, legalRolls = 0, seedsAny = 0;
+    for (let s = 1; s <= 500; s++) {
+      const p = runPatriotPlan(s, 10, { enabled: true });
+      if (p[0]) invBad.push(`seed ${s}: first find`);
+      let count = 0, prev = false;
+      for (let f = 1; f <= 10; f++) {
+        const legal = f >= PATRIOT.firstFind && count < PATRIOT.maxPerRun && !prev;
+        if (legal) legalRolls++;
+        if (p[f - 1]) {
+          count++;
+          if (prev) invBad.push(`seed ${s}: consecutive at ${f}`);
+        }
+        hit += p[f - 1] ? 1 : 0;
+        prev = p[f - 1];
+      }
+      if (count > PATRIOT.maxPerRun) invBad.push(`seed ${s}: ${count} per run`);
+      if (count > 0) seedsAny++;
+    }
+    const rollRate = hit / legalRolls; // the dice themselves: ≈ 1 in 6
+    const seedRate = seedsAny / 500; // how many runs get a Patriot at all
+    const rules = PATRIOT.chance === 1 / 6 && PATRIOT.maxPerRun === 2 && PATRIOT.firstFind === 2 && PATRIOT.reward === 3;
+    const ok = invBad.length === 0 && rules && rollRate > 0.13 && rollRate < 0.22 && seedRate > 0.55 && seedRate < 0.95;
+    add(
+      'patriot-spawn-rule',
+      invBad.length ? invBad.slice(0, 3).join(', ') : `roll ${(rollRate * 100).toFixed(1)}%, ${(seedRate * 100).toFixed(0)}% of seeds`,
+      'never 1st, never back-to-back, ≤2/run; roll ≈1 in 6',
+      ok,
+      'issue #58: one seeded dice per legal find — 500 seeds, 10 finds each',
+    );
+  }
+
+  // 2. The DEFAULTS stay quiet: the capture/bot seed (11) draws no Patriot
+  //    in ten finds and the stress seeds none in their short win=3 runs, so
+  //    every baseline frame and bot number predating #58 keeps its pixels.
+  //    If a future spot pool or chance change breaks this, re-pick the dice
+  //    tag (PATRIOT.seedTag) — do NOT "fix" this check by loosening it.
+  {
+    const p = (s) => runPatriotPlan(s, 10, { enabled: true });
+    const elevenQuiet = p(11).every((x) => !x);
+    const stressQuiet = [23, 47, 9].every((s) => p(s).slice(0, 3).every((x) => !x));
+    add(
+      'patriot-default-seed-quiet',
+      elevenQuiet && stressQuiet ? 'seed 11: 0 in 10; seeds 23/47/9: 0 in 3' : 'a baseline seed draws Patriot — re-pick PATRIOT.seedTag',
+      'seed 11 never; stress seeds not in their scored finds',
+      elevenQuiet && stressQuiet,
+      'capture:full and the stress suites run Patriot-free on their default seeds',
+    );
+  }
+
+  // 3. THE +3 AND THE EARLY WIN: a Patriot catch pays PATRIOT.reward, the
+  //    win fires at score ≥ TARGET (8 + 3 wins at 11), and the wrong-cat
+  //    −1 is untouched whether or not he was the one you pointed at.
+  {
+    const fire = (score, event, patriot) => {
+      game.phase = 'find';
+      game.score = score;
+      game.patriot = patriot;
+      triggerEvent(event);
+      return `${game.score}/${game.phase}`;
+    };
+    const nearWin = fire(TARGET - 2, 'catch', true); // 8 -> 11: WIN, not catch
+    const exact = fire(TARGET - 3, 'catch', true); // 7 -> 10: the exact-line win
+    const mid = fire(TARGET - 5, 'catch', true); // 5 -> 8: still playing
+    const plain = fire(TARGET - 5, 'catch', false); // plain Bobo still +1
+    const dag = fire(5, 'wrong', true); // the penalty never rides the bonus
+    game.patriot = false;
+    const ok = nearWin === `${TARGET + 1}/win` && exact === `${TARGET}/win` && mid === `${TARGET - 2}/catch` && plain === `${TARGET - 4}/catch` && dag === '4/wrong';
+    add(
+      'patriot-reward-early-win',
+      `${nearWin} ${exact} ${mid} ${plain} ${dag}`,
+      `+3, win at ≥${TARGET} (8→11 wins); wrong still −1 floored`,
+      ok,
+      'issue #58: the bonus can end a run early — the win reads the score, not the count',
+    );
+  }
+
+  // 4. Aim still lands on BOBO through the costume: from every compass
+  //    angle a ray at his seated body resolves to cat-bobo (the costume is
+  //    his subtree, never orphaned scenery), a ray aimed straight at the
+  //    hat hits the costume and still resolves to Bobo, and it detaches
+  //    cleanly.
+  {
+    const pc = buildCat('bobo'); // fresh probe; root.name is 'cat-bobo'
+    const m = catRecords[0];
+    setCatPose(pc, PATRIOT.pose); // the costume's pose, seated on the spot
+    pc.root.position.set(m.spot[0], supports[m.spot[1]] ?? 0, m.spot[2]);
+    pc.root.rotation.y = catRootYaw(m.faceYaw);
+    pc.root.updateMatrixWorld(true);
+    addPatriotCostume(pc, { quality: SETTINGS.quality, calm: SETTINGS.reducedMotion });
+    const rc = new THREE.Raycaster();
+    const target = new THREE.Vector3();
+    pc.pivots[PATRIOT.pose].body.getWorldPosition(target);
+    const origin = new THREE.Vector3();
+    const catOf = (o) => {
+      while (o && !(o.name ?? '').startsWith('cat-')) o = o.parent;
+      return o ? o.name : null;
+    };
+    let stray = 0, rayHits = 0;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      origin.set(target.x + Math.sin(a) * 1.4, target.y + 0.25, target.z + Math.cos(a) * 1.4);
+      rc.set(origin, target.clone().sub(origin).normalize());
+      const first = rc.intersectObjects([pc.root], true).find((h) => h.object.isMesh && h.object.visible);
+      if (!first) continue;
+      rayHits++;
+      if (catOf(first.object) !== 'cat-bobo') stray++;
+    }
+    // The compass rays skim the BODY centre, where fur wins the near-side
+    // race; to prove the costume is aim-live (in the subtree, not invisible
+    // scenery) aim straight at the topmost costume piece — the fur hat —
+    // from above. Its first hit must be a costume mesh and must resolve to
+    // cat-bobo exactly like the body does.
+    pc.root.updateMatrixWorld(true);
+    const cm = [];
+    pc.root.traverse((o) => { if (o.isMesh && o.userData?.patriot) cm.push(o); });
+    let top = null;
+    for (const o of cm) {
+      const b = new THREE.Box3().setFromObject(o);
+      if (!top || b.max.y > top.max.y) top = b;
+    }
+    let hatResolves = false, hatOnCostume = false;
+    if (top) {
+      const c = top.getCenter(new THREE.Vector3());
+      const from = c.clone().add(new THREE.Vector3(0.35, 0.55, 0.35));
+      rc.set(from, c.clone().sub(from).normalize());
+      const hit = rc.intersectObjects([pc.root], true).find((h) => h.object.isMesh && h.object.visible);
+      hatResolves = !!hit && catOf(hit.object) === 'cat-bobo';
+      hatOnCostume = !!hit && !!hit.object.userData?.patriot;
+    }
+    removePatriotCostume(pc);
+    const clean = !isPatriotAttached(pc);
+    const ok = rayHits >= 6 && stray === 0 && cm.length >= 5 && hatResolves && hatOnCostume && clean;
+    add(
+      'patriot-aim-hit',
+      ok ? `${rayHits}/8 angles on cat-bobo; hat aim lands on the costume, resolves Bobo` : `${rayHits}/8 ray hits, ${stray} stray, ${cm.length} costume meshes, hat: resolves=${hatResolves} costume=${hatOnCostume}, detached=${clean}`,
+      'every angle resolves cat-bobo; hat aim hits the costume; detaches clean',
+      ok,
+      'issue #58: the hat is part of Bobo — pointing never hits loose scenery',
+    );
+  }
+
+  // 5. Dressing him never MOVES him: the costume swaps the pose only — same
+  //    spot, same faceYaw — so the decoy distance rule (engine, above)
+  //    covers Patriot rounds exactly as it covers plain ones. Re-verified
+  //    here through the dressed record on every spot.
+  {
+    const moved = [];
+    const decoyBad = [];
+    for (const s of catRecords) {
+      const dressed = { ...s, pose: PATRIOT.pose };
+      if (dressed.spot !== s.spot || dressed.faceYaw !== s.faceYaw) moved.push(s.id);
+      const d = pickDecoySpot(dressed.spot, mulberry32(hashId(`patriot-decoy ${s.id}`)), dressed.room);
+      if (!d || Math.hypot(d.pos[0] - dressed.spot[0], d.pos[2] - dressed.spot[2]) < DECOY_MIN_DIST) decoyBad.push(s.id);
+    }
+    add(
+      'patriot-spot-legal',
+      moved.length || decoyBad.length ? `moved: ${moved.join(',')} decoy: ${decoyBad.join(',')}` : `${catRecords.length} spots hold him in place`,
+      'costume never shifts the spot; decoy stays ≥ min distance',
+      !moved.length && !decoyBad.length,
+      'issue #58: he sits ON his drawn spot — nearest allowed pose, same place, same face',
+    );
+  }
+
+  // 6. The bonus celebration is HIS ONLY: at the same seeked time in the
+  //    same phase, a Patriot catch lights the "+3!" pop and the confetti
+  //    and a plain catch leaves both at rest. Calm mode: both stay hidden
+  //    either way (same rule as every other juice).
+  {
+    const savedPhase = game.phase;
+    const calm = SETTINGS.reducedMotion;
+    game.phase = 'catch';
+    game.patriot = true;
+    stageSeek(0.3);
+    const popOn = !!bonusPopEl && bonusPopEl.style.display === 'block' && Number(bonusPopEl.style.opacity) > 0.05;
+    const confOn = confetti ? confetti.points.visible : false;
+    game.patriot = false;
+    stageSeek(0.3);
+    const popOff = !bonusPopEl || (bonusPopEl.style.display !== 'block' || Number(bonusPopEl.style.opacity) <= 0.05);
+    const confOff = confetti ? !confetti.points.visible : true;
+    game.phase = savedPhase;
+    const wantPop = !calm;
+    const wantConf = !calm && (!confetti || confetti.enabled !== false);
+    const ok = popOn === wantPop && popOff && confOn === wantConf && confOff;
+    add(
+      'patriot-celebration-only-for-him',
+      calm ? `calm: pop+confetti stay off for him too (rest=${popOff && confOff})` : `patriot: pop=${popOn} confetti=${confOn}; plain: ${popOff && confOff ? 'both at rest' : 'LEAKED'}`,
+      calm ? 'hidden in calm mode, at rest for plain catches' : 'pop + confetti on a Patriot catch only',
+      ok,
+      'issue #58: extra fireworks belong to the bonus cat alone',
+    );
+  }
+
+  // 7. Determinism and the OFF switch: the same seed yields the same plan
+  //    across calls (the dice ride the seed, not the clock), and every seed
+  //    under ?patriot=off draws nothing — the URL knob is absolute.
+  {
+    const twice = JSON.stringify(runPatriotPlan(SEED, 10, { enabled: true })) === JSON.stringify(runPatriotPlan(SEED, 10, { enabled: true }));
+    let offAny = false;
+    for (let s = 1; s <= 40; s++) if (runPatriotPlan(s, 10, { enabled: false }).some(Boolean)) offAny = true;
+    add(
+      'patriot-off-and-determinism',
+      `${twice ? 'plan stable' : 'plan DRIFTED'}, ${offAny ? 'off leaks' : 'off: 0 in 400 finds'}`,
+      'same seed = same plan; ?patriot=off draws none, ever',
+      twice && !offAny,
+      'issue #58: the roll is a pure function of the seed; the kill switch is real',
+    );
+  }
 }
 
 bootGame({
@@ -454,4 +673,5 @@ bootGame({
   winDefault: LEVEL.TARGET_DEFAULT, // 10 — the real target
   extraChecks: fullExtraChecks,
   hintFade: { fadeStart: 12, fadeEnd: 18 }, // the hint teaches, then gets out of the way
+  splash: SPLASH, // issue #57: the title screen; pause/win hand back to it
 });

@@ -43,6 +43,9 @@
 //       swipe cue show once, retire on the first game touch, auto-fade with no
 //       touch at all, and never appear on desktop or in a capture frame; the
 //       stick, the shout button and the HUD never overlap on a short phone
+//   13  #57 the title screen: up before the start (inline-SVG logo + START,
+//       selfTest green from behind it), lifted by Play, laid out clean at
+//       desktop / 3440×1440 / 740×360, and FULLY absent under ?gate=off
 //
 //   npm run check:mobile
 
@@ -107,8 +110,9 @@ async function phonePage(params, opts = {}) {
   page.__errs = errs;
   return page;
 }
-async function desktopPage(params) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+async function desktopPage(params, opts = {}) {
+  const { viewport = { width: 1280, height: 800 } } = opts;
+  const context = await browser.newContext({ viewport });
   await context.addInitScript(LOCK_COUNTER);
   contexts.push(context);
   const page = await context.newPage();
@@ -259,6 +263,24 @@ try {
     check('phone: thumb UI shown, rotate hint not (landscape)', css.shoutShown === 'flex' && css.rotate === 'none');
     check('phone: gate and hint reworded for thumbs', css.gateBtn === 'tap to start' && css.hint.includes('left thumb') && css.noteTouch === 'inline' && css.noteDesktop === 'none');
 
+    // The title screen (issue #57) rides the same gate: at rest the card is
+    // UP, logo and START visible, on a phone under the body.splash class too.
+    const title = await page.evaluate(() => ({
+      shown: !document.getElementById('gate').classList.contains('hidden'),
+      splash: document.body.classList.contains('splash'),
+      logo: (() => {
+        const s = document.querySelector('#gate svg.bobo');
+        const r = s.getBoundingClientRect();
+        return r.width > 24 && r.height > 24 && s.getAttribute('aria-label') === 'Look at Bobo';
+      })(),
+      word: document.getElementById('title-word').textContent === 'LOOK AT BOBO!',
+      wordInView: (() => {
+        const r = document.getElementById('title-word').getBoundingClientRect();
+        return r.left >= -1 && r.right <= innerWidth + 1 && r.top >= -1 && r.bottom <= innerHeight + 1;
+      })(),
+    }));
+    check('#57 phone: title screen up at rest — logo, wordmark, splash class', title.shown && title.splash && title.logo && title.word && title.wordInView, JSON.stringify(title));
+
     // The shout button is thumb-sized and inside the (landscape) viewport.
     const layout = await page.evaluate(() => {
       const r = document.getElementById('shout-btn').getBoundingClientRect();
@@ -273,10 +295,11 @@ try {
     await waitPhase(page, 'find');
     const after = await page.evaluate(() => ({
       hidden: document.getElementById('gate').classList.contains('hidden'),
+      splash: document.body.classList.contains('splash'),
       locked: document.pointerLockElement !== null,
     }));
     const s1 = await st(page);
-    check('phone: gate tap starts the game, no pointer lock', after.hidden && after.locked === false && s1.gateOpen === true && s1.paused === false, `phase ${s1.phase}, locked ${after.locked}`);
+    check('phone: gate tap starts the game, no pointer lock', after.hidden && !after.splash && after.locked === false && s1.gateOpen === true && s1.paused === false, `phase ${s1.phase}, locked ${after.locked}, splash ${after.splash}`);
 
     const touch = await touchDriver(page);
 
@@ -443,7 +466,7 @@ try {
       again: document.getElementById('ending-again').textContent,
     }));
     check('mobile win run: ten finds over the shout button', fin.phase === 'win' && fin.score === 10 && fin.target === 10, `score ${fin.score}/${fin.target}, ${scores.join(', ')}`);
-    check('mobile win run: exact ending text', ending.text === 'your did it! you wind' && ending.again === 'tap the shout button to look at them again', `"${ending.text}" / "${ending.again}"`);
+    check('mobile win run: exact ending text', ending.text === 'your did it! you wind' && ending.again === 'tap the shout button to go back to the menu', `"${ending.text}" / "${ending.again}"`);
     // The shout button doubles as play-again — but only after the 0.6 s win
     // cooldown (`WIN_RESTART_AFTER`), and the tap that proves it has to be fired
     // from INSIDE the page on the frame the win lands. Measured from the harness,
@@ -459,10 +482,24 @@ try {
       early.error || `winElapsed ${early.we.toFixed(3)} at the tap → ${early.phase} at ${early.score}`,
     );
     await page.waitForTimeout(700); // past WIN_RESTART_AFTER
-    await page.tap('#shout-btn'); // a real finger this time: it must restart
+    await page.tap('#shout-btn'); // a real finger this time: it must hand back to the menu (issue #57)
     await waitPhase(page, 'find');
     const re = await st(page);
-    check('mobile win run: shout restarts only after the cooldown', re.phase === 'find' && re.score === 0, `then ${re.phase} at ${re.score}`);
+    const menu = await page.evaluate(() => ({
+      shown: !document.getElementById('gate').classList.contains('hidden'),
+      splash: document.body.classList.contains('splash'),
+      locked: document.pointerLockElement !== null,
+    }));
+    check(
+      'mobile win run: shout returns to the title screen only after the cooldown',
+      re.phase === 'find' && re.score === 0 && menu.shown && menu.splash,
+      `then ${re.phase} at ${re.score}, card ${menu.shown ? 'up' : 'down'}`,
+    );
+    await page.tap('#gate-btn'); // Play from the card: a fresh run, same door as the first time
+    await waitPhase(page, 'find');
+    const s2 = await st(page);
+    const replay = await page.evaluate(() => ({ splash: document.body.classList.contains('splash'), hidden: document.getElementById('gate').classList.contains('hidden') }));
+    check('mobile win run: Play from the title screen starts a fresh run', s2.score === 0 && s2.paused === false && !replay.splash && replay.hidden, `score ${s2.score}, splash ${replay.splash}`);
     check('mobile win run: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
   }
@@ -843,6 +880,115 @@ try {
     }));
     check('#38 capture mode (?gate=off) carries none of the teaching chrome', dom.capture === true && dom.stick === 'none' && dom.intro === 'none' && dom.look === 'none', JSON.stringify(dom));
     check('#38 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+  // ===========================================================================
+  // 13. Issue #57: the title screen. Up before the start (logo + START),
+  //     lifted by Play, and FULLY absent under ?gate=off — and at every
+  //     viewport the page is read at (desktop, an ultrawide, a short
+  //     landscape phone) the logo, the instructions and START lay out
+  //     without touching each other or the frame edges.
+  // ===========================================================================
+  const TITLE_LAY = () => {
+    const boxes = [];
+    for (const [name, sel] of [
+      ['mark', '#gate svg.bobo'],
+      ['word', '#title-word'],
+      ['tagline', '.title-tagline'],
+      ['hint', '.title-hint'],
+      ['start', '#gate-btn'],
+      ['row', '.title-row'],
+      ['note', '.gate-note'],
+      ['stamp', '#build-stamp'],
+    ]) {
+      const n = document.querySelector(sel);
+      if (!n) continue;
+      const r = n.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) boxes.push({ name, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom });
+    }
+    const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+    const bad = [];
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        if ((boxes[i].name === 'mark' && boxes[j].name === 'word') || (boxes[i].name === 'word' && boxes[j].name === 'mark')) continue; // the peek is the logo
+        if (hit(boxes[i], boxes[j])) bad.push(`${boxes[i].name}×${boxes[j].name}`);
+      }
+    const cr = (() => { const e = document.querySelector('#gate .gate-card'); if (!e) return null; const r = e.getBoundingClientRect(); return r.width > 0 ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : null; })();
+    for (const b of boxes) {
+      const spill = cr && (b.y1 > cr.bottom + 1 || b.y0 < cr.top - 1 || b.x1 > cr.right + 1 || b.x0 < cr.left - 1);
+      if (spill) bad.push(`${b.name} out of card`);
+      else if (b.y0 < -1 || b.y1 > innerHeight + 1 || b.x0 < -1 || b.x1 > innerWidth + 1) bad.push(`${b.name} off-screen`);
+    }
+    const word = boxes.find((b) => b.name === 'word');
+    return { n: boxes.length, bad, wordW: word ? word.x1 - word.x0 : 0, vw: innerWidth, vh: innerHeight };
+  };
+
+  // 13a. Desktop, card up: the whole selfTest suite runs from BEHIND the
+  // title screen (its restore path must survive a page that never started),
+  // and the title checks see the card shown.
+  {
+    const page = await desktopPage('?seed=11');
+    const lay = await page.evaluate(TITLE_LAY);
+    const before = await page.evaluate(() => {
+      const r = document.getElementById('gate').getBoundingClientRect();
+      return {
+        covers: r.width >= innerWidth - 1 && r.height >= innerHeight - 1,
+        start: document.getElementById('gate-btn').textContent,
+        logo: (() => {
+          const s = document.querySelector('#gate svg.bobo');
+          return { label: s.getAttribute('aria-label'), title: s.querySelector('title')?.textContent, w: s.getBoundingClientRect().width };
+        })(),
+        st: window.LC.selfTest(),
+      };
+    });
+    before.lay = lay;
+    const tc = before.st.checks.filter((c) => c.name.startsWith('title-'));
+    check('#57 desktop: title screen up before the start — logo named, START ready', before.lay.n >= 6 && before.lay.bad.length === 0 && before.covers && before.start === 'START' && before.logo.label === 'Look at Bobo' && before.logo.title === 'Look at Bobo' && before.logo.w > 60, JSON.stringify({ bad: before.lay.bad, start: before.start, logo: before.logo }));
+    check('#57 desktop: selfTest runs from behind the title card', before.st.pass && tc.length === 3 && tc.every((c) => c.pass && c.value !== 'n/a (card down)'), tc.map((c) => `${c.name}=${c.value}${c.pass ? '' : ' FAIL'}`).join(' | ') || before.st.checks.filter((c) => !c.pass).map((c) => c.name).join(', '));
+    await page.click('#gate-btn');
+    await waitPhase(page, 'find');
+    const gone = await page.evaluate(() => ({
+      hidden: document.getElementById('gate').classList.contains('hidden'),
+      splash: document.body.classList.contains('splash'),
+      locked: document.pointerLockElement !== null,
+      playing: window.LC.state().playing,
+    }));
+    check('#57 desktop: Play lifts the card and starts the live loop', gone.hidden && !gone.splash && gone.playing, JSON.stringify(gone));
+    await page.context().close();
+  }
+
+  // 13b. The ultrawide: the card centres and nothing touches the edges.
+  {
+    const page = await desktopPage('?seed=11', { viewport: { width: 3440, height: 1440 } });
+    const lay = await page.evaluate(TITLE_LAY);
+    check('#57 ultrawide 3440×1440: title layout clean', lay.n >= 6 && lay.bad.length === 0, JSON.stringify(lay));
+    await page.context().close();
+  }
+
+  // 13c. The short landscape phone (~360px tall): the same promise, thumbs-first size.
+  {
+    const page = await phonePage('?seed=11', { viewport: { width: 740, height: 360 }, dsf: 2 });
+    const lay = await page.evaluate(TITLE_LAY);
+    check('#57 short landscape 740×360: title layout clean, wordmark fits', lay.n >= 5 && lay.bad.length === 0 && lay.wordW < lay.vw, JSON.stringify(lay));
+    await page.context().close();
+  }
+
+  // 13d. ?gate=off: the title screen is fully hidden and empty — no class,
+  // no pixels — so capture and determinism see exactly the game.
+  {
+    const page = await phonePage('?gate=off');
+    const off = await page.evaluate(() => ({
+      gateHidden: document.getElementById('gate').classList.contains('hidden'),
+      gateShown: getComputedStyle(document.getElementById('gate')).display !== 'none',
+      splash: document.body.classList.contains('splash'),
+      // "nothing painted" = NOT RENDERED: children of a display:none subtree
+      // keep their own computed display, so offsetParent is the honest test.
+      word: document.getElementById('title-word').offsetParent === null ? 'unpainted' : 'painted',
+      st: window.LC.selfTest().checks.filter((c) => c.name.startsWith('title-')).map((c) => ({ n: c.name, v: c.value, p: c.pass })),
+    }));
+    check('#57 ?gate=off: title screen fully absent — no splash class, nothing painted', off.gateHidden && !off.gateShown && !off.splash && off.word === 'unpainted', JSON.stringify({ gateShown: off.gateShown, splash: off.splash, word: off.word }));
+    check('#57 ?gate=off: the title checks say "absent" and pass', off.st.length === 3 && off.st.every((c) => c.p) && off.st[0].v === 'absent', JSON.stringify(off.st));
+    check('#57 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
   }
 } finally {

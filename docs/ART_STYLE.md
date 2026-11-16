@@ -220,6 +220,23 @@ DOM, not geometry (crisp at any size, free for the render budget). Colors are
   layers) + two firework bursts, and the ending line is exactly
   **"your did it! you wind"** — spelled exactly that way, on purpose;
   `ending-text-exact` fails the build if anyone "corrects" it.
+- **Title screen** (issue #57): a modern title card in §2's voice — the
+  **"LOOK AT BOBO!"** wordmark in warm gold `#f0c25c` with an ink outline and
+  a soft drop (bold system type stack + layered outlines; no downloaded
+  fonts), and Bobo's black head peeking OVER the lettering as inline SVG:
+  yellow-green eyes `#b8e04f`, the white forehead dash and the white bib —
+  the §5 tells, promoted to the logo. One card vocabulary for the whole
+  game: the title card, the pause menu and the ending share the warm-dark
+  panel with a mustard border, and one pill-button language (mustard = go,
+  paper outline = secondary). Backdrop is CSS-only (dim veil, vignette,
+  slow lamp-dust drift) — never a second WebGL scene. The logo's idle life
+  (blink, ear flick, gentle bob) is for players only: calm mode and the OS
+  reduce-motion preference switch it off. `title-logo-name` enforces the
+  accessible name **"Look at Bobo"**; `title-layout-clean` enforces a clean
+  logo/instructions/START layout at any viewport; `title-screen-state`
+  enforces the lifecycle: shown before the start, hidden after Play, and
+  FULLY absent (no class, no pixels) under `?gate=off`, so capture
+  baselines never see any of it.
 - HUD is only visible when the moment says it should be
   (`hud-score-visibility`, `ending-visibility`, `dag-visibility` all enforce
   per-moment state).

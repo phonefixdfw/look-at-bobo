@@ -22,6 +22,8 @@
 //      a real trusted click on the gate (the view restore used to throw)
 //  11  the live tells: label chip hidden for players, reticle softens on the
 //      decoy, and a shout at nothing nudges instead of saying nothing at all
+//  13  Patriot Bobo (issue #58): the off switch, the forced +3 find, and a
+//      live run that matches LC.patriotPlan and replays it after restart
 //
 // Free and local: starts its own static server, uses the installed Chrome.
 //
@@ -49,7 +51,9 @@ const arg = (name, dflt) => {
 const PAGE = arg('page', 'game/slice.html');
 // issue #27: slice gained cats-face-the-room (45 → 46); full passes --checks 56: 51 + furniture-real-scale (issue #41), + the living room rows (#46, 53) and + the bedroom rows (issue #48)
 // issue #53: full gained spot-pool-covers-rooms + run-draw-legal (53 → 55); slice stays 46.
+// issue #58: full gained the seven Patriot Bobo checks (55 → 62); slice stays 46.
 // issue #59: merging the bedroom (#48) rows onto the spot-pool base: 55 + 1 bedroom row → 56.
+// issue #62: bedroom row onto merged main (kitchen #45 + Patriot #58): 65 + 1 → 66.
 const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
@@ -101,7 +105,10 @@ async function audit(page, where) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. full wins, three seeds, auditing every round
+// 1. full wins, three seeds, auditing every round. Issue #58 made the win a
+//    score event a +3 can reach early, so the scenario plays to the WIN,
+//    not to a fixed catch count — on these seeds (plan-quiet 11/23/47) it
+//    is still three plain finds; on a Patriot seed it would take fewer.
 // ---------------------------------------------------------------------------
 try {
   for (const seed of [11, 23, 47]) {
@@ -109,15 +116,18 @@ try {
     await page.evaluate(() => window.LC.play());
     await waitPhase(page, 'find');
     await audit(page, `seed ${seed} round 1 (wake)`);
-    for (let i = 0; i < 3; i++) {
+    let won = false;
+    for (let round = 1; round <= 6 && !won; round++) {
       await waitPhase(page, 'find');
       const hits = await page.evaluate(() => window.LC.aimAt('bobo').hits);
-      check(`seed ${seed} aim reaches Bobo (round ${i + 1})`, hits === 'cat-bobo', `centre ray: ${hits}`);
+      check(`seed ${seed} aim reaches Bobo (round ${round})`, hits === 'cat-bobo', `centre ray: ${hits}`);
       await page.evaluate(() => window.LC.trigger('catch'));
-      if (i < 2) {
+      const now = await page.evaluate(() => window.LC.state());
+      won = now.phase === 'win';
+      if (!won) {
         await waitPhase(page, 'catch');
         await waitPhase(page, 'find');
-        await audit(page, `seed ${seed} round ${i + 2} (respawn)`);
+        await audit(page, `seed ${seed} round ${round + 1} (respawn)`);
       }
     }
     await waitPhase(page, 'win');
@@ -125,7 +135,7 @@ try {
       s: window.LC.state(),
       ending: document.getElementById('ending').textContent,
     }));
-    check(`seed ${seed} wins at 3`, fin.s.score === 3 && fin.ending === 'your did it! you wind', `score ${fin.s.score}, ending "${fin.ending}"`);
+    check(`seed ${seed} wins at ≥ 3`, fin.s.score >= 3 && fin.ending === 'your did it! you wind', `score ${fin.s.score}, ending "${fin.ending}"`);
     await page.close();
   }
 } catch (err) {
@@ -188,7 +198,7 @@ try {
   });
   await page.waitForTimeout(150); // well inside the 0.6 s cooldown
   const held = await page.evaluate(() => window.LC.state());
-  check('win survives Space-mashing inside the cooldown', held.phase === 'win' && held.score === 3, `phase ${held.phase}, score ${held.score}`);
+  check('win survives Space-mashing inside the cooldown', held.phase === 'win' && held.score >= 3, `phase ${held.phase}, score ${held.score}`);
   await page.waitForTimeout(600); // cooldown over: the SAME key may skip
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })));
   const skipped = await page.evaluate(() => window.LC.state());
@@ -521,7 +531,7 @@ try {
     const alt = r.every((x, i) => i === 0 || x.room !== r[i - 1].room);
     const decoyOk = r.every((x) => x.dd >= 1.2);
     const mean = r.reduce((a, x) => a + x.d, 0) / r.length;
-    check('ten live rounds draw ten distinct spots, one per type', distinct === 10 && types === 10, `${distinct}/10 spots, ${types}/10 types`);
+    check('ten live rounds draw ten distinct spots, one per type', distinct === 10 && types === 10, `${distinct}/10 spots, ${types}/10 types — each find draws a distinct type until the run ends (a +3 win, issue #58, can end it before the cycle is spent)`);
     check('every catch changes room', alt, r.map((x) => x.room).join(' > '));
     check('live decoys stay legal all run', decoyOk, `closest bobo↔decoy ${Math.min(...r.map((x) => x.dd)).toFixed(2)} m`);
     check('spawn→Bobo mean walk is a walk, never a wake-up on the cat', mean >= 1.5 && r.every((x) => x.d >= 1.2), `mean ${mean.toFixed(2)} m, min ${Math.min(...r.map((x) => x.d)).toFixed(2)} m`);
@@ -529,6 +539,84 @@ try {
   await page.close();
 } catch (err) {
   check('full-run-pool', false, String(err).split('\n')[0]);
+}
+
+// ---------------------------------------------------------------------------
+// 13. Patriot Bobo (issue #58), driven through the same loopTick pipeline as
+//     scenario 12: ?patriot=off never spawns him and refuses the force;
+//     LC.patriot(true) dresses exactly the NEXT legal find (score 1 then 4,
+//     never first, never back-to-back); and a plain seeded run matches
+//     LC.patriotPlan(23) find-for-find and replays the identical plan after
+//     LC.restart() — the dice ride the seed, not the clock. Inert on slice.
+// ---------------------------------------------------------------------------
+try {
+  const off = await newPage('?gate=off&seed=11&win=20&patriot=off');
+  const has = await off.evaluate(() => !!window.LC.patriot && window.LC.spots.length > 0); // Patriot rides the spot pool (issue #58) — inert on the slice
+  if (!has) {
+    check('patriot-bobo (this page has no spot pool — nothing to draw)', true, 'slice');
+    await off.close();
+  } else {
+    const DRIVE = () => {
+      window.LC.pause();
+      window.LC.restart();
+      const rounds = [];
+      for (let k = 0; k < 8; k++) {
+        for (let i = 0; i < 400 && window.LC.state().phase !== 'find'; i++) window.LC.loopTick(1 / 60);
+        const s = window.LC.state();
+        rounds.push({ p: !!s.patriot, costume: window.LC.patriot().costumeAttached, find: s.findNum });
+        window.LC.trigger('catch');
+      }
+      return { rounds, score: window.LC.state().score };
+    }; // zero-arg: this playwright-core returns undefined for evaluate(fn, arg)
+    const offState = await off.evaluate(() => ({
+      planAll: window.LC.patriotPlan(11, 10).some(Boolean),
+      refused: window.LC.patriot(true), // the ask itself must be refused on an off page
+    }));
+    const offRun = await off.evaluate(DRIVE);
+    check(
+      '?patriot=off: no Patriot ever, and the force ask is refused',
+      !offState.planAll && offState.refused === false && offRun.rounds.every((r) => !r.p && r.costume === false),
+      `8 rounds, ${offRun.rounds.filter((r) => r.p).length} patriots, costume always off`,
+    );
+    await off.close();
+
+    const forced = await newPage('?gate=off&seed=11&win=20');
+    const asked = await forced.evaluate(() => {
+      window.LC.pause();
+      window.LC.restart();
+      const toFind = () => { for (let i = 0; i < 400 && window.LC.state().phase !== 'find'; i++) window.LC.loopTick(1 / 60); return window.LC.state(); };
+      toFind();
+      const f1 = { p: window.LC.state().patriot, costume: window.LC.patriot().costumeAttached };
+      window.LC.trigger('catch'); // find 1: plain (+1) — he is never FIRST
+      window.LC.patriot(true); // ask for the next legal find
+      const f2 = toFind();
+      const on = { p: f2.patriot, costume: window.LC.patriot().costumeAttached, find: f2.findNum };
+      window.LC.trigger('catch'); // +3: score lands at 4
+      const score = window.LC.state().score;
+      const f3 = toFind();
+      return { f1, on, score, f3p: f3.patriot, count: window.LC.patriot().count };
+    });
+    check(
+      'LC.patriot(true): next legal find only — never first, +3, costume on, never consecutive',
+      !asked.f1.p && !asked.f1.costume && asked.on.p && asked.on.costume && asked.on.find === 2 && asked.score === 4 && !asked.f3p && asked.count === 1,
+      `find1 plain, find ${asked.on.find} costumed (+3), score ${asked.score}, find 3 plain, count ${asked.count}`,
+    );
+    await forced.close();
+
+    const det = await newPage('?gate=off&seed=23&win=20');
+    const plan = await det.evaluate(() => window.LC.patriotPlan(23, 8));
+    const runA = await det.evaluate(DRIVE);
+    const runB = await det.evaluate(DRIVE); // same page, same seed: a restart replays the plan
+    const bits = (r) => r.rounds.map((x) => (x.p ? 1 : 0)).join('');
+    check(
+      'the live run matches LC.patriotPlan and restart replays it (seed 23)',
+      bits(runA) === plan.map((x) => (x ? 1 : 0)).join('') && bits(runA) === bits(runB),
+      `plan ${plan.map((x) => (x ? 1 : 0)).join('')} run A ${bits(runA)} run B ${bits(runB)} (1 = Patriot)`,
+    );
+    await det.close();
+  }
+} catch (err) {
+  check('patriot-bobo-run', false, String(err).split('\n')[0]);
 }
 
 // ---------------------------------------------------------------------------
