@@ -50,6 +50,7 @@ import { buildFullLiving } from './full-living-mesh.js';
 import { buildFullBath } from './full-bath-mesh.js';
 import { buildFullBedroom } from './full-bedroom-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
+import { createRoomCull } from './full-cull.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -614,6 +615,16 @@ export function buildFullApartment(scene) {
     console.info(`[look-at-bobo] issue #61 biggest folds: ${big}`);
   }
 
+  // ── issue #61: stop submitting rooms the camera cannot see ────────────────
+  // Filed now, before game/full.js adds the cast: everything in this list is
+  // flat, and anything added afterwards is nobody's room to hide.
+  // ?cull=off keeps every room drawn, which is how the checks run and how
+  // tools/draw-report.mjs proves hiding a room moves no pixel.
+  const cull = createRoomCull(flat, {
+    enabled: new URLSearchParams(location.search).get('cull') !== 'off',
+  });
+  console.info(`[look-at-bobo] issue #61 cull: rooms -> groups ${JSON.stringify(cull.map())} · ${cull.shared} shared groups never hidden`);
+
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
   const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
   hemi.position.set(0, CEIL_Y, 0);
@@ -662,6 +673,8 @@ export function buildFullApartment(scene) {
     supports,
     lights: { hemi, sun, fills },
     pen: { root: penRoot, barrel: penBody },
+    // issue #61: the per-room draw cull, driven by the camera each frame
+    cull,
     // every plaster slab (walls, parapets, ceilings) as an AABB, from the
     // definitions that were actually built (src/reach.js measures the walls
     // you can actually see — floors are not walls and are deliberately out)
