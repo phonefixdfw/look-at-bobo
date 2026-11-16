@@ -393,6 +393,7 @@ export function bootGame(cfg) {
     // Optional Step 8 extras — present only on the full-game page:
     pauseRestart: document.getElementById('pause-restart'),
     endingAgain: document.getElementById('ending-again'),
+    bonusPop: document.getElementById('score-bonus'), // issue #58: the "+3!" pop (full game only)
   };
 
   /** What is on screen in each phase. The score pill is live state — except
@@ -625,8 +626,9 @@ export function bootGame(cfg) {
 
   // ---------------------------------------------------------------------------
   // 6. The event rules — the demo's rules, exercised the same way:
-  //    catch +1 (reaching TARGET IS the win), wrong −1 floored at 0,
-  //    and after the win nothing moves the number any more.
+  //    catch +1 (Patriot Bobo +3, issue #58 — reaching TARGET IS the win
+  //    either way, so a bonus find can end the run early), wrong −1 floored
+  //    at 0, and after the win nothing moves the number any more.
   // ---------------------------------------------------------------------------
   const CATCH_END = 2.2; // seconds of catch staging before play resumes
   const WRONG_END = 2.6;
@@ -636,7 +638,10 @@ export function bootGame(cfg) {
     measured(() => {
       if (game.phase === 'win') return; // the game is over: a DAG! cannot follow the win
       if (event === 'catch') {
-        game.score += 1;
+        // Issue #58: Patriot Bobo pays PATRIOT.reward (+3), not +1 — and the
+        // win condition is score >= TARGET, so a +3 can end the run early
+        // (8 -> 11 wins). The wrong-cat penalty below is unchanged.
+        game.score += game.patriot ? PATRIOT.reward : 1;
         game.phase = game.score >= TARGET ? 'win' : 'catch';
       } else {
         // ?plant=score lets the penalty run below zero (score-floors-at-zero fails)
@@ -777,6 +782,12 @@ export function bootGame(cfg) {
         cfg.momentAnim({ bp, base, t, bobo, decoy, game, momentById, apt, supports, THREE, clamp, easeOutBack, easeOutCubic });
       }
     }
+    // Patriot's costume life (issue #58): flag wave, small head tilt, one
+    // blink — pure in t, written every frame it is attached, and it RESTS on
+    // removePatriotCostume, so a seeked normal-Bobo frame never strands a
+    // mid-wave flag. Runs after the face/moment writes so the hat rides the
+    // head it just moved.
+    if (isPatriotAttached(bobo)) patriotIdle(bobo, t, { calm: SETTINGS.reducedMotion });
     // The decoy: a slow, heavy breath, sideways only (demo rule: never sinks).
     const dp = decoy.pivots[decoy.current];
     if (dp) {
@@ -803,8 +814,23 @@ export function bootGame(cfg) {
       setStyle(el.dag, 'opacity', k.toFixed(4));
     }
     if (game.phase === 'win') updateRain(t);
-    if (game.phase === 'win' || game.phase === 'catch') updateFireworks(t);
-    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE, calm: SETTINGS.reducedMotion });
+    // Patriot's catch pays the bursts a 1.35 boost (issue #58): extra
+    // fireworks over the regular pop. Calm hides the bursts wholesale in
+    // updateHud, so the boost only ever rides a visible show.
+    if (game.phase === 'win' || game.phase === 'catch') updateFireworks(t, game.phase === 'catch' && game.patriot ? 1.35 : 1);
+    // Bonus pop (issue #58): "+3!" lands once on a PATRIOT catch — a DAG-
+    // style single ease-out-back pulse that rests at opacity 0 every other
+    // frame (single pulse, never a strobe) and stays hidden in calm mode,
+    // same rule as the fireworks and the confetti.
+    if (el.bonusPop) {
+      const bonus = game.phase === 'catch' && game.patriot && !SETTINGS.reducedMotion;
+      const k = bonus ? clamp((t - 0.08) / 0.4, 0, 1) : 0;
+      const s = k <= 0 ? 0.001 : easeOutBack(k);
+      setStyle(el.bonusPop, 'display', k > 0 ? 'block' : 'none');
+      setStyle(el.bonusPop, 'transform', `translate(-50%, -50%) scale(${s.toFixed(4)})`);
+      setStyle(el.bonusPop, 'opacity', k.toFixed(4));
+    }
+    juiceFrame({ phase: game.phase, t, renderer, els: { score: el.score, wrongFlash: el.wrongFlash }, confetti, baseExposure: BASE_EXPOSURE, calm: SETTINGS.reducedMotion, bonus: game.phase === 'catch' && game.patriot });
     // The pointing hand (the demo's choreography, tuned copy): rises with the
     // shout, points, pulls back when the DAG! lands. In `find` it rests in the
     // lower frame — this is a body, not a prop.
@@ -1134,6 +1160,7 @@ export function bootGame(cfg) {
     // reading the state back after mutating it would "restore" a test artefact.
     const entry = { phase: game.phase, momentId: game.momentId, spotId: game.spotId, time: game.time, view: game.view };
     const savedScore = game.score;
+    game.patriot = false; // the +1 rules below are the PLAIN Bobo rules — Patriot checks (full.js) opt in per check; restoreAfterSelfTest re-stages the flag
 
     // --- the exact strings ----------------------------------------------------
     add('ending-text-exact', el.ending.textContent, `exactly "${EXACT_ENDING}"`, el.ending.textContent === EXACT_ENDING, 'story-fixed, never corrected');
@@ -1711,9 +1738,10 @@ export function bootGame(cfg) {
     }
 
     // Step 8: the full game appends its own checks (moment count, every
-    // moment's contact band, room coverage). The slice adds none.
+    // moment's contact band, room coverage). The slice adds none. Issue #58
+    // hands the Patriot pieces (rule, reward, costume, pop) down the same way.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes: apt.wallBoxes ?? [], SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, mulberry32, hashId });
+      cfg.extraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
     }
 
     game.score = savedScore;
@@ -1871,6 +1899,7 @@ export function bootGame(cfg) {
           decoyId: game.decoyId, seed: SEED, gateOpen, plant: PLANT,
           spotId: game.spotId ?? null,
           room: POOL && game.spotId ? POOL.get(game.spotId).room : null,
+          patriot: game.patriot, patriotCount: game.patriotCount, findNum: game.findNum, // issue #58
         };
       },
       camera(name = game.view) {
@@ -1902,6 +1931,39 @@ export function bootGame(cfg) {
         game.score = clamp(Number(n) || 0, 0, TARGET);
         updateHud();
         updateLabel();
+      },
+      /** Issue #58: Patriot Bobo from the tools side.
+       *  LC.patriot()        → the whole picture: mode (from ?patriot=),
+       *                        whether the CURRENT find is him, finds so far.
+       *  LC.patriot(true)    → force the next round where a Patriot roll is
+       *                        legal at all (never first, never consecutive,
+       *                        under the per-run cap). Returns false — and
+       *                        changes nothing — when ?patriot=off disabled
+       *                        him entirely. LC.patriot(false) cancels.
+       *  Staged (capture) finds dress from ?patriot=on|N, not from here. */
+      patriot(force) {
+        if (force === true) {
+          if (!PATRIOT.enabled) return false;
+          forceNextPatriot = true;
+          return true;
+        }
+        if (force === false) {
+          forceNextPatriot = false;
+          return false;
+        }
+        return {
+          mode: PATRIOT.mode, enabled: PATRIOT.enabled, reward: PATRIOT.reward,
+          chance: PATRIOT.chance, maxPerRun: PATRIOT.maxPerRun, firstFind: PATRIOT.firstFind,
+          stageDress: PATRIOT.stageDress, forceNext: forceNextPatriot,
+          on: game.patriot, count: game.patriotCount, find: game.findNum,
+          costumeAttached: isPatriotAttached(bobo),
+        };
+      },
+      /** The spawn rule as data: the natural (no-force) Patriot plan for a
+       *  seed — one boolean per find. Deterministic by construction; the
+       *  tools compare runs against this without touching the game. */
+      patriotPlan(seed = SEED, finds = MOMENT_IDS.length) {
+        return runPatriotPlan(Number(seed), Number(finds), { enabled: PATRIOT.enabled });
       },
       simulate(steps, scriptFn) {
         return simulateHash(Number(steps) || 0, typeof scriptFn === 'function' ? scriptFn : simScript);

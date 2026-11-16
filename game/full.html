@@ -31,6 +31,10 @@
                  ?win=N      points to win (default 10)
                  ?seed=N     the moment-order seed (default 11)
                  ?score=N    start at N points
+                 ?patriot=off     never spawn Patriot Bobo (the +3 costume cat)
+                 ?patriot=on      spawn him per the roll AND dress staged
+                                  finds (his capture frames run this way)
+                 ?patriot=N       also force him on live find N
                  ?label=on   show the tool's moment-label chip live
                  ?quality=low|high  weak-GPU path; auto-low on phones,
                                     ?quality=high forces the full look back
@@ -126,6 +130,30 @@
         font-size: 15px;
         font-weight: 700;
         opacity: 0.75;
+      }
+
+      /* "+3!" bonus pop (issue #58): a Patriot Bobo catch. Anchored just
+         under the score pill; the ENGINE writes transform/opacity as a
+         single ease-out-back pulse (the DAG! pattern), so this rule only
+         carries the rest state — hidden, scaled to nothing. */
+      #score-bonus {
+        position: fixed;
+        left: calc(100% - 78px);
+        top: 78px;
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+        display: none;
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        color: var(--ui-mustard);
+        text-shadow: 0 2px 0 rgba(16, 21, 28, 0.55), 0 0 18px rgba(232, 176, 74, 0.5);
+        font-variant-numeric: tabular-nums;
+      }
+      body.touch #score-bonus {
+        left: calc(100% - 64px);
+        top: calc(64px + env(safe-area-inset-top, 0px));
+        font-size: 27px;
       }
 
       /* Soft aim dot: calm white; coral (never red) when the shout lands wrong. */
@@ -1002,6 +1030,7 @@
 
     <div id="hud">
       <div id="hud-score"><span class="num">00</span><span class="max">/ 10</span></div>
+      <div id="score-bonus" aria-hidden="true">+3!</div>
       <div id="reticle"></div>
       <div id="prompt">find Bobo, point, and shout!</div>
       <div id="dag-burst">

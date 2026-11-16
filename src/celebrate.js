@@ -134,12 +134,15 @@ const bursts = [
   { mesh: burst([-0.5, 1.55, 0.5], [TOKENS.uiMustard, TOKENS.uiCoral, TOKENS.uiPaper], 1.1), period: 2.4, offset: 0 },
   { mesh: burst([0.75, 1.75, 0.15], [TOKENS.uiGlow, TOKENS.uiMustard, TOKENS.uiCoral], 5.7), period: 2.4, offset: 1.2 },
 ];
-function updateFireworks(t) {
+// `boost` (default 1) brightens and widens the bursts: a Patriot Bobo catch
+// (issue #58) pays 1.35 — extra fireworks for the bonus cat, same pure f(t)
+// curve, so plain catches and every captured frame are untouched.
+function updateFireworks(t, boost = 1) {
   for (const b of bursts) {
     const u = fract((t + b.offset) / b.period);
     const k = easeOutCubic(u);
-    b.mesh.scale.setScalar(0.14 + 1.5 * k);
-    b.mesh.material.opacity = Math.pow(1 - u, 1.6) * 0.95;
+    b.mesh.scale.setScalar((0.14 + 1.5 * k) * boost);
+    b.mesh.material.opacity = Math.min(1, Math.pow(1 - u, 1.6) * 0.95 * boost);
   }
 }
 
