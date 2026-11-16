@@ -181,6 +181,19 @@ No window is a route and none is a fall risk: the room rects stop short of
 them, so the player only ever sees the sky through glass it is meant to look
 out of.
 
+**Door leaves are parked, never across** (issue #65). The three `door`
+openings above are permanently open — there is no door control and there
+never will be — and their walnut leaves now stand at 90° flat along the
+plaster BESIDE the opening (2 cm off the trim, 5 cm off the wall, knob on
+the free edge), each on the side with a clear run of wall: living-hall west
+(open floor), living-kitchen north (clear to the window), hall-bedroom east
+and bedroom-side (the hall has only 37 cm stubs there, and the bedroom's
+north face runs clear east to the corner). `doors-read-open` proves no leaf
+touches a walk rect; `doorways-read-open` proves the hole shows the room
+beyond from each standing-height `door-*` VIEWS camera. The old builder ran
+the leaf from the opening's own lo edge, which is why every doorway
+photographed as shut.
+
 **With a ceiling the sun only comes in through the openings.** The rig keeps
 the same warm sun at the same angle, moved back along its own axis so the whole
 flat sits inside its shadow frustum (pos ≈ (−4.0, 8.6, −15.0), target
