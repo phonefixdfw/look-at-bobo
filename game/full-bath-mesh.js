@@ -42,7 +42,7 @@ function bathMaterials() {
     tile: surface(0xdce3e2, { uvTile: 0.28, roughness: 0.3, metalness: 0.06 }), // the 1.2 m wall band
     woodPale: SURFACES.woodPale(), // the vanity's cabinet
     chrome: surface(0xcbd1d6, { uvTile: 0.2, roughness: 0.2, metalness: 0.85 }), // taps, bar, shower, rod
-    frame: surface(0xa9b0b6, { uvTile: 0.25, roughness: 0.4, metalness: 0.5 }), // the mirror's frame
+    mirrorFrame: surface(0xa9b0b6, { uvTile: 0.25, roughness: 0.4, metalness: 0.5 }), // the mirror's frame
     mat: fabric(0x7fa09d), // the bath mat: seafoam loop pile
     towel: fabric(0xbcd6d9), // duck-egg blue, the flat's calm accent
     paper: surface(0xf6f4ee, { uvTile: 0.6, roughness: 0.95 }), // kitchen roll, the bin's bag
@@ -132,9 +132,9 @@ function buildCurtain(bath, mats) {
   // the rod itself, chrome, into brackets at both ends
   mergedMesh(
     bath,
-    [{ geo: cylGeo({ rt: 0.011, rb: 0.011, len: C.x1 - C.x0 + 0.06, rotZ: Math.PI / 2, at: [(C.x0 + C.x1) / 2, C.rodY, C.rodZ] }) },
-      { geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [C.x0 - 0.02, C.rodY, C.rodZ] }) },
-      { geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [C.x1 + 0.02, C.rodY, C.rodZ] }) }],
+    [{ geo: cylGeo({ rt: 0.011, rb: 0.011, len: C.x1 - C.x0 + 0.06, rotZ: Math.PI / 2, at: [(C.x0 + C.x1) / 2, C.rodY, C.rodZ] }), mat: mats.chrome },
+      { geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [C.x0 - 0.02, C.rodY, C.rodZ] }), mat: mats.chrome },
+      { geo: cylGeo({ rt: 0.016, rb: 0.016, len: 0.03, rotZ: Math.PI / 2, at: [C.x1 + 0.02, C.rodY, C.rodZ] }), mat: mats.chrome }],
     { cast: false },
   ).forEach((m) => { m.name = 'shower-rod'; });
 }
@@ -196,7 +196,7 @@ function buildDecking(bath, mats) {
  *  the same `plantLeaves` spiral, seeded by name, so both are deterministic. */
 function buildPlants(bath, mats) {
   const P = BALCONY_PLANT;
-  mergedMesh(bath, [{ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0, y1: P.y0 + P.pot.h, rt: P.pot.r1, rb: P.pot.r0 }) }], { cast: false })
+  mergedMesh(bath, [{ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0, y1: P.y0 + P.pot.h, rt: P.pot.r1, rb: P.pot.r0 }), mat: mats.pot }], { cast: false })
     .forEach((m) => { m.name = 'balcony-pot'; });
   const leaves = [];
   const spec = { name: 'balcony-floor-pot', pot: P.pot, leaf: { n: P.count } };
@@ -214,7 +214,7 @@ function buildPlants(bath, mats) {
   // soil, so the spiral emerges from earth and not from the pot's lid
   mergedMesh(
     bath,
-    [{ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0 + P.pot.h - 0.012, y1: P.y0 + P.pot.h, rt: P.pot.r1 - 0.012, rb: P.pot.r1 - 0.012 }) }],
+    [{ geo: cylGeo({ x: P.x, z: P.z, y0: P.y0 + P.pot.h - 0.012, y1: P.y0 + P.pot.h, rt: P.pot.r1 - 0.012, rb: P.pot.r1 - 0.012 }), mat: mats.dark }],
     { cast: false },
   );
 
@@ -222,7 +222,7 @@ function buildPlants(bath, mats) {
   const tr = BIRD.pot;
   mergedMesh(
     bath,
-    [{ geo: boxGeo({ x0: tr.x - 0.16, y0: tr.y, z0: tr.z - 0.055, x1: tr.x + 0.16, y1: tr.y + 0.145, z1: tr.z + 0.055 }) }],
+    [{ geo: boxGeo({ x0: tr.x - 0.16, y0: tr.y, z0: tr.z - 0.055, x1: tr.x + 0.16, y1: tr.y + 0.145, z1: tr.z + 0.055 }), mat: mats.pot }],
     { cast: false },
   ).forEach((m) => { m.name = 'railing-planter'; });
   const trough = [];
