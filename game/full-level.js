@@ -159,8 +159,9 @@ export const CANONICAL_EVENT_MOMENT = 'box-sit';
  *  The spot pool (issue #33: "a couple of times I didn't see him, or the places
  *  he was hiding wasn't enough").
  *
- *  Twenty-eight places across all seven rooms. A run draws ten of them: random
- *  order, no repeats inside a cycle, never two in the same room twice in a row.
+ *  Twenty-eight places across all seven rooms. A run draws ten of them — ONE
+ *  spot per moment type (all ten types, exactly once), random order, no spot
+ *  twice, never two in the same room twice in a row (`pickSpotCycle` below).
  *  Every record:
  *    id        '<type>.<place>' — the prefix IS the moment type, so the rig
  *              write, the voice line and the capture stage still key off it;
@@ -184,14 +185,13 @@ function spot(type, place, room, pose, pos, faceYaw, extra) {
 }
 
 export const SPOTS = [
-  // ── living room (7) ──────────────────────────────────────────────────────
+  // ── living room (6) ──────────────────────────────────────────────────────
   spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
   spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71),
   spot('window-bird', 'e-window', 'living', 'sit', [1.72, 'floor', 0.55], 1.51),
-  spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], -0.1),
+  spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], 3.04), // #53: was yaw −0.1 — the pool facing sweep caught him staring at the balcony (96° off the only approach); a cat sitting in the doorway looking back into the room is the same moment, readable
   spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
-  spot('hall-chase', 'living', 'living', 'loaf', [-0.6, 'floor', 0.9], 1.41),
   // ── balcony (2) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md) ──
   spot('window-bird', 'balcony-rail', 'balcony', 'sit', [1.35, 'floor', -3.85], -2.9),
   spot('couch-loaf', 'balcony-chair', 'balcony', 'loaf', [2.15, 'chairSeat', -3.6], 1.77, { open: true }),
@@ -201,10 +201,14 @@ export const SPOTS = [
   spot('sink-sit', 'fridge', 'kitchen', 'sit', [5.2, 'floor', -1.75], 1.4),
   spot('sink-sit', 'bar', 'kitchen', 'side', [4.1, 'barTop', 0.4], -0.14, { open: true }),
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
-  // ── hall + entry + bathroom (5) ─────────────────────────────────────────
+  // ── hall + entry + bathroom (6) — the entry gained the dash spot that used
+  //    to sit in the living room (issue #53: `spot-pool-covers-rooms` needs ≥ 2
+  //    per room and the entry had one; the living room, with the most, gave it
+  //    up. A zoomie at the front door is the same moment in a better place.) ──
   spot('hall-chase', 'hall', 'hall', 'loaf', [-0.35, 'floor', 3.3], -0.19),
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
+  spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.5, 'floor', 3.0], 1.57),
   spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 3.1], 1.9),
   spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], 3.06, { open: true }),
   // ── bedroom (9) ─────────────────────────────────────────────────────────
@@ -242,55 +246,88 @@ export const MOMENT_ROOMS = Object.fromEntries(
   MOMENT_IDS.map((id) => [id, [...new Set(SPOTS.filter((s) => s.type === id).map((s) => s.room))]]),
 );
 
-/** Bobo's spots for one run: a shuffled cycle of the pool, re-rolled until no
- *  two neighbours share a room (issue #33: every catch should feel like going
- *  somewhere else). Deterministic for a given rng — the same seed replays the
- *  same run, which is what `capture --determinism` proves. The re-roll is
- *  capped, and on the cap the run falls back to the plain shuffle: the queue
- *  then behaves exactly as it did before the pool existed, and
- *  `queue-no-repeats` (which is about repeats, not rooms) still passes. The
- *  room rule is a promise about the experience, not about safety, so it
- *  degrades rather than hanging on an unlucky stream. */
+/** Bobo's ten spots for ONE run (issue #53): every moment type plays exactly
+ *  once, at a spot drawn uniformly from that type's spots, in an order with no
+ *  two neighbours in the same room (issue #33: every catch should feel like
+ *  going somewhere else). Deterministic for a given rand — the same seed
+ *  replays the same run, which is what `capture --determinism` proves; the
+ *  engine seeds it exactly like the old moment shuffle (`SEED + cycle × 101`).
+ *
+ *  Two draws off one rand stream. First the spot per type: uniform within the
+ *  type, so a type with four spots plays at each of them about a quarter of
+ *  runs. Then the order: the classic "reorganise the string" greedy — at each
+ *  step take the room with the most spots left that is not the room just
+ *  played, ties broken by rand — but a pick is only legal if the rest is
+ *  still orderable afterwards (the safety filter below), which keeps the
+ *  greedy provably deadlock-free while leaving plenty of freedom: since no
+ *  room can hold more than half the ten (the bedroom locks exactly five of
+ *  the ten TYPES, and one spot each), almost every pick is safe and the runs
+ *  do not all start in the same room. A pool data change that breaks that
+ *  bound degrades (appends the rest) instead of hanging, and the
+ *  `run-draw-legal` check fails loudly on 200 seeded runs. */
+function orderable(counts, prev) {
+  // Can the remaining spots be laid out with no two neighbours sharing a
+  // room, starting somewhere other than `prev`? Let M be the biggest pile:
+  // if its room may be played next it needs M ≤ others + 1; if it is the
+  // forbidden room it needs M ≤ others. That condition is also sufficient.
+  let total = 0;
+  let max = 0;
+  let maxRoom = null;
+  let tie = false;
+  for (const [room, n] of counts) {
+    if (!n) continue;
+    total += n;
+    if (n > max) { max = n; maxRoom = room; tie = false; }
+    else if (n === max) tie = true;
+  }
+  if (total <= 1) return true;
+  const others = total - max;
+  return maxRoom === prev && !tie ? max <= others : max <= others + 1;
+}
+
 export function pickSpotCycle(rand) {
-  // Group the pool by room, in shuffled order inside each group, then take one
-  // spot at a time from the room with the most left (weighted-random, so a run
-  // does not always start in the biggest room). Never take the room the last
-  // spot came from. This is the standard "reorganise the string" construction:
-  // it succeeds whenever an order exists, which rejection sampling (24 shuffles)
-  // did not — a 28-card deck with nine bedroom cards almost never shuffles into
-  // a legal order by luck.
+  const chosen = MOMENT_IDS.map((t) => {
+    const list = SPOTS.filter((s) => s.type === t);
+    return list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
+  });
   const groups = new Map();
-  for (const id of seededShuffle(SPOT_IDS.slice(), rand)) {
-    const room = spotRoom(id);
-    if (!groups.has(room)) groups.set(room, []);
-    groups.get(room).push(id);
+  for (const s of chosen) {
+    if (!groups.has(s.room)) groups.set(s.room, []);
+    groups.get(s.room).push(s.id);
   }
   const order = [];
   let prev = null;
-  while (order.length < SPOT_IDS.length) {
-    const cands = [...groups.entries()].filter(([room]) => room !== prev);
-    if (!cands.length) {
-      // Only the room the last spot was in is left, so no order can keep the
-      // promise. Append the rest: the run degrades to a plain queue rather than
-      // hanging, and `queue-no-repeats` (about repeats) still holds.
+  while (order.length < chosen.length) {
+    const counts = new Map([...groups].map(([room, list]) => [room, list.length]).filter(([, n]) => n));
+    // Candidates: a room not just played whose spots, if one is played NEXT,
+    // leave the rest orderable. Weight the safe picks by how much of the room
+    // is left (1.5 powers) so the spread still leans towards big rooms.
+    const cands = [];
+    for (const room of counts.keys()) {
+      if (room === prev) continue;
+      const after = new Map(counts);
+      after.set(room, after.get(room) - 1);
+      if (orderable(after, room)) cands.push([room, groups.get(room)]);
+    }
+    const pool = cands.length
+      ? cands
+      : [...counts.keys()].filter((room) => room !== prev).map((room) => [room, groups.get(room)]); // degraded pool: no safe pick exists
+    if (!pool.length) {
+      // Only the room the last spot was in is left — the pool cannot keep the
+      // promise. Append the rest rather than hang (run-draw-legal reports it).
       for (const [, list] of groups) order.push(...list.splice(0));
       break;
     }
-    // Weight by how much of the room is left (1.5 powers: enough pull to keep
-    // the big rooms spreading out, weak enough that the hall or the entry still
-    // comes up early. The first ten cards — one run — can always be kept
-    // alternating, because no room holds more than a third of the pool.
     let total = 0;
-    for (const [, list] of cands) total += Math.pow(list.length, 1.5);
+    for (const [, list] of pool) total += Math.pow(list.length, 1.5);
     let pick = rand() * total;
-    let chosen = cands[cands.length - 1];
-    for (const cand of cands) {
+    let chosen2 = pool[pool.length - 1];
+    for (const cand of pool) {
       pick -= Math.pow(cand[1].length, 1.5);
-      if (pick <= 0) { chosen = cand; break; }
+      if (pick <= 0) { chosen2 = cand; break; }
     }
-    const [room, list] = chosen;
-    order.push(list.pop());
-    if (!list.length) groups.delete(room);
+    const [room, list] = chosen2;
+    order.push(list.shift());
     prev = room;
   }
   return order;
@@ -321,11 +358,18 @@ export const DECOY_SPOTS = [
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
 export const DECOY_MIN_DIST = 1.2;
 
-/** The decoy pick for one round (the slice's rule, this file's spots). */
-export function pickDecoySpot(boboSpot, rng) {
+/** The decoy pick for one round (the slice's rule, this file's spots). Issue
+ *  #53 adds the soft preference the pool makes possible: when legal spots
+ *  exist in a room OTHER than Bobo's, the decoy draws from those — "is
+ *  that…?" should happen in a different room than the real find, so a wrong
+ *  shout is a mistake about distance, not about which chair you just left.
+ *  `boboRoom` is optional (the slice calls this with two arguments). */
+export function pickDecoySpot(boboSpot, rng, boboRoom = null) {
   const valid = DECOY_SPOTS.filter((s) => Math.hypot(s.pos[0] - boboSpot[0], s.pos[2] - boboSpot[2]) >= DECOY_MIN_DIST);
   if (!valid.length) return null;
-  return valid[Math.min(valid.length - 1, Math.floor(rng() * valid.length))];
+  const away = boboRoom ? valid.filter((s) => s.room !== boboRoom) : valid;
+  const pool = away.length ? away : valid;
+  return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
 }
 
 /** Ten respawns across six rooms — every room but the balcony, because a run
@@ -499,15 +543,6 @@ export const ROOM_LABELS = {
   bedroom: 'bedroom',
   balcony: 'balcony',
 };
-
-/** The same seeded shuffle the slice uses (exported from game/level.js). */
-function seededShuffle(arr, rand) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
 
 /** Feel numbers — identical to the slice (game/level.js MOVE). */
 export { MOVE };

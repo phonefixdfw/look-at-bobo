@@ -93,7 +93,8 @@ This project also uses these extensions (the test scene implements them, later p
 | Extension | Purpose |
 |---|---|
 | `moments` (array of ids) | every moment the page can jump to |
-| `setMoment(id)` / `goto(id, t)` | jump anywhere; **must work in any order** |
+| `spots` (array of ids) | every spot pool id the page can jump to (`game/full.html` since issue #53; moments still work, and on a pooled page each id resolves to that moment's canonical spot) |
+| `setMoment(id)` / `goto(id, t)` | jump anywhere; **must work in any order**; on a pooled page both also accept any spot id |
 | `moment()`, `time()`, `view()`, `playing()`, `state()` | what a frame was taken at |
 | `camera(name)` | `{ position, look, fov }` of a named view |
 | `endingText` | the exact ending string, so checks compare against one source |
@@ -216,3 +217,12 @@ name of what caught it. A tool that only ever says PASS proves nothing.
   page's own inline stamp, so a headless check can prove HTML and JS came from the same
   build. Both are pure reads; the stamp DOM itself is hidden and empty under
   `?gate=off`, so no captured frame contains it (`docs/PLAYTEST_NOTES.md` §15).
+- **Issue #53 (spot pool wired into the run) extended the contract with `spots`**
+  and taught `--moments` to accept spot ids on `game/full.html` (`LC.setSpot(id)` /
+  `LC.gotoSpot(id, t)` jump to any of the 28 pool entries; the tool resolves them
+  through `contract.spots`). New `npm run capture:full:spots` captures the 18
+  non-canonical spots — one diorama frame at t = 1.2 s each, `--selftest` on — into
+  `captures/full-spots/`. The canonical capture matrix is deliberately unchanged
+  (`capture:full` still shoots the ten canonical moments), so every existing pixel
+  baseline still means the same thing: canonical staging never moved, and a spot-id
+  frame is only produced by a command that explicitly asks for it.

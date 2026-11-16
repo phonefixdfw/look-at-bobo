@@ -213,14 +213,78 @@ this file; every number below is what `game/full-level.js` uses.
 | `hall-chase` | hall | loaf | (−0.5, floor, 3.42) | 0 | d-rug | chatter-teeth, tail lash, haunch wiggle |
 
 Extra supports come from `EXTRA_SUPPORTS`; `cushion`/`rug` are the slice's.
+(Since issue #33 the rooms, positions and yaws below are slice-era values —
+the full flat's live numbers live in `SPOTS`, one `canonical` entry per
+moment; see "The spot pool" directly after this section.)
 Issue #27 re-authored the yaws the `cats-face-the-room` check failed or found
 knife-edge: window-bird 2.36 (was −0.98), desk-pen −0.7 and keyboard-sit −2.36
 (both were ±π/2 exactly), blanket-biscuits 2.64 (was π/2), d-bath −1.68 + pose
 `side` (was 1.6 — 172° off, staring at the tub wall), d-bed +π/2 (was −1.2).
 Decoy spots may carry an optional `pose`; `placeDecoyAt` honours it.
-Queue: seeded shuffle, cycle at 10, no repeats inside a round, no same-spot
-respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance) — engine unchanged
-from the slice, `winAt: 10`.
+Slice queue (demo): seeded shuffle, cycle at 10, no repeats inside a round,
+no same-spot respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance),
+`winAt: 10`. The full flat draws each run from the spot pool instead —
+see "The spot pool" below (issue #53).
+
+## The spot pool (`SPOTS`, 28 — wired up by issue #53)
+
+`full-level.js` exports `SPOTS`: 28 authored places Bobo can actually be,
+each with the moment `type` it belongs to, its `room`, `pose`, `spot`
+[x, y, z] and `faceYaw`. Every moment's canonical capture spot is one of
+them, named by `MOMENTS[i].canonical` (★ below); the rest are alternates
+drawn into play by issue #53's run draw. Ids are `<type>.<place>`.
+
+| id | room | pose | Bobo's spot | faceYaw |
+|---|---|---|---|---|
+| `couch-loaf.couch` ★ | living | side | (−2.75, cushion, −0.1) | −0.73 |
+| `couch-loaf.sofa-back` | living | loaf | (−3.16, sofaBackTop, 0.35) | −1.6 |
+| `window-bird.n-window` ★ | living | sit | (−1.35, floor, −2.5) | 1.71 |
+| `window-bird.e-window` | living | sit | (1.72, floor, 0.55) | 1.51 |
+| `window-bird.balcony-door` | living | sit | (1.5, floor, −2.45) | 3.04 |
+| `box-sit.box` ★ | living | sit | (−2.075, boxFloor, 1.575) | −1.57 |
+| `window-bird.balcony-rail` | balcony | sit | (1.35, floor, −3.85) | −2.9 |
+| `couch-loaf.balcony-chair` | balcony | loaf | (2.15, chairSeat, −3.6) | 1.77 |
+| `sink-sit.sink` ★ | kitchen | sit | (4.15, counterTop, −2.6) | −2.92 |
+| `sink-sit.counter-return` | kitchen | loaf | (2.82, counterTopW, −1.5) | 3.02 |
+| `sink-sit.fridge` | kitchen | sit | (5.2, floor, −1.75) | 1.4 |
+| `sink-sit.bar` | kitchen | side | (4.1, barTop, 0.4) | −0.14 |
+| `hall-chase.kitchen` | kitchen | loaf | (4.3, floor, −1.3) | 1.58 |
+| `hall-chase.hall` ★ | hall | loaf | (−0.35, floor, 3.3) | −0.19 |
+| `hall-chase.hall-door` | hall | sit | (0.3, floor, 4.85) | 1.55 |
+| `hall-chase.entry` | entry | loaf | (1.45, floor, 3.4) | 1.81 |
+| `hall-chase.entry-door` | entry | loaf | (1.5, floor, 3.0) | 1.57 |
+| `hall-chase.bath-mat` | bathroom | side | (−2.2, floor, 3.1) | 1.9 |
+| `hall-chase.vanity` | bathroom | sit | (−2.65, vanityTop, 2.46) | 3.06 |
+| `desk-pen.desk` ★ | bedroom | sit | (−1.85, deskTop, 5.7) | 2.89 |
+| `desk-pen.desk-end` | bedroom | loaf | (−2.3, deskTop, 5.85) | 3.01 |
+| `keyboard-sit.keyboard` ★ | bedroom | sit | (−1.85, kbTop, 5.82) | 3.13 |
+| `laundry-nap.basket` ★ | bedroom | side | (0.82, laundryTop, 9) | 1.46 |
+| `laundry-nap.nightstand` | bedroom | side | (0.95, nightstandTop, 6.6) | 0.28 |
+| `bed-stretch.bed` ★ | bedroom | back | (0.2, bedTop, 7.35) | 0.08 |
+| `bed-stretch.bed-foot` | bedroom | side | (−0.4, bedTop, 8.25) | 1.43 |
+| `blanket-biscuits.blanket` ★ | bedroom | sit | (0.2, blanketTop, 7.15) | 0 |
+| `blanket-biscuits.wardrobe` | bedroom | loaf | (−1.55, floor, 8) | 0.03 |
+
+Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 9 · living 6 ·
+kitchen 5 · hall 2 · entry 2 · bathroom 2 · balcony 2. Two data moves got
+there (issue #53): `hall-chase.living` (2.6, 0.2) **moved** to
+`hall-chase.entry-door` — living had 6 spots, entry only 1, and (2.6, 0.2)
+sat on the rug beside the style-test box anyway — and `window-bird.balcony-door`
+had its faceYaw corrected −0.1 → 3.04 (the pool sweep found it 96° off its
+approach; it's not a canonical capture spot, so no baseline moved).
+
+**Run draw** (`pickSpotCycle`, engine's queue slot): every run draws TEN
+spots — one per moment type, all ten types exactly once — and the round
+order is itself randomised (weighted-random greedy over a dead-end-guarded
+frontier — the bedroom locks exactly five of the ten types, the most one
+room can hold without neighbours colliding, so plain greedy could paint
+itself into a corner; the safety filter keeps it provably deadlock-free). Two catches can therefore never land in the same room
+back to back. The draw is seeded per refill (`mulberry32(SEED + refills ×
+101)`), so the same seed replays the same run; `run-draw-legal` sweeps 200
+seeded draws. `game.spotId` names the live spot; `game.momentId` stays the
+moment type (labels, voice, pose anims key off it). Decoys now *prefer* a
+different room than Bobo's new spot (legality unchanged: never Bobo's spot,
+≥ 1.2 m, facing).
 
 ## Respawns (8) and decoy spots (5)
 

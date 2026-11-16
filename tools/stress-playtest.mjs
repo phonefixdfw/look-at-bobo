@@ -48,6 +48,7 @@ const arg = (name, dflt) => {
 };
 const PAGE = arg('page', 'game/slice.html');
 // issue #27: slice gained cats-face-the-room (45 → 46); full passes --checks 52 (51 + furniture-real-scale, issue #41)
+// issue #53: full gained spot-pool-covers-rooms + run-draw-legal (53 → 55); slice stays 46.
 const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
@@ -483,6 +484,50 @@ try {
   await page.close();
 } catch (err) {
   check('live-tells', false, String(err).split('\n')[0]);
+}
+
+// ---------------------------------------------------------------------------
+// 12. the spot-pool run (issue #53): ten live rounds through the REAL loop
+//     must draw ten distinct spots — one per moment type — change rooms with
+//     every catch, keep the decoy legal, and make the player walk. Reported
+//     as the mean spawn→Bobo distance. Inert on pool-less pages (slice).
+// ---------------------------------------------------------------------------
+try {
+  const page = await newPage('?gate=off&seed=11&win=20');
+  const run = await page.evaluate(() => {
+    window.LC.pause();
+    window.LC.restart(); // round 1 comes off the queue here, unlike boot staging
+    const rounds = [];
+    for (let k = 0; k < 10; k++) {
+      for (let i = 0; i < 400 && window.LC.state().phase !== 'find'; i++) window.LC.loopTick(1 / 60); // burn the 2.2 s catch stage
+      const s = window.LC.state();
+      const c = window.LC.catsDebug();
+      rounds.push({
+        spot: s.spotId, room: s.room, type: s.momentId,
+        d: Math.hypot(c.px - c.bobo[0], c.pz - c.bobo[2]),
+        dd: Math.hypot(c.bobo[0] - c.decoy[0], c.bobo[2] - c.decoy[2]),
+      });
+      window.LC.trigger('catch');
+    }
+    return { rounds, pool: window.LC.spots.length };
+  });
+  if (!run.pool) {
+    check('full-run-pool (this page has no spot pool — nothing to draw)', true, 'slice');
+  } else {
+    const r = run.rounds;
+    const distinct = new Set(r.map((x) => x.spot)).size;
+    const types = new Set(r.map((x) => x.type)).size;
+    const alt = r.every((x, i) => i === 0 || x.room !== r[i - 1].room);
+    const decoyOk = r.every((x) => x.dd >= 1.2);
+    const mean = r.reduce((a, x) => a + x.d, 0) / r.length;
+    check('ten live rounds draw ten distinct spots, one per type', distinct === 10 && types === 10, `${distinct}/10 spots, ${types}/10 types`);
+    check('every catch changes room', alt, r.map((x) => x.room).join(' > '));
+    check('live decoys stay legal all run', decoyOk, `closest bobo↔decoy ${Math.min(...r.map((x) => x.dd)).toFixed(2)} m`);
+    check('spawn→Bobo mean walk is a walk, never a wake-up on the cat', mean >= 1.5 && r.every((x) => x.d >= 1.2), `mean ${mean.toFixed(2)} m, min ${Math.min(...r.map((x) => x.d)).toFixed(2)} m`);
+  }
+  await page.close();
+} catch (err) {
+  check('full-run-pool', false, String(err).split('\n')[0]);
 }
 
 // ---------------------------------------------------------------------------
