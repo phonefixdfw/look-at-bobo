@@ -214,8 +214,8 @@ export const SPOTS = [
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
   spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.5, 'floor', 3.0], 1.57),
-  spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 3.1], 1.9),
-  spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], 3.06, { open: true }),
+  spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 3.1], -1.67), // issue #59: #49's bathroom pieces + #47's living pad moved the nearest vantage to the east band — the loaf now faces the opening (was 1.9)
+  spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], -1.57, { open: true }), // issue #59: turned to face the room, not the toilet (was 3.06)
   // ── bedroom (9) — issue #48 turned the bed head-west. The five spots on
   //    the moved pieces came with it (mirrored across the room's middle and
   //    nudged 0.20 m south for the longer head clearance); the desk, desk-end,
