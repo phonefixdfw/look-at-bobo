@@ -36,9 +36,16 @@ function fullMomentAnim({ bp, base, t, bobo, game, momentById, apt, supports }) 
     // side-sleeping on the couch (pose 'side', issue #27): flank breathing in
     // the world-horizontal plane — the body egg is rolled, so local y/z are
     // horizontal here; scaling local x (idle's choice) would rock him off the
-    // cushion contact.
+    // cushion contact. The pool (issue #53) also loaf this type on the sofa
+    // back and the balcony chair, where local y IS up — so pick the pair of
+    // axes that are horizontal for the pose actually on (rule: breath never
+    // moves the contact, demo rule "never sinks").
     const s = Math.sin(t * 0.9);
-    bp.body.scale.set(base.x, base.y * (1 + 0.02 * s), base.z * (1 + 0.014 * s));
+    if (bobo.current === 'side' || bobo.current === 'back') {
+      bp.body.scale.set(base.x, base.y * (1 + 0.02 * s), base.z * (1 + 0.014 * s));
+    } else {
+      bp.body.scale.set(base.x * (1 + 0.02 * s), base.y, base.z * (1 + 0.014 * s));
+    }
     bp.tailPivot.rotation.y = Math.sin(t * 0.55) * 0.08; // a dreaming flick
   } else if (m === 'window-bird') {
     bp.head.rotation.y = Math.sin(t * 0.55) * 0.5; // sweeping the glass
@@ -91,10 +98,14 @@ function fullMomentAnim({ bp, base, t, bobo, game, momentById, apt, supports }) 
     bp.tailPivot.rotation.y = Math.sin(t * 2.2) * 0.16; // the metronome
   } else if (m === 'hall-chase') {
     // the hallway zoomies: quick side-to-side scuttle, tail at full thrash
-    // (sideways scale only — a Y-scale would lift his paws off the contact)
+    // (sideways scale only — a Y-scale would lift his paws off the contact;
+    // on the issue #53 pool spots that lie this type down, the vertical axis
+    // is local x, so the scuttle scales y there instead)
     bobo.root.rotation.y = catRootYaw(momentById(m).faceYaw) + Math.sin(t * 2.2) * 0.7;
     bp.tailPivot.rotation.y = Math.sin(t * 6.4) * 0.3;
-    bp.body.scale.set(base.x * (1 + Math.abs(Math.sin(t * 6)) * 0.02), base.y, base.z);
+    const scuttle = 1 + Math.abs(Math.sin(t * 6)) * 0.02;
+    if (bobo.current === 'side' || bobo.current === 'back') bp.body.scale.set(base.x, base.y * scuttle, base.z);
+    else bp.body.scale.set(base.x * scuttle, base.y, base.z);
   }
 }
 
