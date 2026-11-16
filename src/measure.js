@@ -51,6 +51,7 @@ function scanMarkings(cat, pose) {
   const v = new THREE.Vector3();
   const m = new THREE.Matrix4();
   group.traverse((obj) => {
+    if (obj.userData.patriot) return; // optional costume layer (src/patriot.js): not fur, never the cat's own numbers
     if (obj.userData.fuzz) {
       out.shells++;
       return;

@@ -19,6 +19,13 @@
   - How he sounds (meows, chirps, purrs, silence?) — no audio invented.
   - **Accepted provisional default:** Generic "normal cat stuff" motion and minimal/optional cute vocalizations as placeholders only; **not claims about real Bobo**.
 
+## Patriot Bobo (the joke costume, issue #55)
+- **What it is:** A bonus gag — Bobo in a full patriotic costume, authored by Brandon ("Patriot Bobo!"). It is an **optional costume layer** on the existing model (`src/patriot.js`), never a second cat and never a change to Bobo's body, markings or tells. Normal Bobo is byte-identical with the costume available: the costume attaches only in the style test's `patriot-bobo` moment, every costume mesh is tagged so the marking scans (dash, bib, neck, feet) keep counting fur only, and the costume never enters the contact or hit-test sets.
+- **The pieces:** a brown fur hat with cream horns (covers the ears; the forehead dash and the eyes stay clear of the brim), blue face-paint crescents under the eyes, a tattered stars-and-stripes cape on a crossed webbing harness (the white bib stays visible around the `SAVE THE CAPITOL` button, which sits on the bib itself), and a little flag on a ~0.30 m stick propped against his right side.
+- **Motion:** a short idle — the flag waves, the head tilts a little, Bobo blinks every ~3.2 s. It is a pure function of the loop time and fully rests under `?motion=off` / prefers-reduced-motion; `?quality=low` halves the costume's mesh density.
+- **Budget:** at most 12 extra draw calls (measured at 10 merged meshes) and ~4.5k triangles — see `docs/ART_STYLE.md` §12.
+- **Not canon:** nothing here describes the real Bobo. It is a costume the game can put on the existing model, in the spirit of the joke ending.
+
 ## The decoy cat (name TBD)
 - **Identity:** A second cat — the decoy. He is scenery: he just lies around the apartment, like Bobo does. **Nothing else about his habits is known; do not invent any.**
 - **Name:** **TBD.** Do not invent one — call him "the decoy cat" everywhere until Brandon names him.
