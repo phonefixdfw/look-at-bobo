@@ -144,7 +144,10 @@ export const PIECES = [
   // ---- the desk on the north wall: existing footprint, kept verbatim -----
   piece('desk-top', 'woodPale', [-2.55, -1.15], [0.71, 0.75], [5.32, 6.02], ['desk'],
     'row 45: 1.40 x 0.70 m, top y 0.75 — the `deskTop` rect unchanged', 'desk'),
-  piece('desk-legs', 'wood', [-2.51, -1.19], [0, 0.71], [5.36, 5.98], null,
+  // Same wood as the top on purpose: a group dressed in one material is drawn
+  // as one mesh, and the `desk` row measures the union of the two boxes — the
+  // same box either way, one draw cheaper.
+  piece('desk-legs', 'woodPale', [-2.51, -1.19], [0, 0.71], [5.36, 5.98], null,
     'the panel legs under the top', 'desk'),
   piece('keyboard', 'applianceDark', [-2.07, -1.63], [0.76, 0.79], [5.755, 5.885], ['keyboard'],
     'row 46: 0.44 x 0.13 x 0.03 m, top y 0.79 — the `kbTop` height unchanged'),
@@ -257,9 +260,11 @@ export const DETAILS = [
       z: side === 'n' ? [zMid - 0.10, zMid - 0.07] : [zMid + 0.07, zMid + 0.10],
     };
   }),
-  // the curtain rod across the south window
+  // the curtain rod across the south window (brass, like every other pull in
+  // the room — the merged pass costs one draw per material, so the rod rides
+  // with the hardware rather than opening a slot of its own)
   {
-    id: 'curtain-rod', mat: 'metal', parent: 'curtain-west',
+    id: 'curtain-rod', mat: 'brass', parent: 'curtain-west',
     x: [-1.98, -0.17], y: [2.17, 2.20], z: [9.20, 9.23],
   },
 ];

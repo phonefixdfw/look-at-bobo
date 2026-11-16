@@ -31,9 +31,17 @@
 import * as THREE from 'three';
 import { SURFACES, surface, fabric, worldUV } from '../src/polish.js';
 import { mergedMesh } from './full-apartment.js';
-import { PIECES, DETAILS } from './full-bedroom.js';
+import { BR, PIECES, DETAILS } from './full-bedroom.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+
+/** Dressing bands, west to east across the room. A merged mesh is drawn
+ *  whenever ANY part of it is in shot, so merging room-wide is not free: the
+ *  desk camera already culls the wardrobe wall, and a mesh holding both is
+ *  drawn for both. Two bands — the desk and bed half against the west wall,
+ *  the wardrobe, plant and laundry half to the east — cost the dollhouse view
+ *  one draw per material and let each camera cull the other's dressing. */
+const BAND_X = 1.9;
 
 /** The bedroom's material slots. All procedural (src/polish.js), and every
  *  soft surface a cat lies on is deliberately mid-tone — the cats are black
@@ -41,11 +49,17 @@ const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
  *  dressing is allowed to be the white-of-the-walls nothing that made the
  *  old playset bed disappear. */
 function bedroomMaterials() {
+  // mergedMesh groups by MATERIAL IDENTITY, so two names on the same object
+  // cost one draw call and two objects cost two. The room has 150 draws for
+  // the whole flat in the capture budget, so the dressing slots below point
+  // at an existing object rather than opening a slot for a shade.
+  const wood = SURFACES.wood();
+  const woodPale = SURFACES.woodPale();
   return {
-    wood: SURFACES.wood(), // frames, headboard, the dresser and wardrobe bodies
-    woodPale: SURFACES.woodPale(), // the desk top and nightstand cases
-    woodDark: surface(0x503c28, { uvTile: 0.9, roughness: 0.7 }), // drawer gaps
-    woodLight: surface(0xc49a6c, { uvTile: 0.9, roughness: 0.66 }), // wardrobe doors
+    wood, // frames, headboard, the dresser and wardrobe bodies
+    woodPale, // the desk top and nightstand cases
+    woodDark: wood, // drawer gaps: recessed geometry, so the shade is in the shadow
+    woodLight: woodPale, // wardrobe doors, a hair proud of the body they hang on
     mattress: surface(0xd8d2c2, { uvTile: 0.5, roughness: 0.9 }), // under the coverlet
     coverlet: fabric(0x8ba18e, { uvTile: 0.14 }), // sage — the made-bed plane
     pillow: fabric(0xd9a441, { uvTile: 0.18 }), // the flat's own pillow gold
@@ -118,41 +132,105 @@ function pieceGeometry(p) {
  * @param {THREE.Object3D} parent
  */
 export function buildFullBedroom(parent) {
+
   const mats = bedroomMaterials();
   const bedroom = new THREE.Group();
   bedroom.name = 'bedroom';
   parent.add(bedroom);
 
+  // Three passes, and the split is the ruler's own. (1) A piece a row measures
+  // on its own stays its own mesh — userData.scale is what the furniture-real-
+  // scale check reads. (2) A `group` whose pieces are all one material merges
+  // into a single mesh carrying the group's rows: a shared row measures the
+  // UNION of the group, so one box holding the whole of it is the same
+  // measurement in one draw. (3) Everything the ruler does not measure at all
+  // — pillows, rug, curtains, all the dressing in DETAILS — merges per
+  // material per band. The flat gets 150 draws in the capture budget, so 28
+  // boxes cost 28 draws only until they are grouped like this: 18 measured
+  // meshes, 4 union meshes and the dressing, and each camera culls the
+  // dressing it is not looking at.
+  const groupMembers = new Map(); // group -> the pieces in it
+  for (const p of PIECES) {
+    if (!p.group) continue;
+    if (!groupMembers.has(p.group)) groupMembers.set(p.group, []);
+    groupMembers.get(p.group).push(p);
+  }
+  // A group can merge when more than one piece is in it and every piece is the
+  // same material: the desk's top and its legs are the desk row either way.
+  const mergedGroups = new Set(
+    [...groupMembers]
+      .filter(([, list]) => list.length > 1 && list.every((p) => p.mat === list[0].mat))
+      .map(([group]) => group),
+  );
+  const unionGroups = new Set(
+    PIECES.filter((p) => p.tags?.length && p.group).map((p) => p.group),
+  );
   const measured = [];
+  const unionParts = new Map(); // key -> entries that merge into one measured box
   for (const p of PIECES) {
     const mat = mats[p.mat];
-    const geo = pieceGeometry(p);
-    worldUV(geo, mat.userData?.uvTile ?? 0.6);
-    const m = new THREE.Mesh(geo, mat);
-    m.name = p.id;
-    m.castShadow = false;
-    m.receiveShadow = true;
-    // The ruler's handle: rows this box answers to (an array of names), and
-    // the group whose union is what a shared row measures — straight from the
-    // data file, never retyped here.
-    if (p.tags?.length) m.userData.scale = p.tags;
-    if (p.group) m.userData.scaleGroup = p.group;
-    bedroom.add(m);
-    measured.push(m);
+    const mergedAway = !!p.group && mergedGroups.has(p.group);
+    if (p.tags?.length && !mergedAway) {
+      // The ruler's handle: rows this box answers to (an array of names), and
+      // the group whose union is what a shared row measures — straight from
+      // the data file, never retyped here.
+      const geo = pieceGeometry(p); // already in world position
+      worldUV(geo, mat.userData?.uvTile ?? 0.6);
+      const m = new THREE.Mesh(geo, mat);
+      m.name = p.id;
+      m.castShadow = false;
+      m.receiveShadow = true;
+      m.userData.scale = p.tags;
+      if (p.group) m.userData.scaleGroup = p.group;
+      bedroom.add(m);
+      measured.push(m);
+    } else if (p.group && unionGroups.has(p.group)) {
+      // The row here is measured as a union, so the parts may share a mesh:
+      // one mesh for a whole single-material group, one per material when the
+      // group is dressed in more than one.
+      const key = mergedAway ? p.group : `${p.mat}|${p.group}`;
+      if (!unionParts.has(key)) unionParts.set(key, []);
+      unionParts.get(key).push({ geo: pieceGeometry(p), mat, at: [0, 0, 0] });
+    }
+  }
+  for (const [key, entries] of unionParts) {
+    const group = key.split('|').pop();
+    const tags = mergedGroups.has(group)
+      ? [...new Set(groupMembers.get(group).flatMap((p) => p.tags || []))]
+      : [];
+    for (const m of mergedMesh(bedroom, entries, { cast: false, receive: true })) {
+      m.name = `union-${group}`;
+      if (tags.length) m.userData.scale = tags;
+      m.userData.scaleGroup = group;
+      measured.push(m);
+    }
   }
 
-  // Dressing merges the way the kitchen's does (mergedMesh groups by
-  // material itself); `parent` in the data is only a name for humans — every
-  // entry already carries its own world rectangle.
-  mergedMesh(
-    bedroom,
-    DETAILS.map((e) => ({
+  // Dressing merges the way the kitchen's does (mergedMesh groups by material
+  // itself, and re-bakes UVs from world position, so the geometry above needs
+  // no separate pass); `parent` in the data is only a name for humans — every
+  // entry already carries its own world rectangle. One difference: it merges
+  // per BAND_X metre band across the room instead of room-wide (see BAND_X).
+  const bands = new Map();
+  const bandOf = (x) => Math.floor((x - BR.x0) / BAND_X);
+  const addToBand = (band, entry) => {
+    if (!bands.has(band)) bands.set(band, []);
+    bands.get(band).push(entry);
+  };
+  for (const p of PIECES) {
+    if (p.tags?.length || (p.group && unionGroups.has(p.group))) continue;
+    addToBand(bandOf(centre(p)[0]), { geo: pieceGeometry(p), mat: mats[p.mat], at: [0, 0, 0] });
+  }
+  for (const e of DETAILS) {
+    addToBand(bandOf((e.x[0] + e.x[1]) / 2), {
       geo: box(e.x[1] - e.x[0], e.y[1] - e.y[0], e.z[1] - e.z[0]),
       mat: mats[e.mat] ?? mats.woodDark,
       at: [(e.x[0] + e.x[1]) / 2, (e.y[0] + e.y[1]) / 2, (e.z[0] + e.z[1]) / 2],
-    })),
-    { cast: false, receive: true },
-  );
+    });
+  }
+  for (const entries of bands.values()) {
+    mergedMesh(bedroom, entries, { cast: false, receive: true });
+  }
 
   return { group: bedroom, pieces: measured };
 }
