@@ -172,9 +172,12 @@ export const PIECES = [
     'vanity-counter',
     'marble',
     [
-      bx(V.x0, 0.82, V.z0, V.x1, 0.86, V.z1), // slab — top at the support
+      bx(V.x0, 0.82, V.z0, V.x1, 0.86, V.z0 + 0.10), // slab, north band
+      bx(V.x0, 0.82, 2.59, V.x1, 0.86, V.z1), // slab, south band
+      bx(V.x0, 0.82, V.z0 + 0.10, V.x0 + 0.10, 0.86, 2.59), // slab, west band
+      bx(V.x1 - 0.10, 0.82, V.z0 + 0.10, V.x1, 0.86, 2.59), // slab, east band
       // the undermount bowl's rim, drawn as the counter's frame around a
-      // recess: four lips of marble around a 0.40 × 0.30 well
+      // recess: four lips of marble around a 0.60 × 0.27 well
       bx(V.x0 + 0.10, 0.82, V.z0 + 0.10, V.x0 + 0.15, 0.87, V.z1 - 0.06),
       bx(V.x1 - 0.15, 0.82, V.z0 + 0.10, V.x1 - 0.10, 0.87, V.z1 - 0.06),
       bx(V.x0 + 0.10, 0.82, V.z0 + 0.10, V.x1 - 0.10, 0.87, V.z0 + 0.15),
@@ -387,15 +390,16 @@ export const DETAILS = {
   tankLid: bx(TX - 0.185, 0.76, T.z0 - 0.005, TX + 0.185, 0.78, 2.455),
   // the bowl's well, dark porcelain, seen through the counter's rim
   bowlWell: bx(-3.15, 0.70, 2.37, -2.55, 0.83, 2.59),
-  // the mirror's glass, inset in the frame, 1 mm in front of the tile face
-  mirrorGlass: bx(-3.15, 1.15, 2.236, -2.55, 1.95, 2.244),
+  // the mirror's glass, on the frame's face — 3 mm proud of the frame front,
+  // where a looking surface actually lives
+  mirrorGlass: bx(-3.15, 1.15, 2.266, -2.55, 1.95, 2.27),
   // the towel on the bar: plain duck-egg blue, no pattern yet (chunk 3d's
   // lookalike set owns black-and-white), doubled over the bar like a hung towel
   towel: bx(-2.02, 0.86, 2.245, -1.74, 1.145, 2.275),
   towelBack: bx(-2.02, 0.96, 2.215, -1.74, 1.145, 2.245),
   // paper holder on the west… no — north plaster, east of the tank, y 0.65
   paperArm: bx(T.x1 + 0.12, 0.63, 2.225, T.x1 + 0.15, 0.66, 2.32),
-  paperRoll: cy(T.x1 + 0.135, 2.285, 0.605, 0.72, 0.055), // on its side, by its axle
+  paperRoll: cy(T.x1 + 0.135, 2.275, 0.59, 0.7, 0.055, null, { rotX: Math.PI / 2, len: 0.09, at: [T.x1 + 0.135, 0.645, 2.275] }), // on its side, by its axle
   // tub fittings: spout and two taps on the west wall (below the window line),
   // the shower arm out of the same wall, head over the well's west end
   tubSpout: cy(-3.24, 3.55, 0.62, 0.62, 0.022, null, { rotZ: Math.PI / 2, len: 0.09, at: [-3.24, 0.62, 3.55] }),
