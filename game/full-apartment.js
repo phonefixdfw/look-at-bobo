@@ -46,6 +46,7 @@ import {
 } from './full-shell.js';
 import { buildFullKitchen } from './full-kitchen-mesh.js';
 import { buildFullKitchenDetails } from './full-kitchen-details-mesh.js';
+import { buildFullLiving } from './full-living-mesh.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -541,6 +542,14 @@ export function buildFullApartment(scene) {
   // breakfast bar and its stools, the runner, the pendants — same split, one
   // call, data in game/full-kitchen-details.js.
   buildFullKitchenDetails(flat);
+
+  // ── the living room (issue #46) ───────────────────────────────────────────
+  // Same shape as the kitchen above: every number lives in
+  // game/full-living.js, this is the one call that puts it on screen. The
+  // living room is the last big block of the shell left at placeholder size,
+  // and its pieces share their footprints with the COLLIDERS splice in
+  // game/full-level.js, so what Bobo's body stops against is what gets drawn.
+  buildFullLiving(flat);
 
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────

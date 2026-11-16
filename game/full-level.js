@@ -22,6 +22,7 @@
 import { MOVE } from './level.js';
 import { KITCHEN_COLLIDERS } from './full-kitchen.js';
 import { KITCHEN_DETAILS_COLLIDERS } from './full-kitchen-details.js';
+import { LIVING_COLLIDERS } from './full-living.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
  *  so yaw = atan2(−dx, −dz) means "look towards (dx, dz)", and 0 looks north
@@ -74,14 +75,12 @@ export const WALK_RECTS = [
  *  and the ruler check measures; a cat's own support is exempt from its sight
  *  line, so a cat on the counter is not hidden by the counter. */
 export const COLLIDERS = [
-  // ── living room: a sofa on the west wall facing the telly on the north-east,
-  //    a breakfast nook under the east window, and a box in the middle (box) ──
-  { id: 'sofa', x0: -3.3, z0: -1.15, x1: -2.38, z1: 0.95 }, // 2.10 long × 0.92 deep, back to the wall
-  { id: 'coffee-table', x0: -1.9, z0: -1.0, x1: -1.3, z1: 0.2 },
-  { id: 'tv-stand', x0: 1.98, z0: -2.4, x1: 2.4, z1: -0.85 },
-  { id: 'bookshelf', x0: -3.3, z0: -2.9, x1: -2.95, z1: -2.0 },
-  { id: 'big-plant', x0: -0.95, z0: -2.82, x1: -0.35, z1: -2.22 }, // clear of the WALK_BLOCK lane (x 0.4)
-  { id: 'box', x0: -2.35, z0: 1.35, x1: -1.8, z1: 1.8 },
+  // ── living room: the real-dimension furniture game/full-living.js draws
+  //    (issue #46). LIVING_COLLIDERS is spliced in, so the push boxes ARE the
+  //    drawn footprints — one copy of each number, from the ruler. The
+  //    breakfast nook under the east window stays the placeholder it always
+  //    was: the dining set is a later row of #33, not this one. ──
+  ...LIVING_COLLIDERS,
   { id: 'dining-table', x0: 0.75, z0: 1.1, x1: 2.35, z1: 1.9 }, // the long bench side towards the east wall
   { id: 'chair-a', x0: 0.22, z0: 1.42, x1: 0.69, z1: 1.89 },
   { id: 'chair-b', x0: 1.35, z0: 0.62, x1: 1.82, z1: 1.09 },
@@ -187,12 +186,12 @@ function spot(type, place, room, pose, pos, faceYaw, extra) {
 
 export const SPOTS = [
   // ── living room (7) ──────────────────────────────────────────────────────
-  spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -2.58, { open: true }),
+  spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
   spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71),
   spot('window-bird', 'e-window', 'living', 'sit', [1.72, 'floor', 0.55], 1.51),
   spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], -0.1),
-  spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], 0.32, { open: true }),
+  spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
   spot('hall-chase', 'living', 'living', 'loaf', [-0.6, 'floor', 0.9], 1.41),
   // ── balcony (2) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md) ──
   spot('window-bird', 'balcony-rail', 'balcony', 'sit', [1.35, 'floor', -3.85], -2.9),
@@ -438,17 +437,22 @@ export const SCALE_RANGES = {
   'window-sill': { top: [0.85, 1.55], note: 'the board under a window' },
   baseboard: { w: [0.015, 0.03], h: [0.09, 0.15], note: 'baseboard 2 × 12 cm' },
   railing: { h: [0.9, 1.15], note: 'balcony railing ~1.0 above the parapet? 1.10 total' },
-  // furniture (issue #33's "real furniture, not a playset" list)
-  sofa: { w: [1.8, 2.4], d: [0.8, 1.0], h: [0.75, 0.95], note: 'sofa 2.10 × 0.92 × 0.85' },
-  'seat-height': { top: [0.4, 0.5], note: 'seat height 0.45' },
-  'sofa-back': { top: [0.8, 0.9], note: 'sofa backrest top 0.85' },
-  'coffee-table': { w: [1.1, 1.4], d: [0.5, 0.7], h: [0.4, 0.5], note: 'coffee table 1.30 × 0.60 × 0.45' },
+  // furniture (issue #33's "real furniture, not a playset" list). The living
+  // rows were retuned in issue #46 to what each ruler row ALLOWS — the same
+  // move #41 made for the kitchen — and are now actually measured: the
+  // furniture has been drawn since then (game/full-living.js).
+  sofa: { w: [1.8, 2.4], d: [0.82, 1.05], h: [0.75, 0.95], note: 'row 34: 2.10 × 0.92 × 0.85' },
+  'seat-height': { top: [0.38, 0.5], note: 'row 35: seat 0.45, the `cushion` support' },
+  'sofa-back': { top: [0.8, 0.9], note: 'row 34 again: backrest top 0.85, the `sofaBackTop` support' },
+  'coffee-table': { w: [1.0, 1.3], d: [0.5, 0.7], h: [0.38, 0.52], note: 'row 36: 1.10 × 0.60 × 0.45' },
+  'side-table': { w: [0.38, 0.52], h: [0.48, 0.62], note: 'row 37: 0.45 dia × 0.55 high' },
   'dining-table': { w: [1.5, 1.7], d: [0.8, 0.9], h: [0.72, 0.78], note: 'breakfast table 1.60 × 0.80 × 0.75' },
   'dining-chair': { w: [0.4, 0.5], d: [0.4, 0.55], h: [0.85, 1.0], note: 'chair 0.48 × 0.47 × 0.90' },
-  'tv-stand': { w: [1.4, 1.65], d: [0.38, 0.46], h: [0.4, 0.5], note: 'TV stand 1.55 × 0.42 × 0.45' },
-  'tv-screen': { w: [1.0, 1.3], h: [0.55, 0.75], bottom: [0.5, 0.7], note: '55" TV on the stand' },
-  bookshelf: { w: [0.8, 1.0], d: [0.28, 0.4], h: [1.7, 2.1], note: 'bookcase 0.90 × 0.35 × 1.90' },
-  'floor-lamp': { h: [1.4, 1.7], note: 'floor lamp 1.5–1.6 m' },
+  'tv-stand': { w: [1.45, 1.72], d: [0.32, 0.46], h: [0.38, 0.55], note: 'row 40: 1.60 × 0.40 × 0.45' },
+  'tv-screen': { w: [1.0, 1.35], h: [0.62, 0.8], bottom: [0.79, 0.9], note: 'row 39: 1.22 × 0.71, centre y 1.20' },
+  bookshelf: { w: [0.8, 1.0], d: [0.28, 0.4], h: [1.7, 2.1], note: 'row 41: 0.90 × 0.32 × 1.90 high' },
+  'floor-lamp': { h: [1.35, 1.75], note: 'row 38: 1.55 tall, shade 0.34 dia' },
+  'cardboard-box': { w: [0.4, 0.7], h: [0.3, 0.55], bottom: [0, 0.06], note: 'row 60: 0.60 × 0.44 × 0.42, floor y 0.02' },
   // the kitchen (ruler rows 11-22), retuned in issue #41 to what each row
   // ALLOWS rather than what one placeholder box happened to be. `w` is the long
   // horizontal extent and `d` the short one (see the note above), so a run reads
