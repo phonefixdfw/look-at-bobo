@@ -45,6 +45,7 @@ import {
   SUPPORT_DEFS,
 } from './full-shell.js';
 import { buildFullKitchen } from './full-kitchen-mesh.js';
+import { buildFullKitchenDetails } from './full-kitchen-details-mesh.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -536,6 +537,10 @@ export function buildFullApartment(scene) {
   // puts it on screen, so the flat still draws its shell from full-shell.js and
   // its kitchen from one data module and nowhere else.
   buildFullKitchen(flat);
+  // ...and the small pieces on it (issue #44): appliances, rack, bin, the
+  // breakfast bar and its stools, the runner, the pendants — same split, one
+  // call, data in game/full-kitchen-details.js.
+  buildFullKitchenDetails(flat);
 
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
