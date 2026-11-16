@@ -1289,7 +1289,21 @@ export function bootGame(cfg) {
     return hash;
   }
 
+  // Issue #61: the checks measure the flat as BUILT. A ruler ray skips
+  // invisible meshes and `doorways-read-open` reads pixels through a doorway at
+  // the room beyond it, so the draw cull stands down for the whole test and
+  // comes back on afterwards, where the next frame decides again room by room.
   function selfTest() {
+    const wasOn = apt.cull?.enabled ?? false;
+    apt.cull?.setEnabled(false);
+    try {
+      return selfTestChecks();
+    } finally {
+      if (wasOn) apt.cull?.setEnabled(true);
+    }
+  }
+
+  function selfTestChecks() {
     const checks = [];
     const add = (name, value, limit, pass, note = null) =>
       checks.push({ name, value: round(value), limit, pass: Boolean(pass), note });
@@ -2108,6 +2122,11 @@ export function bootGame(cfg) {
       },
       renderNow() {
         resizeIfNeeded();
+        // Issue #61: rooms the camera cannot reach are hidden before the pass,
+        // so three prunes them instead of submitting and frustum-rejecting
+        // them one box at a time. A level with no cull (the slice, the demo)
+        // draws exactly what it always drew.
+        apt.cull?.update(camera);
         setRendering(true);
         try {
           renderer.render(scene, camera);
@@ -2133,6 +2152,9 @@ export function bootGame(cfg) {
           passes: 1,
           realLights,
           shadowLights,
+          // issue #61: which rooms the cull kept out of this frame
+          cameraRoom: apt.cull?.state?.room ?? null,
+          roomsHidden: apt.cull?.state?.hidden ?? [],
         };
       },
       selfTest,

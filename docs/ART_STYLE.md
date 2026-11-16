@@ -194,12 +194,24 @@ neck band back onto the decoy (241 white verts, the old count) and
   celebration is 3 `InstancedMesh` layers + 2 `Points` bursts. Worst measured
   frame: **89 draws / 101,636 tris** (win moment) — inside the tool's 150 /
   150k budget with room for more room content.
-- **TEMPORARY (issue #59): full flat budget 180 draws for `game/full.html`**
-  until the per-room culling/instancing pass brings it back to 150 (tracked as
-  the next perf issue; recorded in `docs/HANDOFF.md`; the constant is
-  `FULL_GAME_DRAW_CALLS` in `tools/capture.mjs`). The kitchen + bedroom
-  furniture (#44, #48) each fit inside 150 alone but measure 159 worst-case
-  (desk view) merged; the slice and the demo keep 150.
+- **Budget for the full flat is 150 draws again** (issue #61). It had been
+  given 180 while the room furniture landed (#59); two files earned the 150
+  back. `game/full-merge.js` folds static siblings that shade identically into
+  one buffer each — a run of twelve cabinet doors is one draw, not twelve —
+  and refuses anything a check measures by mesh (the ruler rows, the named
+  pieces, the parked leaves), anything transparent and anything with a script
+  on it; `?merge=off` hands every mesh back to its own draw.
+  `game/full-cull.js` hides the room groups a camera cannot reach, counted in
+  openings, and fails open for a camera standing outside every room rect;
+  `?cull=off` keeps all seven rooms drawn. The sky folded too: seven planes
+  that already shared one unlit material are now one sheet.
+  Measured, the worst frame of the 507-frame matrix is **147 draws / 98,656
+  tris** — the overview, which sees the whole flat, and the reason the cull
+  alone was not enough; the desk view went 163 → 123, and the count of frames
+  over 150 in the matrix went 36 → 0. The budget was paid for
+  honestly: `tools/draw-report.mjs --pixels` renders every frame of that
+  matrix with the fold and the cull on and off, and all 507 came back
+  byte-identical, so nothing here bought a draw call with a look.
 - No post-processing (`passes: 1`). Small cat parts and small props have
   `castShadow = false` — only big silhouettes need to shadow.
 - The page implements the `window.LC` contract (`docs/CAPTURE.md`) with the

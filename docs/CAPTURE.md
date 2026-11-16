@@ -119,10 +119,14 @@ Checked on every frame, overridable with `--budget`:
 
 `drawCalls ≤ 150` · `triangles ≤ 150 000` · `passes ≤ 3` · `shadowLights ≤ 2` · `realLights ≤ 6`
 
-TEMPORARY exception (issue #59): `game/full.html` alone is checked against `drawCalls ≤ 180` —
-one named constant (`FULL_GAME_DRAW_CALLS` in `tools/capture.mjs`) — until the per-room
-culling/instancing pass brings the full game back inside 150. Every other page, every other
-number, an explicit `--budget drawCalls=…`, and the `?quality=low` path stay as written.
+`game/full.html` is held to all five again (issue #61). It had been given `drawCalls ≤ 180` as
+one named constant (`FULL_GAME_DRAW_CALLS` in `tools/capture.mjs`) while the room furniture
+landed (issue #59); the flat came back inside 150 by folding its static geometry into shared
+per-shading buffers (`game/full-merge.js`, `?merge=off` to un-fold) and hiding the rooms a
+camera cannot reach (`game/full-cull.js`, `?cull=off` to keep every room drawn). The worst
+frame of the 507-frame matrix is now **147 draws**. The constant stays separate from
+`BUDGET.drawCalls` because the full flat is a different page from the slice and the demo; an
+explicit `--budget drawCalls=…`, every other page, and the `?quality=low` path are unchanged.
 
 (The intent is VISION.md: 60 fps at 1080p on a mid-range laptop. The build-a-game process
 also wants these numbers in `AGENTS.md`, which does not exist in this repo yet — see

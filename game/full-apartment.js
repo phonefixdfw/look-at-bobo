@@ -49,6 +49,8 @@ import { buildFullKitchenDetails } from './full-kitchen-details-mesh.js';
 import { buildFullLiving } from './full-living-mesh.js';
 import { buildFullBath } from './full-bath-mesh.js';
 import { buildFullBedroom } from './full-bedroom-mesh.js';
+import { mergeStaticMeshes } from './full-merge.js';
+import { createRoomCull } from './full-cull.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -445,20 +447,25 @@ export function buildFullApartment(scene) {
   // painted the whole west run the colour of the sky. Out here they only exist
   // where a balcony camera can actually see them: VIEWS.balcony sits at
   // z -3.75 and looks due east and west, which is inside both spans.
-  for (const s of [
+  const skySheets = [
     ...skyPlanes,
     { pos: [1.5, 2.2, -5.02], rotY: 0, w: 9, h: 6 }, // beyond the far parapet
     { pos: [3.1, 2.2, -5.35], rotY: -Math.PI / 2, w: 4.5, h: 6 }, // east, z -7.6 .. -3.1
     { pos: [-0.2, 2.2, -5.35], rotY: Math.PI / 2, w: 4.5, h: 6 }, // west, z -7.6 .. -3.1
-  ]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), sky);
-    m.position.set(...s.pos);
-    m.rotation.y = s.rotY;
-    m.castShadow = false;
-    m.receiveShadow = false;
-    m.userData.tag = 'sky';
-    flat.add(m);
-  }
+  ].map((s) => ({
+    geo: new THREE.PlaneGeometry(s.w, s.h),
+    mat: sky,
+    at: s.pos,
+    rot: [0, s.rotY, 0],
+    // The one exception to mergedMesh's worldUV re-bake: for the sky the texel
+    // IS the sheet, so each plane keeps its own 0..1 mapping.
+    keepUV: true,
+  }));
+  // Every sheet here shares one unlit, shadow-free material, so they fold into
+  // a single draw for the whole horizon: the desk view sees all of them at once
+  // and was spending seven draws on the same seven quads of sky.
+  mergedMesh(flat, skySheets, { cast: false, receive: false })
+    .forEach((m) => { m.userData.tag = 'sky'; });
 
   mergedMesh(flat, casings.map((e) => ({ ...e, mat: trim })));
   mergedMesh(flat, trimBoards.map((e) => ({ ...e, mat: trim })), { cast: false });
@@ -557,6 +564,7 @@ export function buildFullApartment(scene) {
   penRoot.add(penBody);
   penRoot.position.set(-1.85, 0.83, 5.67);
   penRoot.rotation.x = Math.PI / 2; // build pose: lying down (resetPen rights it)
+  penRoot.userData.noMerge = true; // issue #61: game/full.js moves this every find frame
   flat.add(penRoot);
 
   // ── the kitchen (issue #41) ───────────────────────────────────────────────
@@ -590,6 +598,32 @@ export function buildFullApartment(scene) {
   // on the west wall and the rest of the room hangs off that anchor.
   buildFullBedroom(flat);
 
+  // ── issue #61: fold the static geometry the five builders just emitted ────
+  // Every room is a data table that drew one mesh per box, so a run of cabinet
+  // doors cost twelve draw calls to submit twelve boxes that share a material
+  // and never move. game/full-merge.js folds siblings that shade identically
+  // into one buffer each — same vertices, same material, fewer calls. It skips
+  // anything a check measures on its own (ruler rows, named pieces, the parked
+  // leaves), anything transparent, and anything with a script on it.
+  // ?merge=off hands every mesh back to its own draw, which is how
+  // tools/draw-report.mjs and docs/ART_STYLE.md A/B the two numbers.
+  const merge = new URLSearchParams(location.search).get('merge') === 'off' ? null : mergeStaticMeshes(flat);
+  if (merge) {
+    const kept = Object.entries(merge.kept).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join(' ');
+    const big = merge.groups.sort((a, b) => b.from - a.from).slice(0, 6).map((g) => `${g.parent}${g.mat}x${g.from}`).join(' ');
+    console.info(`[look-at-bobo] issue #61 fold: ${merge.folded} of ${merge.visited} static meshes into ${merge.into} buffers (−${merge.draws} draws) across ${merge.parents} groups · kept ${kept}`);
+    console.info(`[look-at-bobo] issue #61 biggest folds: ${big}`);
+  }
+
+  // ── issue #61: stop submitting rooms the camera cannot see ────────────────
+  // Filed now, before game/full.js adds the cast: everything in this list is
+  // flat, and anything added afterwards is nobody's room to hide.
+  // ?cull=off keeps every room drawn, which is how the checks run and how
+  // tools/draw-report.mjs proves hiding a room moves no pixel.
+  const cull = createRoomCull(flat, {
+    enabled: new URLSearchParams(location.search).get('cull') !== 'off',
+  });
+  console.info(`[look-at-bobo] issue #61 cull: rooms -> groups ${JSON.stringify(cull.map())} · ${cull.shared} shared groups never hidden`);
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
   const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x6b5a48, 0.55);
@@ -639,6 +673,8 @@ export function buildFullApartment(scene) {
     supports,
     lights: { hemi, sun, fills },
     pen: { root: penRoot, barrel: penBody },
+    // issue #61: the per-room draw cull, driven by the camera each frame
+    cull,
     // every plaster slab (walls, parapets, ceilings) as an AABB, from the
     // definitions that were actually built (src/reach.js measures the walls
     // you can actually see — floors are not walls and are deliberately out)
