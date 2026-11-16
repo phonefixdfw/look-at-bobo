@@ -318,7 +318,7 @@ export const DECOY_SPOTS = [
   { id: 'd-hall', room: 'hall', pos: [0.35, 'floor', 3.0], faceYaw: 1.23 },
   { id: 'd-entry', room: 'entry', pos: [2.0, 'floor', 2.5], faceYaw: 1.9 },
   { id: 'd-bath', room: 'bathroom', pos: [-2.75, 'floor', 3.55], faceYaw: -0.81, pose: 'side' },
-  { id: 'd-bedroom', room: 'bedroom', pos: [-0.55, 'floor', 6.45], faceYaw: -1.65 }, // moved with the bed: the mirrored -0.05/7.15 landed under DECOY_MIN_DIST of the blanket spot
+  { id: 'd-bedroom', room: 'bedroom', pos: [-0.55, 'floor', 6.45], faceYaw: 0.0 }, // on the rug mid-floor, facing north down the room to the door walk — the nearest stand-and-watch cell; measured: the mirrored yaw was 95° off, this faces the approach head-on
   { id: 'd-balcony', room: 'balcony', pos: [1.4, 'floor', -3.35], faceYaw: 2.82, pose: 'side' },
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
@@ -347,7 +347,7 @@ export const SPAWNS = [
   { room: 'entry', pos: [1.53, 3.73], yaw: 1.5 },
   { room: 'bathroom', pos: [-2.37, 3.33], yaw: -2.2 },
   { room: 'bedroom', pos: [-1.37, 6.63], yaw: 1.6 },
-  { room: 'bedroom', pos: [-1.5, 9.02], yaw: -1.2 }, // issue #48: the bed's head is west now and reaches z 8.66 here; the south band is the walk to it
+  { room: 'bedroom', pos: [-1.5, 9.1], yaw: -1.2 }, // issue #48: the bed's head is west now and reaches z 8.66 here; the south band is the walk to it (z 9.1 keeps the body clear of the bed pad at 8.96)
 ];
 
 export const SPAWN_AVOID_DIST = 1.2;
