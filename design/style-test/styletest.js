@@ -35,6 +35,15 @@ import { buildCat, CAT_SPECS, setCatPose } from '../../src/cat.js';
 import { rulesBobo, paintPose, ellSDF } from '../../src/markings.js';
 import { createCelebration } from '../../src/celebrate.js';
 import { scanMarkings, contactGap, NECK_ZONE_EXPECT } from '../../src/measure.js';
+import {
+  addPatriotCostume,
+  removePatriotCostume,
+  isPatriotAttached,
+  getPatriotRig,
+  patriotIdle,
+  measurePatriot,
+  countPatriotMeshes,
+} from '../../src/patriot.js';
 
 /** Fixed strings. Exact. On purpose. Never "fixed". */
 const EXACT_ENDING = 'your did it! you wind';
@@ -49,6 +58,13 @@ const params = new URLSearchParams(location.search);
  *  ?plant=stats — the page lies about how cheap its frames are
  *  The source files stay correct; the fault only exists in the URL. */
 const PLANT = params.get('plant');
+/** Patriot Bobo (issue #55) honours the same quality/motion switches the game
+ *  uses: ?quality=low halves the costume's mesh resolution, ?motion=off (or
+ *  prefers-reduced-motion) rests the flag wave, the tilt and the blink. */
+const QUALITY = params.get('quality') === 'low' ? 'low' : 'full';
+const CALM =
+  params.get('motion') === 'off' ||
+  (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 /** The ending line. A variable only so ?plant=text can corrupt it data-first,
  *  the way ?plant=dash corrupts the marking rules. The check compares against
  *  EXACT_ENDING, which never changes. */
@@ -67,7 +83,7 @@ const V = {
   'cats-close': { pos: [0.15, 0.42, 1.45], look: [0.05, 0.34, 0.3], fov: 36 },
   'bobo-face': { pos: [-0.3, 0.4, 0.98], look: [-0.3, 0.36, 0.3], fov: 22 },
 };
-const MOMENTS = ['default', 'loaf-couch', 'lineup', 'hud-score', 'hud-dag', 'win'];
+const MOMENTS = ['default', 'loaf-couch', 'lineup', 'hud-score', 'hud-dag', 'win', 'patriot-bobo'];
 
 // ---------------------------------------------------------------------------
 // 2. Renderer / scene / camera
@@ -114,6 +130,8 @@ const LAYOUT = {
   'hud-score': { bobo: { pos: [-0.3, 'rug', 0.35], pose: 'sit' }, decoy: { pos: [0.62, 'rug', 0.42], pose: 'sprawl' } },
   'hud-dag': { bobo: { pos: [-0.3, 'rug', 0.35], pose: 'sit' }, decoy: { pos: [0.62, 'rug', 0.42], pose: 'sprawl' } },
   win: { bobo: { pos: [0, 'rug', 0.55], pose: 'sit' }, decoy: { pos: [1.9, 'floor', -1.4], pose: 'sprawl' } },
+  // issue #55: Bobo sits dead-centre in his costume, decoy parked out of shot
+  'patriot-bobo': { bobo: { pos: [-0.3, 'rug', 0.35], pose: 'sit' }, decoy: { pos: [1.9, 'floor', -1.4], pose: 'sprawl' } },
 };
 function placeCats(moment) {
   const l = LAYOUT[moment] ?? LAYOUT.default;
@@ -154,6 +172,7 @@ const HUD_SPEC = {
   'hud-score': { score: true, scoreValue: 3, reticle: true, soft: false, dag: false, ending: false },
   'hud-dag': { score: true, scoreValue: 3, reticle: true, soft: true, dag: true, ending: false },
   win: { score: true, scoreValue: 10, reticle: false, soft: false, dag: false, ending: true },
+  'patriot-bobo': { score: false, scoreValue: 0, reticle: false, soft: false, dag: false, ending: false },
 };
 
 function applyHud() {
@@ -204,6 +223,9 @@ function applyTime(t) {
     updateRain(t);
     updateFireworks(t);
   }
+  // Patriot idle (issue #55): flag wave, small head tilt, a blink every 3.2 s.
+  // Pure in t, and CALM writes the resting frame instead of freezing mid-wave.
+  if (isPatriotAttached(bobo)) patriotIdle(bobo, t, { calm: CALM });
 }
 
 function applyView(name) {
@@ -249,6 +271,10 @@ function applyMoment(id) {
   momentName = id;
   placeCats(id);
   applyHud();
+  // issue #55: the costume is a pure costume OF THIS MOMENT — attached nowhere
+  // else, so every other frame still shows the untouched cat.
+  if (id === 'patriot-bobo') addPatriotCostume(bobo, { quality: QUALITY, calm: CALM });
+  else removePatriotCostume(bobo);
 }
 function momentOrderIndependence() {
   const canonical = new Map();
@@ -439,6 +465,81 @@ function selfTest() {
   );
   add('seek-no-unseeded-random', countUnseededCalls(), '0 calls', countUnseededCalls() === 0, 'Math.random / Date.now inside seek / setMoment');
   add('duration-positive', DURATION, '>0 s', DURATION > 0, null);
+
+  // --- Patriot Bobo (issue #55) --------------------------------------------
+  // The costume is optional: off every other moment, and the numbers below are
+  // measured on a temporary visit to its moment (restoreAfterSelfTest detaches
+  // it again), so they describe the costume whichever frame selfTest ran on.
+  removePatriotCostume(bobo); // "normal Bobo" for the whole rest of this block
+  let patriotOnly = true;
+  for (const id of MOMENTS) {
+    applyMoment(id);
+    const want = id === 'patriot-bobo' ? 10 : 0;
+    if (countPatriotMeshes(bobo) !== want) patriotOnly = false;
+  }
+  add(
+    'patriot-only-in-its-moment',
+    patriotOnly ? '10 there / 0 elsewhere' : 'leaked',
+    'attached exactly in patriot-bobo',
+    patriotOnly,
+    'normal Bobo carries zero costume meshes in every other moment',
+  );
+  applyMoment('patriot-bobo');
+  applyTime(1.25);
+  scene.updateMatrixWorld(true);
+  const pm = measurePatriot(bobo, {
+    ceilingY: 2.6,
+    wallMinX: -3.14,
+    wallMinZ: WALL_Z + 0.06,
+    stagings: [
+      { name: 'rug', pos: [-0.3, SUPPORTS.rug ?? 0, 0.35] },
+      { name: 'sofa', pos: [-2.5, SUPPORTS.cushion ?? 0.44, -0.46] },
+    ],
+  });
+  add(
+    'patriot-dash-unmasked',
+    pm.dashIntrusions,
+    '0 costume vertices within 2 mm of the dash box',
+    pm.dashIntrusions === 0,
+    `hat/horns come within ${round(pm.dashMin * 1000)} mm of the dash — the tell stays readable (issue #55)`,
+  );
+  add(
+    'patriot-hat-covers-ears',
+    pm.earCoverMargin,
+    '≥0.002 m of hat wall beyond every ear vertex',
+    pm.earCoverMargin >= 0.002,
+    'ears under the fur, eyes and dash under the brim',
+  );
+  add(
+    'patriot-button-on-bib',
+    pm.buttonInBib ? 'on bib' : 'off bib',
+    'inside the bib, straps ≥36 mm from its centre',
+    pm.buttonInBib && pm.nearestStrap >= 0.036,
+    `"SAVE THE CAPITOL" on the white bib, not on black fur (nearest strap ${round(pm.nearestStrap * 1000)} mm)`,
+  );
+  add(
+    'patriot-horn-clearance',
+    pm.worstClearance,
+    '≥0.01 m to wall / ceiling in every staging',
+    pm.worstClearance >= 0.01,
+    pm.clearances.map((c) => `${c.name}: ceil ${round(c.ceiling * 1000)} side ${round(c.sideWall * 1000)} back ${round(c.backWall * 1000)} mm`).join(', '),
+  );
+  // The budget (ART_STYLE.md §7): the costume may add at most 12 draws and
+  // ~4.5k triangles. Measured, not estimated: render, hide, render again.
+  window.LC.renderNow();
+  const pWith = window.LC.getStats();
+  const pRig = getPatriotRig(bobo);
+  pRig.group.visible = false;
+  pRig.headGroup.visible = false;
+  window.LC.renderNow();
+  const pWithout = window.LC.getStats();
+  pRig.group.visible = true;
+  pRig.headGroup.visible = true;
+  window.LC.renderNow();
+  const pDraws = pWith.drawCalls - pWithout.drawCalls;
+  const pTris = pWith.triangles - pWithout.triangles;
+  add('patriot-draw-budget', pDraws, '≤12 extra draw calls', pDraws >= 1 && pDraws <= 12, `${pm.meshes} costume meshes, merged where it counts`);
+  add('patriot-triangle-budget', pTris, '≤4500 extra triangles', pTris >= 1 && pTris <= 4500, 'quality=low halves the grids');
 
   const stats = window.LC?.getStats ? window.LC.getStats() : { drawCalls: 0 };
   add('stats-available', stats.drawCalls, '>0 draw calls', stats.drawCalls > 0, 'render once before getStats means anything');
