@@ -287,10 +287,13 @@ export const SUPPORT_DEFS = {
   // issue #49: the lid moved with the toilet to the north wall — the closed
   // lid of the real piece, top 0.425 (no spot uses it yet; it stays honest)
   toiletLid: { x0: -2.0, z0: 2.54, x1: -1.65, z1: 2.87, top: 0.425 },
-  // bedroom
-  bedTop: { x0: -0.81, z0: 6.92, x1: 1.18, z1: 8.41, top: 0.5 },
-  blanketTop: { x0: -0.79, z0: 6.95, x1: 1.16, z1: 7.88, top: 0.545 },
-  nightstandTop: { x0: 0.72, z0: 6.37, x1: 1.18, z1: 6.83, top: 0.55 },
+  // bedroom — the planes issue #48's furniture actually has: coverlet top
+  // 0.50 (bedTop), the foot-of-bed fold at 0.58 (blanketTop), the west-
+  // flush nightstand at 0.55. deskTop/kbTop/laundryTop are the plan's own
+  // rects and are unchanged — the desk strip and the basket did not move.
+  bedTop: { x0: -2.48, z0: 7.09, x1: -0.49, z1: 8.64, top: 0.5 },
+  blanketTop: { x0: -0.89, z0: 7.16, x1: -0.63, z1: 8.57, top: 0.58 },
+  nightstandTop: { x0: -2.58, z0: 6.57, x1: -2.17, z1: 7.03, top: 0.55 },
   deskTop: { x0: -2.53, z0: 5.34, x1: -1.17, z1: 6.0, top: 0.75 },
   kbTop: { x0: -2.13, z0: 5.74, x1: -1.57, z1: 5.9, top: 0.79 },
   laundryTop: { x0: 0.64, z0: 8.82, x1: 1.0, z1: 9.18, top: 0.55 },

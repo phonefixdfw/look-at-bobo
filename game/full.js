@@ -16,6 +16,7 @@ import { bathGapReport } from './full-bath.js';
 import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
+import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
 
 /* ---- the ten moments, pose by pose ----
  * The engine runs the baseline idle right before this, only during `find`,
@@ -301,6 +302,22 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'bookshelf',
       'floor-lamp',
       'cardboard-box',
+      // the bedroom (issue #48)
+      'headboard',
+      'bed-frame',
+      'bed-queen',
+      'mattress-height',
+      'folded-blanket',
+      'nightstand',
+      'desk',
+      'keyboard',
+      'monitor',
+      'desk-chair',
+      'desk-chair-back',
+      'dresser',
+      'wardrobe',
+      'laundry-basket',
+      'laundry-pile',
       // rows 52-59 (issue #49): the bathroom and the balcony. Same rule —
       // a row nobody built fails the run. 'toilet', 'vanity' and 'railing'
       // already had rows and are re-tagged by full-bath-mesh.js (the faucet
@@ -409,6 +426,50 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'row 58: 0.90 m on the routes, 0.60 tolerated only in front of the tub and the toilet',
       short.length === 0,
       'issue #49: the last two rooms measured in the ruler\'s own units',
+    );
+  }
+
+  /* Issue #48 — `bedroom-flush-to-wall`: the pieces issue #48 calls flush
+   * hug their wall within FLUSH_TOL (0.05 m), measured off the same built
+   * world AABBs `furniture-real-scale` uses — and the two nightstands flank
+   * the headboard's z edges on the same face, so the west run is one line
+   * of furniture meeting the plaster, not three pieces placed near it. */
+  {
+    const byName = new Map();
+    scene.traverse((o) => {
+      if (o.isMesh && o.name) byName.set(o.name, o);
+    });
+    const boxOf = (id) => {
+      const m = byName.get(id);
+      if (!m) return null;
+      m.updateWorldMatrix(true, false);
+      return new THREE.Box3().setFromObject(m);
+    };
+    const bad = [];
+    let worst = 0;
+    for (const f of FLUSH_PIECES) {
+      const b = boxOf(f.id);
+      if (!b) {
+        bad.push(`${f.id}: not in the scene`);
+        continue;
+      }
+      const gap = f.face === 'w' ? b.min.x - FACES.w : FACES.e - b.max.x;
+      if (!(gap >= -0.005 && gap <= FLUSH_TOL)) {
+        bad.push(`${f.id} ${f.face}-face gap ${gap.toFixed(3)} outside -0.005…${FLUSH_TOL}`);
+      }
+      if (gap > worst) worst = gap;
+    }
+    const hb = boxOf('bed-headboard');
+    const nw = boxOf('nightstand-north');
+    const ns = boxOf('nightstand-south');
+    if (hb && nw && nw.max.z > hb.min.z + 0.005) bad.push('nightstand-north overlaps the headboard');
+    if (hb && ns && ns.min.z < hb.max.z - 0.005) bad.push('nightstand-south overlaps the headboard');
+    add(
+      'bedroom-flush-to-wall',
+      bad.length ? bad.join(', ') : `5 pieces flush, worst gap ${worst.toFixed(3)} m`,
+      `gap <= ${FLUSH_TOL} m and the nightstands flank the headboard`,
+      bad.length === 0,
+      'issue #48: the headboard is flat on the west wall, not near it',
     );
   }
 }

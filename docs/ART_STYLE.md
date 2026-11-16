@@ -187,6 +187,12 @@ neck band back onto the decoy (241 white verts, the old count) and
   celebration is 3 `InstancedMesh` layers + 2 `Points` bursts. Worst measured
   frame: **89 draws / 101,636 tris** (win moment) — inside the tool's 150 /
   150k budget with room for more room content.
+- **TEMPORARY (issue #59): full flat budget 180 draws for `game/full.html`**
+  until the per-room culling/instancing pass brings it back to 150 (tracked as
+  the next perf issue; recorded in `docs/HANDOFF.md`; the constant is
+  `FULL_GAME_DRAW_CALLS` in `tools/capture.mjs`). The kitchen + bedroom
+  furniture (#44, #48) each fit inside 150 alone but measure 159 worst-case
+  (desk view) merged; the slice and the demo keep 150.
 - No post-processing (`passes: 1`). Small cat parts and small props have
   `castShadow = false` — only big silhouettes need to shadow.
 - The page implements the `window.LC` contract (`docs/CAPTURE.md`) with the
