@@ -316,6 +316,9 @@ export function bootGame(cfg) {
     gate: document.getElementById('gate'),
     gateBtn: document.getElementById('gate-btn'),
     pause: document.getElementById('pause'),
+    // rotate card: the id keeps a `-hint` suffix (the design system's name),
+    // resolved tolerantly so a rename can never hand the engine `undefined`.
+    rotate: document.getElementById('rotate-hint') || document.getElementById('rotate'),
     hint: document.getElementById('hint'),
     // Optional Step 8 extras — present only on the full-game page:
     pauseRestart: document.getElementById('pause-restart'),
@@ -579,14 +582,19 @@ export function bootGame(cfg) {
   let splashOn = false; // the title card is up (gate shown, un-started)
 
   /** Show the title card again from the pause/win states. Play from here
-   *  starts a fresh run, so the card promises what it means. */
+   *  starts a fresh run, so the card promises what it means. The page is
+   *  driven back to exactly its pre-start shape — gate up, gateOpen false,
+   *  started false — so the ONE unlockGate path (audio + touch fullscreen +
+   *  startGame) answers the next click, and the loop (which by now runs)
+   *  sleeps at stepGame's !started guard: nothing moves under the card,
+   *  exactly like the frozen boot frame under the first one. */
   function backToMenu() {
-    if (!SPLASH_CFG || !started) return; // the gate was never left
+    if (!SPLASH_CFG || GATE_OFF || !started) return; // the gate was never left
     restartRun();
     input.unlock(); // the card wants the pointer back
     started = false; // next Play = startGame, a fresh run
-    el.pause.classList.remove('show');
-    gateOpen = true;
+    gateOpen = false; // next Play = unlockGate, the same first-time door
+    resumePlay(); // the pause is over: the menu is not a pause card wearing a hat
     el.gate.classList.remove('hidden');
     document.body.classList.add('splash');
     updateLabel();
@@ -851,6 +859,11 @@ export function bootGame(cfg) {
   let hintDone = !cfg.hintFade;
 
   function stepGame(dt) {
+    // The sim sleeps before the first Play — and again whenever the title
+    // card is back up (issue #57): the loop may already be running from a
+    // past run, but nothing moves or ticks under the card. (Every captured
+    // page boots with started already true, so this never fires there.)
+    if (!started) return;
     for (const action of input.consumeActions()) {
       // A "pause" out of src/input.js always means the same thing: the pointer
       // went away (Esc, a window blur, or the issue #29 switch that hands the
@@ -1448,6 +1461,68 @@ export function bootGame(cfg) {
       // (hidden,open) once unlocked — by ?gate=off OR by a real click; shown/locked before
       'click-to-begin before any sound; ?gate=off only for headless capture',
     );
+
+    // --- the title screen (issue #57) --------------------------------------------
+    // Only pages with cfg.splash have one (the full game); the slice has no title
+    // screen and gets none of these checks. They are state-aware because their
+    // callers arrive from both sides of the card: capture runs them with it
+    // fully absent, the stress run reads it after Play lifted it, and the
+    // mobile check watches it up. The card's contract: shown WITH its body
+    // class before the start, hidden without it after, and nowhere at all
+    // under ?gate=off — no class, no pixels, baselines untouched.
+    if (SPLASH_CFG) {
+      const splashClass = document.body.classList.contains('splash');
+      add(
+        'title-screen-state',
+        gateHidden ? (GATE_OFF ? 'absent' : 'hidden') : 'shown',
+        GATE_OFF ? 'absent (never offered)' : gateOpen ? 'hidden (Play lifted it)' : 'shown (card up)',
+        gateHidden ? (GATE_OFF ? !splashClass : !splashClass) : splashClass,
+        'the title card and its body class arrive and leave together; ?gate=off has neither',
+      );
+      const mark = el.gate.querySelector('svg.bobo');
+      const markOk =
+        Boolean(mark) &&
+        mark.getAttribute('role') === 'img' &&
+        mark.getAttribute('aria-label') === 'Look at Bobo' &&
+        mark.querySelector('title')?.textContent === 'Look at Bobo' &&
+        (gateHidden || mark.getBoundingClientRect().height > 0);
+      add('title-logo-name', mark ? `"${mark.getAttribute('aria-label') || ''}"` : 'no logo', 'named "Look at Bobo"', markOk, 'inline SVG in the page: role, aria-label and <title> agree');
+      const boxes = [];
+      for (const [name, sel] of [
+        ['mark', 'svg.bobo'],
+        ['word', '#title-word'],
+        ['tagline', '.title-tagline'],
+        ['hint', '.title-hint'],
+        ['start', '#gate-btn'],
+        ['row', '.title-row'],
+        ['panel', '#gate-howto-panel'],
+        ['note', '.gate-note'],
+        ['stamp', '#build-stamp'],
+      ]) {
+        const n = el.gate.querySelector(sel);
+        if (!n) continue;
+        const r = n.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) boxes.push({ name, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom });
+      }
+      let layoutMsg = 'n/a (card down)';
+      let layoutOk = true;
+      if (boxes.length) {
+        const bad = [];
+        const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+        for (let i = 0; i < boxes.length; i++)
+          for (let j = i + 1; j < boxes.length; j++) {
+            // Bobo peeking OVER the lettering is the logo, not a collision.
+            if ((boxes[i].name === 'mark' && boxes[j].name === 'word') || (boxes[i].name === 'word' && boxes[j].name === 'mark')) continue;
+            if (hit(boxes[i], boxes[j])) bad.push(`${boxes[i].name}×${boxes[j].name}`);
+          }
+        for (const b of boxes) {
+          if (b.y0 < -1 || b.y1 > window.innerHeight + 1 || b.x0 < -1 || b.x1 > window.innerWidth + 1) bad.push(`${b.name} off-screen`);
+        }
+        layoutOk = bad.length === 0;
+        layoutMsg = layoutOk ? `${boxes.length} boxes clean at ${window.innerWidth}×${window.innerHeight}` : bad.join(', ');
+      }
+      add('title-layout-clean', layoutMsg, 'no overlaps, nothing off-screen', layoutOk, 'logo, instructions and START lay out side by side at this viewport');
+    }
 
     // --- celebration staging ---------------------------------------------------
     const fireworks = ['find', 'catch', 'wrong', 'win'].map((p) => {
@@ -2262,6 +2337,9 @@ export function bootGame(cfg) {
   function boot() {
     if (GATE_OFF) {
       el.gate.classList.add('hidden');
+      // The title screen is FULLY absent here — element, class, everything —
+      // so nothing it styles can reach a capture pixel (issue #57).
+      document.body.classList.remove('splash');
       // Capture mode (?gate=off): the stamp chrome must never reach a frame, so
       // it is hidden by CSS as well as skipped by renderStamp().
       document.body.classList.add('capture');
@@ -2278,6 +2356,13 @@ export function bootGame(cfg) {
     applyTime(0);
     resize();
     renderer.render(scene, camera);
+    // issue #57: the title screen lives the whole time the gate is up — the
+    // loading card is on top of the canvas until announceReady, and a rAF
+    // started here would put a game frame between the loading card and the
+    // title card (a flash, and not a byte-identical ?gate=off boot). So the
+    // title screen does NOT run the loop: the page paints this one first-
+    // person frame under #gate, and the drifting view the card asks for is
+    // CSS-only (title.css). The loop starts with the game (LC.play).
     installContract();
     initTouchUI(); // issue #25: no-op on desktop
     wireInput();
