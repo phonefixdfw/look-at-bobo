@@ -12,6 +12,7 @@
  */
 import * as LEVEL from './full-level.js';
 import { livingGapReport } from './full-living.js';
+import { bathGapReport } from './full-bath.js';
 import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
@@ -275,6 +276,14 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'bookshelf',
       'floor-lamp',
       'cardboard-box',
+      // rows 52-59 (issue #49): the bathroom and the balcony. Same rule —
+      // a row nobody built fails the run. 'toilet', 'vanity', 'faucet',
+      // 'railing', 'side-table' and 'balcony-chair' already had rows; these
+      // four are new, and every one is tagged by full-bath-mesh.js.
+      'tub',
+      'bath-mirror',
+      'towel-bar',
+      'bath-mat',
     ];
     const boxes = new Map(); // row -> [[label, Box3]]
     const groups = new Map(); // group -> [label, Box3] to union
@@ -355,6 +364,23 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'row 58: ≥ 0.90 m on every route; the sofa→coffee gap is a reach, not a walkway',
       short.length === 0,
       'issue #46: the gaps between real furniture, measured between the footprints',
+    );
+  }
+
+  /* Issue #49 — row 58 through the last two rooms: the bathroom's band and
+   * the balcony's slider field, measured the same way, off the FOOT rects
+   * the pieces and their colliders are both drawn from. The bathroom is the
+   * room that gave row 58 its 0.60 exception (in front of the tub and the
+   * toilet), so the exception is the number this check prints. */
+  {
+    const rows = bathGapReport();
+    const short = rows.filter((r) => r.min != null && !(r.m >= r.min));
+    add(
+      'bath-balcony-walkways',
+      short.length ? short.map((r) => `${r.name} ${r.m.toFixed(2)} < ${r.min}`).join(', ') : rows.map((r) => `${r.name} ${r.m.toFixed(2)} m`).join(' · '),
+      'row 58: 0.90 m on the routes, 0.60 tolerated only in front of the tub and the toilet',
+      short.length === 0,
+      'issue #49: the last two rooms measured in the ruler\'s own units',
     );
   }
 }

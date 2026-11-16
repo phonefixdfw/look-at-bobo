@@ -22,6 +22,7 @@
 import { MOVE } from './level.js';
 import { KITCHEN_COLLIDERS } from './full-kitchen.js';
 import { LIVING_COLLIDERS } from './full-living.js';
+import { BATH_COLLIDERS, BALCONY_COLLIDERS } from './full-bath.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
  *  so yaw = atan2(−dx, −dz) means "look towards (dx, dz)", and 0 looks north
@@ -101,9 +102,11 @@ export const COLLIDERS = [
   { id: 'hall-console', x0: 0.58, z0: 4.0, x1: 0.9, z1: 4.6 },
   { id: 'coat-bench', x0: 1.95, z0: 2.6, x1: 2.4, z1: 3.4 },
   // ── bathroom (door-less, so neither pad may cross the cased opening — that
-  //    is issue #27's trap wearing a new costume) ──
-  { id: 'vanity', x0: -3.1, z0: 2.22, x1: -2.2, z1: 2.7 },
-  { id: 'toilet', x0: -1.7, z0: 3.45, x1: -1.02, z1: 3.83 },
+  //    is issue #27's trap wearing a new costume). Issue #49: the vanity, the
+  //    toilet, the tub and the bin are drawn pieces now — BATH_COLLIDERS is
+  //    spliced in, so the push boxes ARE the footprints in
+  //    game/full-bath.js, and none of them touches the opening's jambs. ──
+  ...BATH_COLLIDERS,
   // ── bedroom: a queen with the headboard flush to the east wall (a floating
   //    headboard with a 0.60 m gap behind it is a playset tell), a desk on the
   //    north wall, a wardrobe on the west, the basket in the south-east corner.
@@ -116,10 +119,12 @@ export const COLLIDERS = [
   { id: 'laundry-basket', x0: 0.62, z0: 8.8, x1: 1.02, z1: 9.2 },
   { id: 'bedroom-plant', x0: -2.6, z0: 8.85, x1: -2.1, z1: 9.32 },
   // ── balcony: the railing (its pad keeps a body a whole radius off the rail)
-  //    and the chair and plant that make it a place instead of a ledge ──
+  //    and the chair and plant that make it a place instead of a ledge.
+  //    Issue #49: the railing pad stays exactly as it was — the shell's, the
+  //    safe one; the chair and plant are drawn pieces now and a bistro table
+  //    joins them, all three spliced from game/full-bath.js. ──
   { id: 'balcony-railing', x0: 0.55, z0: -4.4, x1: 2.45, z1: -4.28 },
-  { id: 'balcony-chair', x0: 1.9, z0: -3.9, x1: 2.45, z1: -3.3 },
-  { id: 'balcony-plant', x0: 0.63, z0: -4.28, x1: 0.9, z1: -4.0 },
+  ...BALCONY_COLLIDERS,
 ];
 
 /** The ten moment TYPES — docs/STORY.md's generic list, invented-generic only:
@@ -342,7 +347,7 @@ export const SPAWNS = [
   { room: 'hall', pos: [-0.37, 4.43], yaw: 0.1 },
   { room: 'hall', pos: [0.33, 3.03], yaw: 3.0 },
   { room: 'entry', pos: [1.53, 3.73], yaw: 1.5 },
-  { room: 'bathroom', pos: [-2.37, 3.33], yaw: -2.2 },
+  { room: 'bathroom', pos: [-1.27, 2.83], yaw: -2.2 }, // the east band (issue #49: the tub took the old corner)
   { room: 'bedroom', pos: [-1.37, 6.63], yaw: 1.6 },
   { room: 'bedroom', pos: [-1.17, 8.73], yaw: -1.2 },
 ];
@@ -483,6 +488,12 @@ export const SCALE_RANGES = {
   'laundry-basket': { w: [0.36, 0.46], d: [0.36, 0.46], h: [0.5, 0.62], note: 'basket 0.40 × 0.40 × 0.55' },
   vanity: { w: [0.85, 0.95], d: [0.45, 0.55], h: [0.8, 0.9], note: 'vanity 0.90 × 0.50 × 0.85' },
   toilet: { w: [0.35, 0.42], d: [0.62, 0.72], h: [0.36, 0.45], note: 'toilet 0.38 × 0.68 × 0.40' },
+  // rows 54-57 (issue #49): the tub, the mirror, the bar and the mat, drawn
+  // by game/full-bath-mesh.js and measured back off the built boxes
+  tub: { w: [1.5, 1.8], d: [0.7, 0.8], h: [0.5, 0.62], note: 'row 56: 1.60 × 0.75, rim 0.55' },
+  'bath-mirror': { w: [0.6, 0.8], h: [0.8, 1.0], note: 'row 54: 0.70 × 0.90, bottom 1.10' },
+  'towel-bar': { w: [0.5, 0.7], h: [0.03, 0.1], note: 'row 55: 0.60 long, axis 1.15' },
+  'bath-mat': { w: [0.8, 1.0], d: [0.45, 0.7], h: [0.005, 0.05], note: 'row 57: 0.90 × 0.45 pile' },
   'balcony-chair': { w: [0.5, 0.62], d: [0.55, 0.65], h: [0.75, 0.95], note: 'balcony chair 0.57 × 0.60 × 0.85' },
   'coat-bench': { w: [0.75, 0.85], d: [0.4, 0.5], h: [0.4, 0.5], note: 'hall bench 0.80 × 0.45 × 0.45' },
   'console-table': { w: [0.55, 0.65], d: [0.3, 0.36], h: [0.72, 0.8], note: 'hall console 0.60 × 0.32 × 0.76' },
