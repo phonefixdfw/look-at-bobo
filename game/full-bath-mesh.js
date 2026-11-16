@@ -43,7 +43,13 @@ function bathMaterials() {
   return {
     porcelain: surface(0xf1efe9, { uvTile: 0.45, roughness: 0.16, metalness: 0.04 }), // toilet, tub, and every white-enamel fitting
     marble: surface(0xe9e6de, { uvTile: 0.35, roughness: 0.22, metalness: 0.05 }), // the one stone vanity
-    chrome: surface(0xcbd1d6, { uvTile: 0.2, roughness: 0.2, metalness: 0.85 }), // the mirror: frame and glass
+    chrome: surface(0xb9c6cd, {
+      uvTile: 0.2,
+      roughness: 0.12,
+      metalness: 0.0,
+      emissive: new THREE.Color(0x6f8792), // a looking-glass sheen: with no env map to reflect, a real metal renders black (the red-debug pass proved it) — this reads as silvered glass from any angle, the same honesty the frost pane and TV glow keep
+      emissiveIntensity: 0.35,
+    }), // the mirror: frame and glass
     mat: fabric(0x7fa09d), // the bath mat: seafoam loop pile
     towel: fabric(0xbcd6d9), // duck-egg blue, the flat's calm accent — wrapped bar and draped towel
     curtain: fabric(0xece9e0), // off-white cloth, DoubleSide below
