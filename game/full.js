@@ -261,6 +261,17 @@ function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, co
       'hood',
       'fridge',
       'dishwasher',
+      // ...and the small pieces of issue #44 (ruler rows 23-33): every one of
+      // them must be present and measured, bar and stools included.
+      'microwave',
+      'kettle',
+      'toaster',
+      'coffee-maker',
+      'dish-rack',
+      'trash-bin',
+      'bar-height',
+      'bar-stool',
+      'rug-runner',
     ];
     const boxes = new Map(); // row -> [[label, Box3]]
     const groups = new Map(); // group -> [label, Box3] to union
