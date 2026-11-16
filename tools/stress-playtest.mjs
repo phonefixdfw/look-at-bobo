@@ -648,15 +648,18 @@ try {
   check('a live boot draws a random run seed, not the old fixed 11', a.live === true && a.source === 'live random' && INT(a.seed), `seed ${a.seed} (${a.source})`);
   check('two live boots are two different runs', a.seed !== b.seed && INT(b.seed), `${a.seed} vs ${b.seed}`);
 
-  // START, then a restart: both are NEW runs, so both draw again.
+  // START and a restart are both NEW runs, so both draw again. (The boot seed
+  // is what a page holds before the first run exists; pressing START starts
+  // one, and that is a new run like any other.)
   await liveA.locator('#gate-btn').click(); // the real trusted gesture
   await liveA.waitForFunction(() => window.LC.gateUnlocked() && window.LC.state().playing, null, { timeout: 5000 });
   const startedSeed = await liveA.evaluate(() => window.LC.state().seed);
+  check('START begins a run, so it draws a seed of its own', startedSeed !== a.seed && INT(startedSeed), `boot ${a.seed} → START ${startedSeed}`);
   const after = await liveA.evaluate(() => {
     window.LC.restart(); // the pause card's restart / "play again" path
     return { seed: window.LC.state().seed, panel: document.getElementById('settings-build')?.textContent ?? '' };
   });
-  check('START kept the boot seed and a restart re-drew a fresh one', startedSeed === a.seed && after.seed !== startedSeed && INT(after.seed), `boot ${a.seed} → restart ${after.seed}`);
+  check('a restart re-draws a fresh seed — never the old run again', after.seed !== startedSeed && INT(after.seed), `START ${startedSeed} → restart ${after.seed}`);
   const panelHasSeed = after.panel === '' ? true : after.panel.includes(`seed ${after.seed}`);
   check('the gear panel line carries the run seed', panelHasSeed, after.panel || 'this page ships no gear panel (slice)');
   await liveA.close();
