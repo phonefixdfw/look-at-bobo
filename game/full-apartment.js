@@ -411,11 +411,19 @@ export function buildFullApartment(scene) {
   // the sky the flat has windows for: one plane per window outside its own
   // wall, and three big ones beyond the balcony's parapets (the VIEWS.balcony
   // camera looks east at the chair, so the "city" has to exist that way too).
+  //
+  // The two side planes are clipped to z <= -3.10, the flat's north exterior
+  // line. Their old 6 m and 7 m spans ran on south of that line, so they stood
+  // INSIDE the flat — the east one at x 3.10, which is the kitchen's west
+  // return's own door-front plane, and it is a DoubleSide sky sheet, so it
+  // painted the whole west run the colour of the sky. Out here they only exist
+  // where a balcony camera can actually see them: VIEWS.balcony sits at
+  // z -3.75 and looks due east and west, which is inside both spans.
   for (const s of [
     ...skyPlanes,
     { pos: [1.5, 2.2, -5.02], rotY: 0, w: 9, h: 6 }, // beyond the far parapet
-    { pos: [3.1, 2.2, -3.8], rotY: -Math.PI / 2, w: 7, h: 6 }, // east
-    { pos: [-0.2, 2.2, -3.8], rotY: Math.PI / 2, w: 6, h: 6 }, // west
+    { pos: [3.1, 2.2, -5.35], rotY: -Math.PI / 2, w: 4.5, h: 6 }, // east, z -7.6 .. -3.1
+    { pos: [-0.2, 2.2, -5.35], rotY: Math.PI / 2, w: 4.5, h: 6 }, // west, z -7.6 .. -3.1
   ]) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), sky);
     m.position.set(...s.pos);

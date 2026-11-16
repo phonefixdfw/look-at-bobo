@@ -466,7 +466,7 @@ export const SCALE_RANGES = {
   range: { w: [0.55, 0.68], d: [0.55, 0.68], top: [0.85, 0.95], note: 'row 19: 0.60 × 0.60, top flush with the worktop' },
   hood: { w: [0.5, 0.75], d: [0.5, 0.75], note: 'row 20: 0.60 wide × 0.50 deep over the range' },
   fridge: { w: [0.6, 0.85], h: [1.65, 1.95], note: 'row 21: 1.80 tall, 0.70 across' },
-  dishwasher: { w: [0.55, 0.65], d: [0.58, 0.66], top: [0.85, 0.92], note: 'row 22: 0.60 front under the counter' },
+  dishwasher: { w: [0.55, 0.65], d: [0.55, 0.66], top: [0.85, 0.92], note: 'row 22: 0.60 front under the counter' },
   'bar-height': { top: [1.0, 1.1], note: 'breakfast bar top 1.05' },
   'bar-stool': { w: [0.3, 0.4], d: [0.3, 0.4], h: [0.6, 0.7], note: 'stool 0.36 × 0.36 × 0.65' },
   'bed-queen': { w: [1.95, 2.1], d: [1.45, 1.65], note: 'queen 2.03 long × 1.53 wide' },

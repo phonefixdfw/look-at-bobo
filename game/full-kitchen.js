@@ -51,7 +51,7 @@ export const KIT = {
   // row 15: the uppers
   upD: 0.35, upH: 0.7, upBottom: 1.45,
   // row 16: a base cabinet door
-  doorH: 0.58, doorBottom: 0.14,
+  doorH: 0.629, doorBottom: 0.108, // 8 mm above the kick, 8 mm under the drawer
   // the carcass between the toe kick and the worktop, and the drawer line
   toeH: 0.1, toeIn: 0.06,
   drawerY0: 0.745, drawerY1: 0.855,
@@ -136,9 +136,9 @@ export const PIECES = [
   // around it, so both are four boxes rather than one. The full-depth boxes
   // carry row 12; the slabs beside the cut-out are still the same height and
   // thickness and carry those two rows.
-  piece('carcass-n-w', 'carcass', [2.52, BOWL.x0], CARCASS_Y, [-2.9, -2.32], ['counter-depth'], 'base cabinets, 0.60 deep'),
-  piece('carcass-n-e', 'carcass', [BOWL.x1, 4.92], CARCASS_Y, [-2.9, -2.32], null, 'the end filler: 0.52 wide, so it is not a depth sample'),
-  piece('carcass-n-base', 'carcass', [BOWL.x0, BOWL.x1], [KIT.toeH, 0.64], [-2.9, -2.32], null, 'the sink base, open-shelved'),
+  piece('carcass-n-w', 'carcass', [2.52, BOWL.x0], CARCASS_Y, [-2.9, -2.34], ['counter-depth'], 'base cabinets, 0.56 under a 0.60 worktop'),
+  piece('carcass-n-e', 'carcass', [BOWL.x1, 4.92], CARCASS_Y, [-2.9, -2.34], null, 'the end filler: 0.52 wide, so it is not a depth sample'),
+  piece('carcass-n-base', 'carcass', [BOWL.x0, BOWL.x1], [KIT.toeH, 0.64], [-2.9, -2.34], null, 'the sink base, open-shelved'),
   ...minusHole(2.52, 4.92, -2.9, -2.3, BOWL).map(([x0, x1, z0, z1], i) =>
     piece(`worktop-n${i}`, 'worktop', [x0, x1], WT_Y, [z0, z1], ['counter-height', 'worktop-thickness']),
   ),
@@ -146,11 +146,13 @@ export const PIECES = [
   // the counter stops at the jamb, so the tile runs 2.52 → 3.40.
   piece('splash-n', 'tile', [2.52, 3.4], SPLASH_Y, [-2.9, -2.88], ['backsplash'], 'tile up to 1.35'),
   // ── the west return (the pass-through wall: SUPPORT_DEFS counterTopW) ────
-  piece('carcass-w', 'carcass', [2.52, 3.1], CARCASS_Y, [-2.31, -1.05], ['counter-depth']),
+  // butts into the north run's front plane at z −2.34: 3 cm short of it left a
+  // pocket that read as a bright wedge of wall at the kitchen camera's angle.
+  piece('carcass-w', 'carcass', [2.52, 3.08], CARCASS_Y, [-2.34, -1.05], ['counter-depth']),
   piece('worktop-w', 'worktop', [2.52, 3.12], WT_Y, [-2.3, -1.05], WT_ROWS),
   piece('splash-w', 'tile', [2.52, 2.54], SPLASH_Y, [-2.3, -1.05], ['backsplash']),
   // ── the east run: the range in the break, then cabinets ──────────────────
-  piece('carcass-e', 'carcass', [4.94, 5.52], CARCASS_Y, [-0.75, 0.3], ['counter-depth']),
+  piece('carcass-e', 'carcass', [4.96, 5.52], CARCASS_Y, [-0.75, 0.3], ['counter-depth']),
   piece('worktop-e', 'worktop', [4.92, 5.52], WT_Y, [-0.75, 0.3], WT_ROWS),
   piece('splash-e', 'tile', [5.5, 5.52], SPLASH_Y, [-1.35, 0.3], ['backsplash']),
   // ── the uppers, on the three walls away from the window (row 15) ────────
@@ -164,7 +166,7 @@ export const PIECES = [
   piece('range', 'steel', [4.92, 5.52], [0, KIT.top], [-1.35, -0.75], ['range'], '0.60 × 0.60, 4 burners, knobs'),
   piece('hood', 'steel', [5.52 - KIT.hoodD, 5.52], [KIT.hoodY0, KIT.hoodY1], [-1.35, -0.75], ['hood'], 'over the range'),
   piece('fridge', 'enamel', [4.92, 5.52], [0, KIT.fridgeH], [-2.9, -2.2], ['fridge'], 'door seam + handle'),
-  piece('dishwasher', 'steel', [3.12, 3.72], [0, KIT.top - KIT.worktopT], [-2.9, -2.3], ['dishwasher'], 'front under the counter'),
+  piece('dishwasher', 'steel', [3.12, 3.72], [0, KIT.top - KIT.worktopT], [-2.9, -2.32], ['dishwasher'], 'its face in the door line'),
   // ── the sink and the faucet (rows 17, 18) ───────────────────────────────
   // The bowl is an inset box the mesh builder hollows (4 walls + a floor); the
   // measured piece is its outer rim-to-rim envelope, which is the row's number.
@@ -244,7 +246,7 @@ export const DETAILS = [
   ...[
     { id: 'toe-n', axis: 'x', x0: 2.52, x1: 4.92, z0: -2.9, z1: -2.9 + KIT.toeIn },
     { id: 'toe-w', axis: 'z', x0: 2.52, x1: 2.52 + KIT.toeIn, z0: -2.3, z1: -1.05 },
-    { id: 'toe-e', axis: 'z', x0: 4.92, x1: 4.92 + KIT.toeIn, z0: -1.35, z1: 0.3 },
+    { id: 'toe-e', axis: 'z', x0: 5.52 - KIT.toeIn, x1: 5.52, z0: -1.35, z1: 0.3 },
   ].map((t) => ({ id: t.id, mat: 'dark', x0: t.x0, y0: 0, z0: t.z0, x1: t.x1, y1: KIT.toeH, z1: t.z1 })),
   // the hood's duct up to the ceiling and the lip under its rim (dressing, not
   // the measured row 20 box, which is `hood` above)
@@ -274,25 +276,29 @@ export const DETAILS = [
  *  The doors, module by module. North run: a 0.60 corner unit, the dishwasher,
  *  a 0.70 sink base under the glass, a 0.50 end unit. West return: two 0.60s.
  *  East run: 1.05 of cabinets south of the range, two doors.
+ *
+ *  The fronts are 8 mm apart and 8 mm from the carcass ends — a real slab-door
+ *  reveal. Wider than that and the pale carcass behind them reads as a light
+ *  gap, which at the kitchen camera's grazing angle looked like missing doors.
  * -------------------------------------------------------------------------- */
-// north run (the room is +z from its front line at z −2.32)
-door('door-n-corner', 'x', 2.54, 3.1, -2.32, 1, 1);
-door('door-n-sink', 'x', 3.74, 4.4, -2.32, 1, 1);
-door('door-n-end', 'x', 4.44, 4.9, -2.32, 1, 1);
-// west return (the room is +x from its front line at x 3.10, flush with the
-// worktop's edge at 3.12 — the front is 2 cm proud of the 3.10 carcass)
-door('door-w-a', 'z', -2.28, -1.715, 3.1, 1, 1);
-door('door-w-b', 'z', -1.685, -1.12, 3.1, 1, -1);
-// east run (the room is −x from its front line at x 4.94)
-door('door-e-a', 'z', -0.73, -0.235, 4.94, -1, 1);
-door('door-e-b', 'z', -0.215, 0.28, 4.94, -1, -1);
+// north run (the room is +z from its front line at z −2.34)
+door('door-n-corner', 'x', 2.528, 3.112, -2.34, 1, 1);
+door('door-n-sink', 'x', 3.728, 4.436, -2.34, 1, 1);
+door('door-n-end', 'x', 4.444, 4.912, -2.34, 1, 1);
+// west return (the room is +x from its front line at x 3.08: the front's face
+// lands 2 cm behind the worktop's edge at 3.12 and 2 cm proud of the carcass)
+door('door-w-a', 'z', -2.312, -1.719, 3.08, 1, 1);
+door('door-w-b', 'z', -1.711, -1.058, 3.08, 1, -1);
+// east run (the room is −x from its front line at x 4.96)
+door('door-e-a', 'z', -0.742, -0.243, 4.96, -1, 1);
+door('door-e-b', 'z', -0.235, 0.292, 4.96, -1, -1);
 // the uppers, same rhythm 1.51 to 2.09 (row 15's bottom + 0.06)
-door('door-up-n-a', 'x', 2.54, 2.93, -2.55, 1, -1, true);
-door('door-up-n-b', 'x', 2.95, 3.34, -2.55, 1, 1, true);
-door('door-up-w-a', 'z', -2.28, -1.715, 2.87, 1, 1, true);
-door('door-up-w-b', 'z', -1.685, -1.12, 2.87, 1, -1, true);
-door('door-up-e-a', 'z', -0.73, -0.235, 5.17, -1, 1, true);
-door('door-up-e-b', 'z', -0.215, 0.28, 5.17, -1, -1, true);
+door('door-up-n-a', 'x', 2.528, 2.94, -2.55, 1, -1, true);
+door('door-up-n-b', 'x', 2.948, 3.352, -2.55, 1, 1, true);
+door('door-up-w-a', 'z', -2.292, -1.719, 2.87, 1, 1, true);
+door('door-up-w-b', 'z', -1.711, -1.058, 2.87, 1, -1, true);
+door('door-up-e-a', 'z', -0.742, -0.243, 5.17, -1, 1, true);
+door('door-up-e-b', 'z', -0.235, 0.292, 5.17, -1, -1, true);
 
 /* -------------------------------------------------------------------------- *
  *  COLLIDERS: the footprints game/full-level.js splices into its own list, so
