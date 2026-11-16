@@ -282,7 +282,9 @@ function hatDomeGeo(lowQ) {
     // the ear flaps keep a near-vertical wall; elsewhere the shell hugs
     const hug = headHoriz(phi, y, pad);
     const flap = earWindow(phi) * clamp((0.112 - y) / 0.015, 0, 1);
-    const R = lerp(hug, Math.max(hug, 0.0905), flap) * lumpy;
+    // the ear flaps keep a near-vertical wall (95.5 mm clears the widest ear
+    // rim vertex by well over 5 mm even at the bottom of the knit-lump range)
+    const R = lerp(hug, Math.max(hug, 0.0955), flap) * lumpy;
     pos.setXYZ(i, Math.sin(phi) * R, y - HAT_Y0, Math.cos(phi) * R - HAT_Z0);
     // shaggy brown: lighter toward the crown and the lit front
     const k = clamp((y - 0.03) / 0.11, 0, 1) * 0.55 + clamp(Math.cos(phi), 0, 1) * 0.25 + hash1(i * 3.7) * 0.2;
@@ -561,7 +563,7 @@ function addPatriotCostume(cat, opts = {}) {
     const matCape = std(0xffffff, { map: tex.cape, side: THREE.DoubleSide, roughness: 0.86 });
     const matStrap = std(PAT.strap, { side: THREE.DoubleSide, roughness: 0.72 });
     const matButton = std(TOKENS.furWhite, { map: tex.button, transparent: true, roughness: 0.35, polygonOffset: true, polygonOffsetFactor: -2 });
-    const matCheek = std(0xffffff, { map: tex.cheek, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -3 });
+    const matCheek = std(0xffffff, { map: tex.cheek, transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -3 });
     const matFlag = std(0xffffff, { map: tex.flag, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.86 });
     const matPole = std(PAT.wood, { roughness: 0.8 });
     const matHatFuzz = new THREE.MeshBasicMaterial({
@@ -584,8 +586,11 @@ function addPatriotCostume(cat, opts = {}) {
     pMesh(cheeksGeo(), matCheek, 'patriot-facepaint', headGroup, { cast: false });
 
     // --- body: tattered flag cape, crossed harness, the button
-    pMesh(capeGeo(lowQ), matCape, 'patriot-cape', group);
-    pMesh(harnessGeo(lowQ), matStrap, 'patriot-harness', group);
+    // issue #55: the costume is a prop, and props this small do not shadow
+    // (ART_STYLE.md §7). Keeping only the hat and horns as casters keeps the
+    // whole gag inside 12 draw calls: the shadow pass draws every caster again.
+    pMesh(capeGeo(lowQ), matCape, 'patriot-cape', group, { cast: false });
+    pMesh(harnessGeo(lowQ), matStrap, 'patriot-harness', group, { cast: false });
     const button = pMesh(new THREE.CircleGeometry(BUTTON_R, 24), matButton, 'patriot-button', group, { cast: false });
     button.position.set(BUTTON_AT[0], BUTTON_AT[1], BUTTON_AT[2]);
     button.rotation.x = -0.188; // the chest leans back; the button faces the viewer
@@ -598,6 +603,7 @@ function addPatriotCostume(cat, opts = {}) {
       matPole,
       'patriot-pole',
       group,
+      { cast: false },
     );
     pole.position.copy(base).add(tip).multiplyScalar(0.5);
     pole.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), FLAG_DIR);

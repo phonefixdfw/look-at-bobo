@@ -303,6 +303,10 @@ function selfTest() {
     checks.push({ name, value: round(value), limit, pass: Boolean(pass), note });
 
   scene.updateMatrixWorld(true);
+  // The Patriot costume (issue #55) comes off for the whole test: the boxes
+  // and scans below describe the cats, not the gag. Its own checks put it back
+  // on, and restoreAfterSelfTest leaves it exactly where the frame had it.
+  removePatriotCostume(bobo);
   const spec = HUD_SPEC[momentName];
 
   // --- the tells: is it Bobo? (docs/ART_STYLE.md §5, docs/DECOY_CAT.md) -----
@@ -470,7 +474,8 @@ function selfTest() {
   // The costume is optional: off every other moment, and the numbers below are
   // measured on a temporary visit to its moment (restoreAfterSelfTest detaches
   // it again), so they describe the costume whichever frame selfTest ran on.
-  removePatriotCostume(bobo); // "normal Bobo" for the whole rest of this block
+  // (the costume is already off since the top of selfTest; this proves the
+  // attach/detach switch itself never leaks)
   let patriotOnly = true;
   for (const id of MOMENTS) {
     applyMoment(id);
@@ -727,6 +732,12 @@ if (PLANT === 'dash') {
 
 function boot() {
   applyMoment(state.moment);
+  // Build the Patriot costume's meshes now, outside any measured() call (issue
+  // #55): allocating inside a measured setMoment would count three.js' UUID
+  // randomness against the frame. Later moment switches only re-attach this
+  // cache, and every non-costume moment detaches it again.
+  addPatriotCostume(bobo, { quality: QUALITY, calm: CALM });
+  removePatriotCostume(bobo);
   applyTime(0);
   applyView(state.view);
   updateLabel();
