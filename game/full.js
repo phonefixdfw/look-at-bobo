@@ -149,7 +149,7 @@ function batThePen(pen, supports, t) {
 
 /* ---- full-game checks the engine can't know on its own ----
  * Appended after the engine's own 42, so the full page reports 46. */
-function fullExtraChecks({ add, THREE, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes }) {
+function fullExtraChecks({ add, THREE, scene, supports, buildCat, setCatPose, contactGap, MOMENTS, DECOY_SPOTS, SPAWNS, wallBoxes }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every moment must be findable AND shoutable: measured paw contact on its
@@ -228,6 +228,104 @@ function fullExtraChecks({ add, THREE, supports, buildCat, setCatPose, contactGa
   const momentRooms = [...new Set(MOMENTS.map((m) => m.room))];
   const bare = momentRooms.filter((r) => !DECOY_SPOTS.some((d) => d.room === r));
   add('decoy-in-searchable-rooms', bare.length ? bare.join(', ') : 'all', 'a decoy spot per findable room', !bare.length, '"is that…?" is possible everywhere Bobo can be');
+
+  /* Issue #41 — `furniture-real-scale`: the ruler, measured back off the scene.
+   *
+   * Any mesh may carry a row of docs/ISSUE_33_REBUILD.md §1 in `userData.scale`
+   * (game/full-kitchen.js is the first thing that tags anything); a row nobody
+   * built is a failure too, which is what stops a 0.45 m sofa or a 3 m ceiling
+   * shipping again. Measurements come off the built world AABB, never off the
+   * numbers a builder was handed, in the convention game/full-level.js documents
+   * above SCALE_RANGES: w = the long horizontal extent, d the short one, t the
+   * thinner of the two, h the vertical extent, top/bottom the y it reaches. So a
+   * cabinet reads the same whichever way its wall runs, and a run of counters
+   * facing north measures its 0.60 depth as `d` without the checker knowing
+   * which axis is which.
+   *
+   * `userData.scaleGroup` is the one extra concession to how things are drawn:
+   * the faucet is a column and a spout, and row 18 is one object, so every mesh
+   * sharing a group is unioned and the GROUP is measured. */
+  {
+    const rows = LEVEL.SCALE_RANGES;
+    const REQUIRED = [
+      'counter-height',
+      'counter-depth',
+      'worktop-thickness',
+      'backsplash',
+      'upper-cabinet',
+      'upper-mounted',
+      'cab-door',
+      'sink',
+      'faucet',
+      'range',
+      'hood',
+      'fridge',
+      'dishwasher',
+    ];
+    const boxes = new Map(); // row -> [[label, Box3]]
+    const groups = new Map(); // group -> [label, Box3] to union
+    const claim = (row, label, b) => {
+      if (!boxes.has(row)) boxes.set(row, []);
+      boxes.get(row).push([label, b]);
+    };
+    const seen = new Set();
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.visible) return;
+      const g = o.userData?.scaleGroup;
+      const tag = o.userData?.scale;
+      if (!g && !tag) return;
+      o.updateWorldMatrix(true, false);
+      const b = new THREE.Box3().setFromObject(o);
+      if (b.isEmpty()) return;
+      if (g) {
+        seen.add(g);
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g).push([o.name || g, b]);
+        return;
+      }
+      for (const t of Array.isArray(tag) ? tag : [tag]) claim(typeof t === 'string' ? t : t.key, o.name || 'untitled', b);
+    });
+    for (const [g, parts] of groups) {
+      const u = parts.reduce((acc, [, b]) => acc.union(b), parts[0][1].clone());
+      claim(g, parts.map(([n]) => n).join('+'), u);
+    }
+    const bad = [];
+    let n = 0;
+    for (const [row, hits] of boxes) {
+      const spec = rows[row];
+      if (!spec) {
+        bad.push(`${row}: tagged by ${hits.length} mesh(es) but not in SCALE_RANGES`);
+        continue;
+      }
+      for (const [label, b] of hits) {
+        const dx = b.max.x - b.min.x;
+        const dz = b.max.z - b.min.z;
+        const got = {
+          w: Math.max(dx, dz),
+          d: Math.min(dx, dz),
+          t: Math.min(dx, dz),
+          h: b.max.y - b.min.y,
+          top: b.max.y,
+          bottom: b.min.y,
+        };
+        for (const key of Object.keys(spec)) {
+          if (key === 'note') continue;
+          const [lo, hi] = spec[key];
+          const v = got[key];
+          if (!(v >= lo && v <= hi)) bad.push(`${label} ${row}.${key} ${v.toFixed(3)} outside ${lo}…${hi}`);
+        }
+        n++;
+      }
+    }
+    for (const row of REQUIRED) if (!boxes.has(row)) bad.push(`${row}: nothing in the scene carries it`);
+    add(
+      'furniture-real-scale',
+      bad.length ? bad.join(', ') : `${n} boxes across ${boxes.size} ruler rows`,
+      `every tagged box inside docs/ISSUE_33_REBUILD.md §1 (+${REQUIRED.length} rows required)`,
+      bad.length === 0,
+      'issue #41: the kitchen measures what the ruler says, not what it was handed',
+    );
+  }
 }
 
 bootGame({
