@@ -24,6 +24,9 @@
 //      decoy, and a shout at nothing nudges instead of saying nothing at all
 //  13  Patriot Bobo (issue #58): the off switch, the forced +3 find, and a
 //      live run that matches LC.patriotPlan and replays it after restart
+//  14  the live run seed (issue #66): a live boot is random-seeded, two boots
+//      are two runs, a restart re-draws, the seed is readable on the gear
+//      panel and the ?stamp=on line, ?seed=N replays, ?gate=off is seed 11
 //
 // Free and local: starts its own static server, uses the installed Chrome.
 //
@@ -55,6 +58,7 @@ const PAGE = arg('page', 'game/slice.html');
 // issue #59: merging the bedroom (#48, +1) and bathroom/balcony (#49, +1) rows onto the spot-pool base: 55 + 2 → 57.
 // issue #62: bath/balcony + bedroom rows onto merged main (kitchen #45 + Patriot #58): 65 + 2 → 67.
 // issue #65: full gained doors-read-open + wood-texture-clean + doorways-read-open (67 → 70); slice stays 46.
+// issue #66: full gained the five run-seed checks — 500-run spot coverage, 500-run Patriot coverage, the seed source, the fresh picker, seed-fixed-inside-gameplay (70 → 75). They live in the spot-pool block, so the slice stays 46.
 const CHECKS = Number(arg("checks", 46));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
@@ -618,6 +622,82 @@ try {
   }
 } catch (err) {
   check('patriot-bobo-run', false, String(err).split('\n')[0]);
+}
+
+// ---------------------------------------------------------------------------
+// 14. The live run seed (issue #66). Brandon played ~20 rounds and saw the same
+//     run every time — the same spots, no Patriot Bobo, never the balcony —
+//     because every live boot took the fixed default seed 11. Here: a live boot
+//     is random, two boots are two different runs, START/restart re-draw, the
+//     seed is readable where a player can quote it (gear panel, ?stamp=on),
+//     ?seed=N still replays a run exactly, and ?gate=off is still seed 11 with
+//     none of it reaching a frame. Only the cycle comparison needs a pool, so
+//     the slice runs every check here too.
+// ---------------------------------------------------------------------------
+try {
+  const INT = (s) => Number.isInteger(s) && s >= 1 && s <= 2 ** 31 - 1; // plain, readable, quotable
+
+  const liveA = await newPage('');
+  const a = await liveA.evaluate(() => ({
+    ...window.LC.runSeed(),
+    panel: document.getElementById('settings-build')?.textContent ?? null,
+    corner: document.getElementById('build-corner')?.textContent ?? null,
+  }));
+  const liveB = await newPage('');
+  const b = await liveB.evaluate(() => window.LC.runSeed());
+  check('a live boot draws a random run seed, not the old fixed 11', a.live === true && a.source === 'live random' && INT(a.seed), `seed ${a.seed} (${a.source})`);
+  check('two live boots are two different runs', a.seed !== b.seed && INT(b.seed), `${a.seed} vs ${b.seed}`);
+
+  // START, then a restart: both are NEW runs, so both draw again.
+  await liveA.locator('#gate-btn').click(); // the real trusted gesture
+  await liveA.waitForFunction(() => window.LC.gateUnlocked() && window.LC.state().playing, null, { timeout: 5000 });
+  const startedSeed = await liveA.evaluate(() => window.LC.state().seed);
+  const after = await liveA.evaluate(() => {
+    window.LC.restart(); // the pause card's restart / "play again" path
+    return { seed: window.LC.state().seed, panel: document.getElementById('settings-build')?.textContent ?? '' };
+  });
+  check('START kept the boot seed and a restart re-drew a fresh one', startedSeed === a.seed && after.seed !== startedSeed && INT(after.seed), `boot ${a.seed} → restart ${after.seed}`);
+  const panelHasSeed = after.panel === '' ? true : after.panel.includes(`seed ${after.seed}`);
+  check('the gear panel line carries the run seed', panelHasSeed, after.panel || 'this page ships no gear panel (slice)');
+  await liveA.close();
+  await liveB.close();
+
+  const dbg = await newPage('?stamp=on');
+  const d = await dbg.evaluate(() => ({ seed: window.LC.state().seed, corner: document.getElementById('build-corner')?.textContent ?? '' }));
+  check('?stamp=on puts the seed on the debug line', d.corner.includes(`seed ${d.seed}`) && INT(d.seed), d.corner || 'no corner element');
+  await dbg.close();
+
+  const pinA = await newPage('?seed=4242');
+  const pinB = await newPage('?seed=4242');
+  const pinOf = (p) => p.evaluate(() => ({
+    seed: window.LC.state().seed,
+    src: window.LC.runSeed().source,
+    live: window.LC.runSeed().live,
+    cycle: window.LC.spotCycle ? window.LC.spotCycle() : [],
+    plan: window.LC.patriotPlan ? window.LC.patriotPlan(4242, window.LC.moments.length) : [],
+  }));
+  const pa = await pinOf(pinA);
+  const pb = await pinOf(pinB);
+  check(
+    '?seed=N pins the run: two boots, the same ten spots and the same Patriot plan',
+    pa.seed === 4242 && pa.src === 'url ?seed=' && pa.live === false && JSON.stringify(pa.cycle) === JSON.stringify(pb.cycle) && JSON.stringify(pa.plan) === JSON.stringify(pb.plan),
+    pa.cycle.length ? `${pa.cycle.join(' > ')} · plan ${pa.plan.map((x) => (x ? 1 : 0)).join('')}` : 'no spot pool on this page (slice): the pin still holds the seed',
+  );
+  await pinA.close();
+  await pinB.close();
+
+  const cap = await newPage('?gate=off');
+  const c = await cap.evaluate(() => ({
+    ...window.LC.runSeed(),
+    panel: document.getElementById('settings-build')?.textContent ?? '',
+    card: document.getElementById('build-stamp')?.textContent ?? '',
+    corner: document.getElementById('build-corner')?.textContent ?? null,
+  }));
+  check('?gate=off still plays the default seed 11 (every baseline holds)', c.seed === 11 && c.live === false && c.source === 'capture default', `seed ${c.seed} (${c.source})`);
+  check('?gate=off keeps the seed out of the frame', c.panel === '' && c.card === '' && c.corner === null, JSON.stringify({ panel: c.panel, card: c.card, corner: c.corner }));
+  await cap.close();
+} catch (err) {
+  check('live-run-seed', false, String(err).split('\n')[0]);
 }
 
 // ---------------------------------------------------------------------------

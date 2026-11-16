@@ -41,7 +41,7 @@ import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
-import { resolveRunSeed, randomRunSeed, parseSeedParam, DEFAULT_SEED, SEED_MAX } from '../src/run-seed.js';
+import { resolveRunSeed, randomRunSeed, parseSeedParam, DEFAULT_SEED, SEED_MAX, SEED_SOURCE as SEED_SOURCES } from '../src/run-seed.js';
 
 /**
  * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
@@ -1460,10 +1460,10 @@ export function bootGame(cfg) {
       const seedShapeOk = Number.isInteger(SEED) && SEED >= 1 && SEED <= SEED_MAX;
       const seedRuleOk =
         pinnedSeed !== null
-          ? SEED === pinnedSeed && SEED_SOURCE === SEED_SOURCE.url
+          ? SEED === pinnedSeed && SEED_SOURCE === SEED_SOURCES.url
           : GATE_OFF
-            ? SEED === DEFAULT_SEED && SEED_SOURCE === SEED_SOURCE.capture && !LIVE_SEED
-            : SEED_SOURCE === SEED_SOURCE.live && LIVE_SEED;
+            ? SEED === DEFAULT_SEED && SEED_SOURCE === SEED_SOURCES.capture && !LIVE_SEED
+            : SEED_SOURCE === SEED_SOURCES.live && LIVE_SEED;
       add(
         'run-seed-source',
         `${SEED} from ${SEED_SOURCE}`,
