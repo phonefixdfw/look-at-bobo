@@ -4,6 +4,13 @@
 //   node tools/draw-report.mjs [--page game/full.html] [--views desk,overview]
 //                              [--moments win,couch-loaf] [--time 1.2]
 //                              [--param k=v] [--json file.json]
+//   node tools/draw-report.mjs --inventory
+//   node tools/draw-report.mjs --pixels --param merge=off --param2 merge=on
+//
+// `--inventory` asks the merge rules in game/full-merge.js which static meshes
+// could still fold and which are held by a check, before anything is folded.
+// `--pixels` renders every frame under both parameter sets and compares the
+// PNGs byte for byte, which is how a draw-call change proves it moved nothing.
 //
 // capture.mjs says HOW MANY draws a frame costs; this says WHICH objects they
 // were. It boots a page exactly like the capture tool does, instruments Three's
@@ -29,7 +36,7 @@ import { startStaticServer } from './serve.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  const opts = { page: 'game/full.html', views: null, moments: null, time: 1.2, params: [], json: null };
+  const opts = { page: 'game/full.html', views: null, moments: null, time: 1.2, params: [], params2: [], pixels: false, json: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const take = () => argv[++i];
@@ -40,6 +47,8 @@ function parseArgs(argv) {
       case '--time':
       case '--times': opts.time = Number(take()); break;
       case '--param': opts.params.push(take()); break;
+      case '--param2': opts.params2.push(take()); break;
+      case '--pixels': opts.pixels = true; break;
       case '--json': opts.json = take(); break;
       case '--inventory': opts.inventory = true; break;
       default:
@@ -230,6 +239,62 @@ const views = !opts.views || opts.views.includes('all') ? contract.views : opts.
 const moments = !opts.moments
   ? [contract.moments[0] ?? null]
   : opts.moments.includes('all') ? contract.moments : opts.moments;
+
+// A change that only moves draw calls must move no pixels. This mode renders
+// every frame twice, once per parameter set, and compares the PNGs byte for
+// byte: byte-identical is the strongest statement available that two builds of
+// the page look the same. `--param` is the first set, `--param2` the second.
+// The A-vs-A control proves the harness itself is deterministic, so a
+// difference reported below is the change and not the machine.
+if (opts.pixels) {
+  if (!opts.params2.length) {
+    console.error('--pixels needs --param2: the second parameter set to compare against');
+    process.exit(2);
+  }
+  const frames = moments.flatMap((moment) => views.map((view) => ({ moment, view })));
+  const shoot = async (params) => {
+    const pg = await context.newPage();
+    pg.on('pageerror', (e) => console.error('pageerror:', String(e).split('\n')[0]));
+    const q = params.length
+      ? `?${new URLSearchParams(params.map((p) => { const i = p.indexOf('='); return i === -1 ? [p, ''] : [p.slice(0, i), p.slice(i + 1)]; })).toString()}`
+      : '';
+    await pg.goto(server.url + opts.page + q, { waitUntil: 'load', timeout: 120_000 });
+    await pg.waitForFunction(() => window.LCError || (window.LC && window.LC.ready === true), null, { timeout: 120_000 });
+    const out = [];
+    for (const m of moments) {
+      for (const v of views) {
+        await pg.evaluate(async ([mm, t, vv]) => {
+          window.LC.pause?.();
+          if (mm !== null) window.LC.setMoment(mm);
+          window.LC.seek?.(t);
+          window.LC.setView(vv);
+          window.LC.renderNow();
+        }, [m, opts.time, v]);
+        out.push(await pg.screenshot({ type: 'png' }));
+      }
+    }
+    await pg.close();
+    return out;
+  };
+  const a = await shoot(opts.params);
+  const again = await shoot(opts.params);
+  const drift = a.filter((s, k) => !s.equals(again[k])).length;
+  console.log(`control: ${a.length - drift}/${a.length} frames shot twice in one page are byte-identical`);
+  if (drift) console.log(`  ${drift} frames the page did not repeat for itself — read the rest with that in mind`);
+  const b = await shoot(opts.params2 ?? []);
+  let same = 0;
+  const moved = [];
+  a.forEach((png, i) => {
+    const { moment, view } = frames[i];
+    if (png.equals(b[i])) same++;
+    else moved.push(`${moment ?? 'none'}/${view} (${png.length} vs ${b[i].length} bytes)`);
+  });
+  console.log(`\npixels: ${same}/${a.length} frames byte-identical${b[0] ? '' : ' (empty B set?)'}`);
+  for (const m of moved) console.log(`  moved: ${m}`);
+  await browser.close();
+  await server.close?.();
+  process.exit(moved.length ? 1 : 0);
+}
 
 const results = [];
 for (const moment of moments) {
