@@ -126,9 +126,9 @@ export const PIECES = [
     [7.085, 8.645], ['mattress-height'],
     'the coverlet over it — its top is the plan\'s `bedTop` plane at 0.50'),
   piece('bed-pillow-n', 'pillow', [FACES.w + 0.16, FACES.w + 0.54], [0.50, 0.60], [7.18, 7.72],
-    null, 'a pillow at the head of the bed, north half', 'bed-pillows'),
+    null, 'a pillow at the head of the bed, north half'),
   piece('bed-pillow-s', 'pillow', [FACES.w + 0.16, FACES.w + 0.54], [0.50, 0.60], [7.99, 8.53],
-    null, 'and its twin, south half', 'bed-pillows'),
+    null, 'and its twin, south half'),
   piece('blanket-folded', 'blanket', [-0.91, -0.61], [0.50, 0.58], [7.14, 8.59],
     ['folded-blanket'],
     'row 44: folded across the foot of the bed — its top is `blanketTop` at 0.58'),
@@ -136,12 +136,10 @@ export const PIECES = [
   // ---- nightstands flush west, one either side of the headboard ----------
   piece('nightstand-north', 'woodPale', [nbNorth.x0, nbNorth.x1], [0, 0.55],
     [nbNorth.z0, nbNorth.z1], ['nightstand'],
-    'rows 48+51: 0.50 x 0.45 m, top 0.55, flush west north of the headboard',
-    'nightstand-north'),
+    'rows 48+51: 0.50 x 0.45 m, top 0.55, flush west north of the headboard'),
   piece('nightstand-south', 'woodPale', [nbSouth.x0, nbSouth.x1], [0, 0.55],
     [nbSouth.z0, nbSouth.z1], ['nightstand'],
-    'rows 48+51: the matching one south of the headboard, flush west',
-    'nightstand-south'),
+    'rows 48+51: the matching one south of the headboard, flush west'),
 
   // ---- the desk on the north wall: existing footprint, kept verbatim -----
   piece('desk-top', 'woodPale', [-2.55, -1.15], [0.71, 0.75], [5.32, 6.02], ['desk'],
@@ -149,7 +147,7 @@ export const PIECES = [
   piece('desk-legs', 'wood', [-2.51, -1.19], [0, 0.71], [5.36, 5.98], null,
     'the panel legs under the top', 'desk'),
   piece('keyboard', 'applianceDark', [-2.07, -1.63], [0.76, 0.79], [5.755, 5.885], ['keyboard'],
-    'row 46: 0.44 x 0.13 x 0.03 m, top y 0.79 — the `kbTop` height unchanged', 'keyboard'),
+    'row 46: 0.44 x 0.13 x 0.03 m, top y 0.79 — the `kbTop` height unchanged'),
   piece('monitor-foot', 'applianceDark', [-2.02, -1.68], [0.75, 0.77], [5.36, 5.52], null,
     'row 47: the monitor foot on the desk', 'monitor'),
   piece('monitor-post', 'applianceDark', [-1.89, -1.81], [0.77, 1.03], [5.41, 5.47], null,
@@ -164,31 +162,35 @@ export const PIECES = [
   piece('chair-seat', 'seatFabric', [-2.20, -1.76], [0.41, 0.45], [6.08, 6.50], ['desk-chair'],
     'the seat, top y 0.45', 'desk-chair'),
   piece('chair-cushion', 'cushion', [-2.18, -1.78], [0.45, 0.47], [6.10, 6.48], ['seat-height'],
-    'a fabric cushion on the seat', 'desk-chair'),
+    'a fabric cushion on the seat'),
   piece('chair-back', 'seatFabric', [-2.20, -1.76], [0.45, 0.90], [6.45, 6.50], ['desk-chair-back'],
-    'its back to y 0.90', 'desk-chair'),
+    'its back to y 0.90'),
 
   // ---- the east wall: dresser north of the walkway, wardrobe south -------
   piece('dresser', 'wood', [FACES.e - 0.46, FACES.e], [0, 0.78], [5.40, 6.62], ['dresser'],
-    'the dresser: 1.22 m tall x 0.46 deep, flush east north of the walkway',
-    'dresser'),
+    'the dresser: 1.22 m tall x 0.46 deep, flush east north of the walkway'),
   piece('wardrobe', 'wood', [FACES.e - 0.60, FACES.e], [0, 2.10], [7.05, 8.20], ['wardrobe'],
     'the wardrobe: 1.15 m along the wall, 2.10 tall, flush east', 'wardrobe'),
 
   // ---- laundry: the basket spilling over, south-east of the bed ----------
   piece('laundry-basket', 'fabricBasket', [0.62, 1.02], [0, 0.37], [8.85, 9.15],
-    ['laundry-basket'], 'row 50: 0.40 x 0.30 m, rim at 0.37', 'laundry-basket'),
-  piece('laundry-pile', 'fabricPile', [0.69, 0.95], [0.40, 0.55], [8.895, 9.105],
-    ['laundry-pile'], 'row 51: the pile, ~0.18 above the rim — its top is `laundryTop`',
-    'laundry-pile'),
+    ['laundry-basket'], 'row 50: 0.40 x 0.30 m, rim at 0.37'),
+  piece('laundry-pile', 'fabricPile', [0.69, 0.95], [0.20, 0.55], [8.895, 9.105],
+    ['laundry-pile'], 'row 51: the pile, ~0.18 above the rim — its top is `laundryTop`'),
+
+  // ---- the plant, in the south-east corner by the door --------------------
+  piece('plant-pot', 'pot', [0.08, 0.40], [0, 0.32], [8.86, 9.18], ['plant-pot'],
+    'the pot: 0.32 m across, 0.32 m tall'),
+  piece('plant-leaf', 'leaf', [0.03, 0.45], [0.30, 1.00], [8.81, 9.23], ['plant-leaf'],
+    'and its leaves, a cone to y 1.00'),
 
   // ---- soft goods: rug and curtains ---------------------------------------
   piece('bedroom-rug', 'rug', [-0.40, 0.56], [0, 0.012], [6.20, 8.45], null,
-    'the rug on the mid-floor walkway', 'rug'),
+    'the rug on the mid-floor walkway'),
   piece('curtain-west', 'curtain', [-1.95, -1.67], [0.85, 2.15], [9.18, 9.24], null,
-    'the south window\'s west curtain', 'curtains'),
+    'the south window\'s west curtain'),
   piece('curtain-east', 'curtain', [-0.48, -0.20], [0.85, 2.15], [9.18, 9.24], null,
-    'and its east curtain', 'curtains'),
+    'and its east curtain'),
 ];
 
 /**
@@ -197,6 +199,10 @@ export const PIECES = [
  * doors, and the curtain rod. Colliders ignore them, so a pull sticking a
  * centimetre proud of its piece cannot narrow a walkway.
  */
+PIECES.find((p) => p.id === 'laundry-basket').hollow = 0.05;
+PIECES.find((p) => p.id === 'plant-pot').shape = 'cyl';
+PIECES.find((p) => p.id === 'plant-leaf').shape = 'cone';
+
 export const DETAILS = [
   // nightstands: a drawer face, a drawer, a pull — on the east face
   ...['nightstand-north', 'nightstand-south'].flatMap((id) => {

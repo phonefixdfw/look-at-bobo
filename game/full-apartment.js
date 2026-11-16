@@ -46,6 +46,7 @@ import {
 } from './full-shell.js';
 import { buildFullKitchen } from './full-kitchen-mesh.js';
 import { buildFullLiving } from './full-living-mesh.js';
+import { buildFullBedroom } from './full-bedroom-mesh.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, seg = 18) => new THREE.CylinderGeometry(rt, rb, h, seg);
@@ -545,6 +546,12 @@ export function buildFullApartment(scene) {
   // and its pieces share their footprints with the COLLIDERS splice in
   // game/full-level.js, so what Bobo's body stops against is what gets drawn.
   buildFullLiving(flat);
+
+  // ── the bedroom (issue #48) ───────────────────────────────────────────────
+  // Same split as the kitchen: every number lives in game/full-bedroom.js and
+  // this is the one call that puts it on screen. The bed's headboard is flush
+  // on the west wall and the rest of the room hangs off that anchor.
+  buildFullBedroom(flat);
 
 
   // ── the rig: sun outside the north windows, sky wash, four fills ─────────
