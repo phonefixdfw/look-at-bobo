@@ -9,8 +9,9 @@
 // capture tools all read.
 //
 // Issue #33 changed two things about this file beyond the coordinates:
-//   * the flat is a real one-bedroom (65.7 m² net, plus a 2.5 m² balcony) with
-//     a ceiling, so the room rectangles moved and the kitchen became a room;
+//   * the flat is a real one-bedroom (68.68 m² net since issue #67 grew the
+//     bathroom, plus a 2.5 m² balcony) with a ceiling, so the room rectangles
+//     moved and the kitchen became a room;
 //   * the ten moment *types* each own several *spots* (`SPOTS` below). A run
 //     draws ten of them, and never two in the same room twice in a row. The
 //     type list itself is still exactly ten, so the capture matrix, the stage
@@ -465,7 +466,10 @@ export const VIEWS = {
   // issue #67: the vestibule, from the hall — the frame Brandon's playtest
   // caught as "a weird hall to nowhere", so it is the frame that proves it is
   // now a lit ENTRY with a front door at the end of it.
-  entry: { pos: [1.71, 1.62, 2.45], yaw: 1.5708, pitch: 0.02, fov: 78, hand: false }, // the front door, from the hall opening
+  // issue #67: the front door, from the hall opening — leaf, mat, the console
+  // beside it and the wall it sits in, all in one frame (yaw 3.379 faces
+  // south-south-east down the vestibule; pitch -0.17 drops the floor in).
+  entry: { pos: [1.45, 1.62, 2.6], yaw: 3.379, pitch: -0.17, fov: 76, hand: false },
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
   // The three doorways, from standing height, aimed through the hole at a

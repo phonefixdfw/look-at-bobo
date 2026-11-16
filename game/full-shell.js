@@ -46,7 +46,8 @@ export const SLIDER_HEAD = 2.1;
 /** --------------------------------------------------------------------------
  *  The rooms, as interior faces (docs/ISSUE_33_REBUILD.md §2). `area` is
  *  derived, never typed, so the doc's m² figure cannot quietly drift: the net
- *  interior area is the sum of these (65.7 m² as built, before the balcony).
+ *  interior area is the sum of these (68.68 m² since issue #67 grew the
+ *  bathroom, before the balcony).
  *  ------------------------------------------------------------------------- */
 export const ROOMS = [
   { id: 'living', x0: -3.3, z0: -2.9, x1: 2.4, z1: 2.1, label: 'living room' },
@@ -69,7 +70,8 @@ export const ROOMS = [
 export function roomArea(room) {
   return (room.x1 - room.x0) * (room.z1 - room.z0);
 }
-/** Net interior floor area (m²): 65.67 as built, inside issue #33's 65–80 band. */
+/** Net interior floor area (m²): 68.68 as built since issue #67, inside
+ *  issue #33's 65–80 band (it was 65.67 while the bathroom stopped at z 3.90). */
 export function netInteriorArea() {
   return ROOMS.filter((r) => !r.outdoor).reduce((sum, r) => sum + roomArea(r), 0);
 }
