@@ -41,6 +41,7 @@ import { createInput } from '../src/input.js';
 import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
+import { liveSeedFromEnv, newRunSeed, pinnedSeed, FIXED_SEED } from '../src/run-seed.js';
 
 /**
  * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
@@ -96,7 +97,31 @@ export function bootGame(cfg) {
 
   const GATE_OFF = params.get('gate') === 'off';
   const TARGET = clamp(Number.parseInt(params.get('win') ?? String(WIN_DEFAULT), 10) || WIN_DEFAULT, 1, 20);
-  const SEED = Number.parseInt(params.get('seed') ?? '11', 10) || 11;
+  /** The run's seed (issue #66). The rules live in src/run-seed.js: `?seed=N`
+   *  pins it (that is how a run is reproduced and how a bug report reads),
+   *  `?gate=off` — every tool page, capture, determinism run, LC simulation —
+   *  keeps the fixed 11 every baseline was drawn from, and live play draws a
+   *  fresh random 31-bit integer. It used to be one fixed `const 11`, which
+   *  is why Brandon's twenty rounds were twenty copies of one run.
+   *  A `let`, because a live page re-rolls it for every new run: every rng
+   *  stream in here is derived from SEED, so a re-roll means re-deriving them
+   *  the same way boot does, and gameplay still never touches Math.random. */
+  let SEED = liveSeedFromEnv(location.search, { gateOff: GATE_OFF });
+  /** Is randomising even on? It is off the moment the URL pins a seed or the
+   *  page runs in capture mode — that is what keeps the tools byte-identical. */
+  const LIVE_SEED = !GATE_OFF && pinnedSeed(location.search) === null;
+
+  /** A new run on a live page plays a new seed: re-roll, then let the callers
+   *  below re-derive their streams from it (they seed off SEED the same way
+   *  boot does). Under `?gate=off` or with `?seed=N` this changes nothing, so
+   *  restart keeps replaying the same run for the bots and the determinism
+   *  checks. Called from the run boundaries only — never inside a frame. */
+  function rerollRunSeed() {
+    if (!LIVE_SEED) return SEED;
+    SEED = newRunSeed(location.search, { gateOff: GATE_OFF }, SEED);
+    renderStamp(); // the gear panel and the ?stamp=on line follow the run
+    return SEED;
+  }
   const INITIAL_SCORE = clamp(Number.parseInt(params.get('score') ?? '0', 10) || 0, 0, TARGET);
 
   /** Patriot Bobo (issue #58, part of #35): the rare costume bonus cat. Every
@@ -116,6 +141,11 @@ export function bootGame(cfg) {
    *               the stress seeds draw none in their short (win=3) runs: the
    *               capture/bot baselines keep their pixels. Re-pick the tag if
    *               the spot pool or the chance changes — the checks say so.
+   *               Issue #66 note: seed 11 is now only what the TOOLS play —
+   *               live play draws a random seed, which is the whole reason
+   *               this calibration is safe to keep: over random seeds the
+   *               bonus cat really does show up (see the `seed-coverage`
+   *               check and tools/seed-coverage.mjs).
    *  URL: ?patriot=off disables him entirely; ?patriot=on ALSO dresses the
    *  staged (capture) finds — that is how his capture frames work; ?patriot=N
    *  forces him on live find N (staging stays undressed there, since the
@@ -193,12 +223,14 @@ export function bootGame(cfg) {
   const STAMP_DEBUG = params.get('stamp') === 'on';
   const DOC_TITLE = document.title;
 
-  /** One line, plain words: build, control mode (and why), quality. */
+  /** One line, plain words: build, control mode (and why), quality, and the
+   *  seed this run is playing (issue #66 — read it off the panel, send it, and
+   *  `?seed=<that number>` gives the identical run back). */
   function stampText() {
     const mode = TOUCH ? 'touch' : TOUCH_OVERRIDE === false ? 'mouse (?touch=off)' : 'mouse';
     const parts = [stampBit()];
     if (HTML_BUILD && HTML_BUILD !== JS_BUILD) parts.push('MISMATCH: html and js are different builds');
-    parts.push(`mode ${mode}`, `quality ${SETTINGS.quality}`);
+    parts.push(`mode ${mode}`, `quality ${SETTINGS.quality}`, `seed ${SEED}`);
     return parts.join(' · ');
   }
 
@@ -227,7 +259,7 @@ export function bootGame(cfg) {
       document.body.appendChild(corner);
     }
     if (!corner) return;
-    corner.textContent = `${stampBit()} · ${TOUCH ? 'touch' : 'mouse'} · ${SETTINGS.quality}`;
+    corner.textContent = `${stampBit()} · ${TOUCH ? 'touch' : 'mouse'} · ${SETTINGS.quality} · seed ${SEED}`;
     if (STAMP_DEBUG) document.title = `${DOC_TITLE} [js ${JS_BUILD}]`;
   }
 
@@ -707,7 +739,8 @@ export function bootGame(cfg) {
   }
 
   function restartRun() {
-    rng = mulberry32(SEED + 991); // replays are still seeded runs, never Math.random
+    rerollRunSeed(); // issue #66: a live restart is a NEW run, not a replay
+    rng = mulberry32(SEED + 991); // the replay stream rides the run's seed (whatever it now is), never Math.random
     refills = 0;
     queue = [];
     resetPatriotRunState();
@@ -1847,7 +1880,73 @@ export function bootGame(cfg) {
     const h1 = simulateHash(600, simScript);
     const h2 = simulateHash(600, simScript);
     add('sim-deterministic', h1 === h2 ? '600 steps, same hash' : `${h1} vs ${h2}`, 'two identical scripted runs hash equal', h1 === h2, 'movement + look are pure functions of the script');
-    add('seek-no-unseeded-random', countUnseededCalls(), '0 calls', countUnseededCalls() === 0, 'Math.random / Date.now inside seek / setMoment / trigger');
+    add('seek-no-unseeded-random', countUnseededCalls(), '0 calls', countUnseededCalls() === 0, 'Math.random / Date.now / crypto.getRandomValues inside seek / setMoment / trigger (issue #66: the live seed is drawn OUTSIDE this region)');
+
+    // Issue #66: the run's seed. Every live game used to play the same fixed
+    // seed 11, so every player saw the identical ten spots and never the
+    // bonus cat. Three cases, all checkable from inside the page: `?seed=N`
+    // pins the run, `?gate=off` (every tool page) stays on the fixed seed 11,
+    // and a live page holds a fresh random one and re-rolls it per run.
+    {
+      const env = { gateOff: GATE_OFF };
+      const info = window.LC.seedInfo();
+      add(
+        'seed-matches-url-env',
+        info.seed,
+        'the url seed, else 11 under ?gate=off, else a random 31-bit int',
+        info.seed === liveSeedFromEnv(location.search, env) && info.live === (!GATE_OFF && info.pinned === null),
+        `live=${info.live} pinned=${info.pinned ?? '-'} gateOff=${GATE_OFF} (src/run-seed.js is the only rule)`,
+      );
+      add(
+        'capture-seed-stays-fixed',
+        GATE_OFF ? info.seed : 'not capture mode',
+        '?gate=off plays the fixed seed 11',
+        !GATE_OFF || info.seed === FIXED_SEED,
+        GATE_OFF ? 'every baseline, bot run and determinism pair is drawn from this seed' : 'the gate is up, so the fixed seed does not apply here',
+      );
+      add(
+        'seed-is-a-plain-integer',
+        info.seed,
+        `1…${2 ** 31 - 1}`,
+        Number.isInteger(info.seed) && info.seed >= 1 && info.seed <= 2 ** 31 - 1,
+        'a player reads it off the gear panel and types it back into the url',
+      );
+      // A new run must be a NEW run live, and a replay where a seed was asked
+      // for. Proved off the pure picker, so the current run is left alone.
+      const next = newRunSeed(location.search, env, info.seed);
+      add(
+        'restart-reseeds-in-live-play',
+        info.live ? (next === info.seed ? 'same seed' : 'a different seed') : `holds ${info.seed}`,
+        'live: a different seed per run; ?seed= / ?gate=off: the same seed',
+        info.live ? next !== info.seed : next === info.seed,
+        'play again, the pause card restart and the win all run through restartRun',
+      );
+      if (POOL) {
+        // Same seed, same run: the two pure draws a run is made of replay
+        // exactly, which is what `?seed=N` in a bug report buys.
+        const cycleA = pickSpotCycle(mulberry32(info.seed)).join(',');
+        const cycleB = pickSpotCycle(mulberry32(info.seed)).join(',');
+        const planA = JSON.stringify(runPatriotPlan(info.seed, MOMENT_IDS.length));
+        const planB = JSON.stringify(runPatriotPlan(info.seed, MOMENT_IDS.length));
+        add(
+          'seed-reproduces-the-run',
+          `${cycleA.split(',').length} spots + ${(planA.match(/true/g) ?? []).length} patriot finds`,
+          'the same seed draws the same spots and the same Patriot plan twice',
+          cycleA === cycleB && planA === planB,
+          `cycle ${cycleA.slice(0, 32)}… for seed ${info.seed}`,
+        );
+      }
+      const panel = document.getElementById('settings-build');
+      const card = document.getElementById('build-stamp');
+      const line = panel?.textContent ?? card?.textContent ?? '';
+      add(
+        'seed-shown-to-the-player',
+        GATE_OFF ? 'no chrome in capture mode' : line.includes(`seed ${info.seed}`) ? `seed ${info.seed}` : line || '(empty stamp line)',
+        'the gear panel / start card carries "seed <n>" (and the ?stamp=on corner does)',
+        GATE_OFF ? !line : line.includes(`seed ${info.seed}`),
+        GATE_OFF ? 'capture mode keeps every stamp out of the frame, on purpose' : 'read it here, send it in a bug report',
+      );
+    }
 
     const stats = window.LC?.getStats ? window.LC.getStats() : { drawCalls: 0 };
     add('stats-available', stats.drawCalls, '>0 draw calls', stats.drawCalls > 0, 'render once before getStats means anything');
@@ -2113,6 +2212,27 @@ export function bootGame(cfg) {
        *  tools compare runs against this without touching the game. */
       patriotPlan(seed = SEED, finds = MOMENT_IDS.length) {
         return runPatriotPlan(Number(seed), Number(finds), { enabled: PATRIOT.enabled });
+      },
+      /** The seed the current run plays (issue #66) — the number the gear
+       *  panel and the ?stamp=on line show, and what `?seed=N` must carry to
+       *  replay it. `seedInfo()` adds why it is that number. */
+      seed() {
+        return SEED;
+      },
+      seedInfo() {
+        return {
+          seed: SEED,
+          live: LIVE_SEED, // randomising: a live page with no seed asked for
+          pinned: pinnedSeed(location.search) ?? null,
+          gateOff: GATE_OFF,
+          fixedSeed: FIXED_SEED,
+        };
+      },
+      /** The run's ten spots for a seed (issue #66 coverage tooling): the same
+       *  pure draw the queue's first refill makes, without playing a run.
+       *  Empty on the slice, which has no spot pool. */
+      spotCycle(seed = SEED) {
+        return POOL ? pickSpotCycle(mulberry32(Number(seed) || 0)) : [];
       },
       simulate(steps, scriptFn) {
         return simulateHash(Number(steps) || 0, typeof scriptFn === 'function' ? scriptFn : simScript);
