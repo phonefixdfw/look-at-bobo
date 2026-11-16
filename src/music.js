@@ -80,19 +80,22 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
   let liveVoices = 0;
   let vibrato = null; // one shared pipe vibrato LFO
   const liveNodes = new Set(); // every started source, for a clean stop()
+  let rendering = false; // true while renderOffline owns the graph
+  let lastLevel = 0; // last scene level we aimed sceneGain at
 
   let scene = 'none';
-  let arrangement = 'main';
+  let arrangement = 'main'; // what the scheduler is playing RIGHT NOW
+  let baseArrangement = 'main'; // what the scene asks for (pause overrides it)
   let step = 0; // absolute grid step since this arrangement started
-  let frozen = false; // paused/hidden: clock frozen, output faded
+  let frozen = false; // tab hidden: clock frozen, output faded
   let running = false;
   let finishedOnce = false; // non-looping arrangements (flourish) hand over once
   let ducked = false;
   const sceneLevels = { play: 1, calm: 0.7, pause: 0.62, title: 0.5, win: 1, none: 0 };
+  const SCENE_ARR = { play: 'main', calm: 'calm', pause: 'calm', title: 'calm', win: 'flourish' };
 
-  const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const masterTarget = () => (muted || volume <= 0 ? 0 : volume);
-  const sceneLevel = () => sceneLevels[scene] ?? 1;
+  const sceneLevel = () => sceneLevels[isPaused() && scene !== 'title' && scene !== 'none' ? 'pause' : scene] ?? 1;
 
   // ---------------------------------------------------------------- lifecycle
   function buildGraph() {
@@ -167,20 +170,15 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
   }
 
   // ---------------------------------------------------------------- scenes
-  /** play → the 32-bar loop; pause/title → the thin calm arrangement;
-   *  win → the once-only flourish (the scheduler hands over to calm at its
-   *  end). Switching fades the old pass out (~120 ms) and fades the new one
-   *  in from silence: arrangements can never overlap or stack. */
-  function setScene(name, opts = {}) {
-    const target = { play: 'main', pause: 'calm', title: 'calm', win: 'flourish' }[name] ?? 'main';
-    scene = name;
+  /** play → the 32-bar loop; pause → the thin calm arrangement (still playing,
+   *  quieter — the pause menu deserves company); title → calm, lowest; win →
+   *  the once-only flourish (the scheduler hands over to calm at its end).
+   *  A swap dips ~120 ms then fades in from silence: arrangements can never
+   *  overlap or stack. */
+  function swapArrangement(target) {
     if (!ctx || !running) return;
     const now = ctx.currentTime;
     sceneGain.gain.cancelScheduledValues(now);
-    if (target === arrangement && !opts.force) {
-      sceneGain.gain.setTargetAtTime(sceneLevel(), now, 0.05); // just re-level
-      return;
-    }
     sceneGain.gain.setTargetAtTime(0, now, 0.04); // dip out any residual notes
     arrangement = target;
     step = 0;
@@ -189,6 +187,20 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
     anchorStep = 0;
     const fadeIn = score.arrangements[target].fadeIn ?? 0.5;
     sceneGain.gain.setTargetAtTime(sceneLevel(), now + 0.16, Math.max(0.05, fadeIn / 3));
+  }
+
+  function setScene(name, opts = {}) {
+    scene = name;
+    baseArrangement = SCENE_ARR[name] ?? 'main';
+    if (!ctx || !running) return;
+    const target = isPaused() && baseArrangement === 'main' ? 'calm' : baseArrangement;
+    if (target === arrangement && !opts.force) {
+      const now = ctx.currentTime;
+      sceneGain.gain.cancelScheduledValues(now);
+      sceneGain.gain.setTargetAtTime(sceneLevel(), now, 0.05); // just re-level
+      return;
+    }
+    swapArrangement(target);
   }
 
   // ---------------------------------------------------------------- ducking
@@ -203,6 +215,9 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
   const onVoice = (ev) => duck(ev.detail?.event === 'start');
   if (typeof document !== 'undefined') {
     document.addEventListener('lc-voice', onVoice);
+    // Fade/pause immediately when the tab hides (timers get throttled there,
+    // so this event, not the tick, is what freezes the clock on time).
+    document.addEventListener('visibilitychange', () => setFrozen(document.hidden));
   }
 
   // ---------------------------------------------------------------- synth
@@ -301,21 +316,47 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
     anchorStep = step;
   }
 
+  /** Freeze on hide / resume on show. Driven by the visibilitychange event
+   *  (fires even when timers are throttled), and mirrored by tick. Hiding
+   *  fades out and HOLDS the step counter; showing re-anchors against the
+   *  clock so the loop resumes exactly where it left off — mid-pattern. */
+  function setFrozen(hidden) {
+    if (!ctx || !running || rendering) return;
+    if (hidden === frozen) return;
+    frozen = hidden;
+    const now = ctx.currentTime;
+    sceneGain.gain.cancelScheduledValues(now);
+    if (frozen) {
+      sceneGain.gain.setTargetAtTime(0, now, 0.04); // 120 ms dip to silence
+    } else {
+      reAnchor(); // continue mid-loop from a fresh, real clock
+      lastLevel = sceneLevel();
+      sceneGain.gain.setTargetAtTime(lastLevel, now, 0.06);
+    }
+  }
+
   function tick() {
     if (!ctx || !running) return;
+    if (rendering) return; // an offline render owns the graph right now
     if (ctx.state === 'suspended') return; // iOS: wait, never burst-schedule
     const now = ctx.currentTime;
-    const wantFrozen = !!isPaused() || (typeof document !== 'undefined' && document.hidden);
-    if (wantFrozen !== frozen) {
-      frozen = wantFrozen;
-      sceneGain.gain.cancelScheduledValues(now);
-      if (frozen) sceneGain.gain.setTargetAtTime(0, now, 0.04); // 120 ms dip
-      else {
-        reAnchor(); // continue mid-pattern from a fresh, real clock
-        sceneGain.gain.setTargetAtTime(sceneLevel(), now, 0.06);
-      }
+    // Tab hidden (rAF-free background): freeze the clock. setFrozen is also
+    // wired to visibilitychange so it happens even under timer throttling.
+    setFrozen(typeof document !== 'undefined' && document.hidden);
+    if (frozen) return; // step counter frozen: resume continues mid-pattern
+    // Pause menu: play the calm arrangement instead of the full one, at the
+    // quieter pause level. Un-pausing swaps back the same clean way.
+    const eff = isPaused() && baseArrangement !== 'calm' ? 'calm' : baseArrangement;
+    if (eff !== arrangement) {
+      swapArrangement(eff);
+      return;
     }
-    if (frozen) return; // step counter frozen: resume continues the same bar
+    const wantLevel = sceneLevel();
+    if (Math.abs(wantLevel - lastLevel) > 0.001) {
+      lastLevel = wantLevel;
+      sceneGain.gain.cancelScheduledValues(now);
+      sceneGain.gain.setTargetAtTime(wantLevel, now, 0.06);
+    }
     // Stall clamp: after a throttled tab or a suspended context, SKIP the
     // missed steps (pure int math) instead of scheduling a burst of stale
     // notes — this is the pause/iOS overlap bug, fixed at the design level.
@@ -357,8 +398,11 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
     const savedBus = instBus;
     const savedNoise = noiseBuf;
     const savedVib = vibrato;
+    const savedVoices = liveVoices;
+    rendering = true; // the live scheduler stands down while we swap the graph
     try {
       ctx = octx;
+      liveVoices = 0;
       instBus = {};
       for (const [name2, inst] of Object.entries(score.instruments)) {
         const g = octx.createGain();
@@ -393,6 +437,8 @@ export function createMusicEngine({ score, lowQuality = false, volume = 1, muted
       instBus = savedBus;
       noiseBuf = savedNoise;
       vibrato = savedVib;
+      liveVoices = savedVoices;
+      rendering = false;
     }
   }
 
