@@ -1897,12 +1897,17 @@ export function bootGame(cfg) {
         info.seed === liveSeedFromEnv(location.search, env) && info.live === (!GATE_OFF && info.pinned === null),
         `live=${info.live} pinned=${info.pinned ?? '-'} gateOff=${GATE_OFF} (src/run-seed.js is the only rule)`,
       );
+      const fixedExpected = info.pinned !== null ? info.pinned : FIXED_SEED;
       add(
         'capture-seed-stays-fixed',
         GATE_OFF ? info.seed : 'not capture mode',
-        '?gate=off plays the fixed seed 11',
-        !GATE_OFF || info.seed === FIXED_SEED,
-        GATE_OFF ? 'every baseline, bot run and determinism pair is drawn from this seed' : 'the gate is up, so the fixed seed does not apply here',
+        `?gate=off defaults to the fixed seed ${FIXED_SEED}`,
+        !GATE_OFF || info.seed === fixedExpected,
+        GATE_OFF
+          ? info.pinned !== null
+            ? `the tool pinned ?seed=${info.pinned}; with no seed in the url it would play ${FIXED_SEED}`
+            : 'no seed asked for, so this is the seed every baseline, bot run and determinism pair is drawn from'
+          : 'the gate is up, so the fixed seed does not apply here',
       );
       add(
         'seed-is-a-plain-integer',
@@ -1939,12 +1944,23 @@ export function bootGame(cfg) {
       const panel = document.getElementById('settings-build');
       const card = document.getElementById('build-stamp');
       const line = panel?.textContent ?? card?.textContent ?? '';
+      const hasStampSurface = Boolean(panel || card);
       add(
         'seed-shown-to-the-player',
-        GATE_OFF ? 'no chrome in capture mode' : line.includes(`seed ${info.seed}`) ? `seed ${info.seed}` : line || '(empty stamp line)',
+        !hasStampSurface
+          ? 'this page carries no stamp surface'
+          : GATE_OFF
+            ? 'no chrome in capture mode'
+            : line.includes(`seed ${info.seed}`) ? `seed ${info.seed}` : line || '(empty stamp line)',
         'the gear panel / start card carries "seed <n>" (and the ?stamp=on corner does)',
-        GATE_OFF ? !line : line.includes(`seed ${info.seed}`),
-        GATE_OFF ? 'capture mode keeps every stamp out of the frame, on purpose' : 'read it here, send it in a bug report',
+        !hasStampSurface
+          ? true // the slice page never carried the issue #29 stamp chrome — nothing to show it on
+          : GATE_OFF ? !line : line.includes(`seed ${info.seed}`),
+        hasStampSurface
+          ? GATE_OFF
+            ? 'capture mode keeps every stamp out of the frame, on purpose'
+            : 'read it here, send it in a bug report'
+          : 'the full page carries the panel and the corner; the seed checks there prove the wiring',
       );
     }
 

@@ -1033,3 +1033,81 @@ and the pore loop drops the page to 67/70 with all three failing by name
   suite's three-page load that starved the 150 ms window the `#reticleAim`
   probe counts. Door frames now render **once per page** (static geometry;
   a failing first pass keeps re-testing). stress:full green standalone after.
+
+## 23. Issue #66 — every live game was playing the same run
+
+**Asked for (Brandon, 2026-11-16):** "I never saw MAGA Bobo. He was never on
+the balcony. It seemed like he was in the same spots over and over" — over
+about twenty rounds on the deployed game.
+
+**What was actually happening:** one line in `game/engine.js`
+(`const SEED = Number.parseInt(params.get('seed') ?? '11', 10) || 11`) gave
+EVERY page the same seed, so every player on earth drew the identical ten
+hiding places out of the 28-spot pool — `desk-pen.desk-end, sink-sit.fridge,
+keyboard-sit.keyboard, couch-loaf.sofa-back, laundry-nap.basket,
+window-bird.balcony-door, bed-stretch.bed-foot, box-sit.box,
+blanket-biscuits.wardrobe, hall-chase.entry` — and, because the Patriot dice
+tag was deliberately calibrated so seed 11 draws nobody in ten finds (§21),
+not one of those runs ever contained Patriot Bobo. The pool, the balcony and
+the bonus cat were all fine; the die was bolted to one number.
+
+**Fix:** `src/run-seed.js`, one rule in one place. `?seed=N` pins the run
+(reproduce-a-run and the bug-report knob); `?gate=off` — capture mode, every
+tool page, every determinism pair — keeps the fixed **11**, byte-identical to
+what it drew before this file existed; live play draws a fresh 31-bit integer
+from `crypto.getRandomValues` **at boot and again for every new run**
+(`play again`, the pause card's restart and the win all route through
+`restartRun`, which re-rolls and re-derives `rng`, `patriotRng` and the queue
+refills exactly the way boot seeds them). The seed now reads on the gear panel
+and the `?stamp=on` line (`… · seed 123456789`), so a player can send the run
+they saw back, and `LC.seed() / LC.seedInfo() / LC.spotCycle(seed)` hand it to
+the tools. `src/determinism.js` counts `crypto.getRandomValues` as an unseeded
+call too, so `seek-no-unseeded-random` still proves gameplay is seeded-only
+now that a crypto roll exists in the page at all — the seed is taken at boot
+and at a run boundary, never inside a measured region.
+
+### The pool under random seeds (`npm run seed:coverage`, 500 random seeds)
+Every spot gets played. The rarest of the 28 lands in **12.0%** of runs
+(`hall-chase.hall-door`), and the three balcony places in 33.8%
+(`couch-loaf.balcony-chair`), 24.6% (`window-bird.balcony-door`) and 20.2%
+(`window-bird.balcony-rail`) — the balcony itself is reached by **48.6% of
+runs**. Two spots are 100% because they are the only place of their moment
+type (`box-sit.box`, `keyboard-sit.keyboard`). **83.4% of runs (417/500)**
+now contain at least one Patriot find, **1.24 finds per run** on average.
+That is higher than the 40…55% the issue guessed: a ten-find run gets NINE
+legal rolls at a 1-in-6 dice (never the first find, never back-to-back, max
+two), which is what `pool-coverage-over-random-seeds` now asserts (70…95%).
+
+**The one-spot-per-moment-type rule is what limits a room** (issue #53's
+draw, unchanged here): `hall-chase` owns 7 spots spread over the hall, the
+entry, the kitchen and the bathroom, but exactly ONE of them is played per
+run, so each of those places lands in 12…16% of runs and the bathroom in
+about 28% of runs. Loosening that rule (say, two spots of the same type when
+they are in different rooms) is a story-design call for Brandon, not
+something to slip into a seed fix — it is raised in the PR, not done.
+
+### What the numbers are now (recorded at HEAD a0b9cae)
+- `capture:full` **507 frames**, selfTest **70 → 77 every frame** (the five
+  engine `seed-*` checks, plus full-only `seed-reproduces-the-run` and
+  `pool-coverage-over-random-seeds`), budget **PASS at 169 draws / 99,288
+  tris — the same worst frame as before the change**, pixels luma 41.8..137.1
+  · colours 74..230, console clean. Determinism **8/8 byte-identical**;
+  `:weak` PASS; both planted-fault captures still **FAIL** naming
+  `ending-text-exact`.
+- `capture:slice` **51/51** (46 + the same five shared checks),
+  `capture:slice:determinism` **8/8**, `capture:demo` **37/37** untouched,
+  `capture:demo:determinism` **8/8**, `gate` **PASS** (all five planted faults
+  still caught), `check:mobile` **PASS** (92 green without `dist/`, 96 with),
+  `build` dist/ stamped `a0b9cae-20261116-1723`, 53 files.
+- `playtest:stress:full` (--checks 77) **77 PASS / 0 FAIL** and
+  `playtest:stress` **72 PASS / 0 FAIL**, both carrying the new scenario 14:
+  two live boots play two different seeds and two different spot cycles,
+  `?seed=4242` hands the same run back on both boots, a live restart re-seeds
+  (40108844 → 974821936 in the log), `?gate=off` still boots on 11, and the
+  seed reads on the gear panel and the `?stamp=on` corner while capture mode
+  still keeps every stamp out of the frame.
+- Bots unchanged at their seed: full **10/10**, Patriot **5/5** (1+1+3),
+  slice **5/5** — they pass `?gate=off&seed=11`, so they replay exactly what
+  they replayed before. Audio: `audio:selftest` 23/23, `audio:pagecheck`
+  24/24, `audio:slicecheck` + `audio:fullcheck` **23/23**, `audio:democheck`
+  17/17.
