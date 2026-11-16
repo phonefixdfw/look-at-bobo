@@ -45,6 +45,7 @@ import {
   SUPPORT_DEFS,
 } from './full-shell.js';
 import { buildFullKitchen } from './full-kitchen-mesh.js';
+import { buildFullKitchenDetails } from './full-kitchen-details-mesh.js';
 import { buildFullLiving } from './full-living-mesh.js';
 import { buildFullBedroom } from './full-bedroom-mesh.js';
 
@@ -538,6 +539,10 @@ export function buildFullApartment(scene) {
   // puts it on screen, so the flat still draws its shell from full-shell.js and
   // its kitchen from one data module and nowhere else.
   buildFullKitchen(flat);
+  // ...and the small pieces on it (issue #44): appliances, rack, bin, the
+  // breakfast bar and its stools, the runner, the pendants — same split, one
+  // call, data in game/full-kitchen-details.js.
+  buildFullKitchenDetails(flat);
 
   // ── the living room (issue #46) ───────────────────────────────────────────
   // Same shape as the kitchen above: every number lives in
