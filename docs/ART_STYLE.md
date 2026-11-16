@@ -207,7 +207,8 @@ neck band back onto the decoy (241 white verts, the old count) and
   that already shared one unlit material are now one sheet.
   Measured, the worst frame of the 507-frame matrix is **147 draws / 98,656
   tris** — the overview, which sees the whole flat, and the reason the cull
-  alone was not enough; the desk view went 169 → 123. The budget was paid for
+  alone was not enough; the desk view went 163 → 123, and the count of frames
+  over 150 in the matrix went 36 → 0. The budget was paid for
   honestly: `tools/draw-report.mjs --pixels` renders every frame of that
   matrix with the fold and the cull on and off, and all 507 came back
   byte-identical, so nothing here bought a draw call with a look.
