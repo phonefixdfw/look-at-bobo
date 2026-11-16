@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+  tools/logo-export.html — the host page tools/export-logo.mjs screenshots to
+  rasterise assets/logo/logo.svg. ?size=N sets the box (the viewport matches),
+  so the PNG is the mark at exactly N×N with no browser margin. Not a game page:
+  never captured, never deployed.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>logo export</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      img {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <img id="mark" src="/assets/logo/logo.svg" alt="" />
+    <script>
+      var q = new URLSearchParams(location.search);
+      var n = Math.max(1, Math.min(4096, Number(q.get('size')) || 64));
+      var img = document.getElementById('mark');
+      img.style.width = n + 'px';
+      img.style.height = n + 'px';
+      document.title = 'logo-' + n;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Look at Bobo logo: Bobo's head — a sleeping cat with a mustard dash on his forehead — on a dark badge">
+  <!-- game/full.html inlines this same mark for the title screen (issue #57);
+       tools/export-logo.mjs rasterises it to the PNGs shipped beside it.
+       Colours are the design system (docs/ART_STYLE.md §8): the dark badge,
+       Bobo's cream face, his forehead dash in mustard. Eyes closed: the
+       title-screen Bobo is asleep (issue #57). -->
+  <rect width="64" height="64" rx="14" fill="#1b1e26"/>
+  <!-- ears first, bases sunk under the head so the silhouette is one shape -->
+  <path d="M16.5 23.5 20.5 6.5 31 16.5Z" fill="#f1ece1"/>
+  <path d="M47.5 23.5 43.5 6.5 33 16.5Z" fill="#f1ece1"/>
+  <ellipse cx="32" cy="34.5" rx="17" ry="15.5" fill="#f1ece1"/>
+  <!-- the forehead dash: Bobo's name-tag mark, in mustard -->
+  <rect x="30.4" y="20.5" width="3.2" height="7.4" rx="1.6" fill="#e8b04a"/>
+  <!-- gentle closed-sleep eyes -->
+  <path d="M22.2 35.5q3.2 2.7 6.4 0" fill="none" stroke="#1b1e26" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M35.4 35.5q3.2 2.7 6.4 0" fill="none" stroke="#1b1e26" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- tiny nose -->
+  <path d="M32 40.2 34 42.6h-4Z" fill="#1b1e26"/>
+</svg>
