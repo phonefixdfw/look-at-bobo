@@ -166,8 +166,11 @@ try {
   await page.evaluate(() => window.LC.setPaused(true));
   const paused = await waitFor(() => window.LC.music().arrangement === 'calm', 'pause-swaps-to-calm', 6000);
   if (paused) {
+    // the swap dips first and fades the calm loop IN to the pause level, so
+    // give the automation a moment to settle before reading the level
+    const settled = await waitFor(() => window.LC.music().sceneLevel < 0.75 && window.LC.music().sceneLevel > 0, 'pause-level-settles', 4000);
     const p = await music();
-    check('pause-swaps-to-calm', p.arrangement === 'calm' && p.sceneLevel < 0.75 && p.running === true, `arrangement ${p.arrangement} at level ${p.sceneLevel} (still playing)`);
+    if (settled) check('pause-swaps-to-calm', p.arrangement === 'calm' && p.sceneLevel < 0.75 && p.running === true, `arrangement ${p.arrangement} at level ${p.sceneLevel} (still playing, quieter than play's 1)`);
   }
   await page.evaluate(() => window.LC.setPaused(false));
   const resumed = await waitFor(() => window.LC.music().arrangement === 'main', 'resume-swaps-back', 6000);
