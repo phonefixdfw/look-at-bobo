@@ -83,9 +83,14 @@ export const WALK_RECTS = [
   { id: 'open-hall-bath', room: 'hall', x0: -1.5, z0: 2.6, x1: -1.02, z1: 3.45 }, // issue #81: slid 0.30 west with the widened hall's face
   { id: 'open-hall-entry', room: 'hall', x0: 1.02, z0: 2.6, x1: 1.5, z1: 3.45 }, // issue #81: slid 0.30 east with it
   // Issue #81: the dining room's two cased openings, bridged like every
-  // other band. The kitchen one crosses the 0.20 m exterior band the same
-  // way the kitchen door crosses its 0.12 m one.
-  { id: 'door-kitchen-dining', room: 'dining', x0: 2.68, z0: 0.68, x1: 3.58, z1: 1.0 },
+  // other band. Issue #100: the kitchen one only reached z 0.68 — the middle
+  // of the 0.20 m exterior band — so the union had a 0.16 m dead band
+  // (z [0.52, 0.68]) straight through the doorway and a body could not walk
+  // kitchen→dining at all (every room still flooded through the living room,
+  // which is how the check missed it). Like every bridge it now spans the
+  // band plus 0.08 of each room rect: z [0.52, 1.0], clear width x [2.68,
+  // 3.58] = the opening's own 0.90 m.
+  { id: 'door-kitchen-dining', room: 'dining', x0: 2.68, z0: 0.52, x1: 3.58, z1: 1.0 },
   { id: 'door-living-dining', room: 'dining', x0: 2.22, z0: 0.8, x1: 2.7, z1: 2.02 },
   { id: 'slider-balcony', room: 'living', x0: 0.85, z0: -3.28, x1: 2.15, z1: -2.72 },
 ];
