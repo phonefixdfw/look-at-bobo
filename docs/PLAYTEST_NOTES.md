@@ -62,7 +62,7 @@ correct, so a passing suite proves the checks work, not that they were skipped.
 | `score` | wrong-cat penalty not floored at 0 | `score-floors-at-zero` | exit 1 |
 | `repeats` | queue never advances | `queue-no-repeats` | exit 1 |
 | `decoy-share` | decoy placed on Bobo's spot | `decoy-never-shares-spot` | exit 1 |
-| `over-budget` | 170 extra draws pinned to the camera | tool's budget check (`drawCalls 245 > 150`) | exit 1 |
+| `over-budget` | 300 extra draws pinned to the camera | tool's budget check (`drawCalls 370 > 250`; 300 since issue #87 so it overshoots the 250 cap) | exit 1 |
 | `no-collision` | player walks through furniture | `walk-blocked` | exit 1 |
 
 (`npm run capture:slice:planted` runs the `text` plant; the other six were run
@@ -1684,3 +1684,65 @@ seeded `hash1`-painted once at boot, never in the render path); `gate` PASS;
 slice + demo byte-identical; `check:mobile` PASS; bots 10/10 with the ending
 text exact; `playtest:stress:full` at `--checks 87`; audio 23/23;
 `capture:full:weak` clean under swiftshader; `build` stamps 124 URLs.
+
+## 30. Issue #87 — the draw-call cap becomes one shared constant, and it is 250
+
+**What was asked.** Brandon (2026-11-16): "Let's raise it to 250 limit." Issue #69's
+decor had left the flat at exactly 150 of 150 — the ceiling reached with zero
+margin — and the ask was headroom, not content.
+
+**What changed.** One number in `tools/capture.mjs`: `export const
+DRAW_CALL_CAP = 250`, the draw budget for EVERY page — slice, talking demo,
+style test and full flat alike. The flat's own `FULL_GAME_DRAW_CALLS` (issue
+#59's 180, brought back to 150 by #61) retired into it, and an explicit
+`--budget drawCalls=…` still overrides everything as it always did. Zero
+content changes: no mesh, material, merge rule or cull rule was touched.
+Merging (`game/full-merge.js`) and per-room culling (`game/full-cull.js`) stay
+the preferred way to pay for geometry — the cap is a ceiling, not a target.
+
+**Weak GPUs keep the ceiling they already shipped under.** The old cap lives on
+as `LOW_QUALITY_DRAW_CALL_CAP = 150`, which the tool swaps in when a page
+reports `quality: 'low'` through `LC.comfort()` (the `?quality=low` path,
+issue #25). Chosen because 150 is exactly the cap that path was always measured
+under (worst 122 — about 25 draws lighter at the same frame), phones were
+granted no headroom, and 150 stays proportionally below the main cap (60 % of
+250). `?cull=off` and `?merge=off` behaviour is unchanged, and no capture run
+boots a page at `?quality=low`, so no existing baseline could move.
+
+**Worst frame per room, measured at this HEAD against the 250 cap** — the
+headroom record later features will plan against, unchanged from the #69 matrix
+exactly as it should be (this issue moved the ceiling, not the flat):
+
+| Room (camera room) | Worst frame | tris at that frame | Which frame |
+|---|---|---|---|
+| living | **150** | 98,940 | win / overview |
+| kitchen | 130 | 97,216 | sink-sit / kitchen |
+| bedroom | 125 | 98,482 | win / desk |
+| balcony | 115 | 80,370 | sink-sit / balcony |
+| entry | 98 | 95,696 | blanket-biscuits / entry |
+| hall | 95 | 95,572 | blanket-biscuits / door-hall-bedroom |
+| bathroom | 83 | 68,186 | desk-pen / bathroom |
+
+The flat's worst frame is **150 of 250** — a hundred draws of headroom on the
+heaviest view (the overview, which sees the whole flat and loses nothing to
+culling). A feature wanting more than that on this view still comes with
+merging or culling work, exactly as before.
+
+**The `over-budget` plant moved with the ceiling, or it stopped being a
+fault.** Its +170 pinned boxes reached only 240 on the slice's 70-draw win
+frame — UNDER 250, so the budget tripwire would have been quietly passing the
+run that exists to prove the budget catches overruns. `game/engine.js` now
+pins **300** boxes: slice `win/first-person` = **370 > 250 → exit 1**, full
+flat `win/first-person` = **395 > 250 → exit 1**, still caught by the tool's
+own budget line, still failing by design. The loop runs only under
+`?plant=over-budget`, which no baseline uses — determinism was re-run after
+this edit and stayed byte-identical.
+
+**Suites at this HEAD.** `capture:full` 546 frames PASS · selfTest 87/87 every
+frame · budget PASS (worst frame 150 ≤ 250; worst tris 99,740 ≤ 150k);
+`capture:full:determinism` 8/8 byte-identical, re-run after the plant edit;
+`gate` PASS — every planted fault still fails by design; `check:mobile` PASS
+(121 checks); `build` PASS (66 files, 2.98 MB, 126 URLs stamped). Held for the
+PR to record as skipped (constant-only diff: the cap loosens, pixels cannot):
+slice/demo captures and their determinism, `capture:full:spots|patriot|weak`,
+bots, stress, audio/music, seed:coverage.

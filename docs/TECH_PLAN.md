@@ -125,7 +125,7 @@ audioPlan/audioStatus/gateUnlocked/unlock/goto` — and:
 - `?plant=` faults (proof the checks bite): `text` (the joke ending gets
   "fixed"), `audio` (wrong take), `score` (score can go negative),
   `repeats` (the queue repeats within a cycle), `decoy-share` (decoy sits on
-  Bobo's spot), `over-budget` (+170 meshes blows the draw budget),
+  Bobo's spot), `over-budget` (+300 meshes blows the 250-draw cap — issue #87),
   `no-collision` (you walk through walls).
 - `?gate=off` skips the click-to-begin gate headlessly; `?seed=N` fixes the
   run seed.

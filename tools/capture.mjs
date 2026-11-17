@@ -55,7 +55,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // the content, was what left no room. Merging (game/full-merge.js) and per-room
 // culling (game/full-cull.js) stay the preferred way to pay for geometry: this
 // cap is a ceiling, not a target, and the measured worst frame (docs/
-// PLAYTEST_NOTES.md §28) is the headroom number to keep an eye on. The full
+// PLAYTEST_NOTES.md §30) is the headroom number to keep an eye on. The full
 // flat's own FULL_GAME_DRAW_CALLS constant retires into this one; an explicit
 // --budget drawCalls=… still overrides it, as it always did.
 export const DRAW_CALL_CAP = 250;
