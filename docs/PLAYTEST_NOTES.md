@@ -2051,3 +2051,102 @@ Both spots clear at the first or second probe now. `stress-playtest.mjs`
 also carried a latent crash on the slice (issue #81 wrote `LC.spot().hide`
 pool-only; the slice has no pool) — guarded; that is why slice stress reports
 its full 72 scenarios for the first time since.
+
+## 34. Issue #89 — the decoy sits on furniture (2026-11-17)
+
+Before #89 the decoy had 13 spots and exactly two of them were furniture —
+`d-heatpad` and `d-balcony-chair` (#82) — so ~7 of 8 rounds it sat on the
+floor. The issue asked for at least eight furniture spots (perched or seated,
+in at least four rooms, one low shelf, one "patio chair"), a pick that lands
+on furniture about half the time, no single spot over ~10% of 500 seeds, and
+never the same room as Bobo more than ~1 run in 6.
+
+### Before — 10,000-seed simulation on main (the shipped picker, seed = round)
+
+**Before — 10,000 seeds** (pool 13: 11 floor + only 2 furniture). Furniture
+**14.3%**; worst spot 8.50% (`d-kitchen`); same-room 0%.
+
+| pick | n | % | kind |
+|---|---|---|---|
+| d-kitchen | 850 | 8.50% | floor |
+| d-hall | 832 | 8.32% | floor |
+| d-entry | 817 | 8.17% | floor |
+| d-bath | 807 | 8.07% | floor |
+| d-bar | 806 | 8.06% | floor |
+| d-balcony-deck | 797 | 7.97% | floor |
+| d-balcony | 789 | 7.89% | floor |
+| d-tv | 743 | 7.43% | floor |
+| d-balcony-chair | 729 | 7.29% | FURN (chairSeat) |
+| d-dining | 728 | 7.28% | floor |
+| d-bedroom | 711 | 7.11% | floor |
+| d-heatpad | 702 | 7.02% | FURN (heatPad) |
+| d-living | 689 | 6.89% | floor |
+
+### After — 10,000 seeds at this branch's HEAD
+
+**After — 10,000 seeds** (pool 21: 11 floor + 10 furniture). Furniture
+**46.0%**; worst spot 5.76% (`d-bath`); same-room 0%.
+
+| pick | n | % | kind |
+|---|---|---|---|
+| d-bath | 576 | 5.76% | floor |
+| d-entry | 533 | 5.33% | floor |
+| d-bar | 529 | 5.29% | floor |
+| d-hall | 515 | 5.15% | floor |
+| d-toilet | 512 | 5.12% | FURN (toiletLid) |
+| d-dining | 502 | 5.02% | floor |
+| d-kitchen | 491 | 4.91% | floor |
+| d-bar-loaf | 489 | 4.89% | FURN (barTop) |
+| d-sofa-back | 484 | 4.84% | FURN (sofaBackTop) |
+| d-balcony | 474 | 4.74% | floor |
+| d-balcony-deck | 473 | 4.73% | floor |
+| d-chair-s | 473 | 4.73% | FURN (diningSeatS) |
+| d-tv-stand | 444 | 4.44% | FURN (tvTop) |
+| d-bed-foot | 440 | 4.40% | FURN (blanketTop) |
+| d-coffee | 439 | 4.39% | FURN (coffeeTop) |
+| d-balcony-chair | 435 | 4.35% | FURN (chairSeat) |
+| d-desk-chair | 434 | 4.34% | FURN (deskChair) |
+| d-bedroom | 427 | 4.27% | floor |
+| d-living | 426 | 4.26% | floor |
+
+Furniture 14.3% → 46.0% — about half of rounds, which is the issue's ask,
+and no single spot over 5.8% of 10,000 (the ~10%-over-500 bound has room to
+spare: the 500-seed run measures worst-spot 6.38%). Same-room decoys across
+10,000 rounds of the before AND after sims: **0** — the #53 rule (the decoy
+may not enter Bobo's room unless every other room's decoys are exhausted)
+kept its word, unchanged. The rule was kept as-is rather than re-tuned:
+the furniture spots are spread over seven rooms, so the law that already
+kept the floor decoys out of Bobo's room keeps the new ones out too, and
+46% of rounds now put the decoy on a named support.
+
+Five of the eight new spots sit on surfaces a Bobo spot already stands on —
+the sofa-back top (`couch-loaf.sofa-back`, 0.63 m apart), the south dining
+chair (`sink-sit.chair-s`, the same patch), the blanket
+(`blanket-biscuits.blanket`, 0.41 m), the desk chair (`laundry-nap.desk-chair`,
+0.02 m — the #82 laundry-nap trick repeated) and the bar slab
+(`sink-sit.bar`, 0.55 m) — and the new engine check pins that pattern for the
+whole pool: whenever a decoy shares a NAMED support with a Bobo spot, the two
+centres must sit inside `DECOY_MIN_DIST`, so the per-round filter can never
+draw the pair in one round. One surface, one cat — the heat pad (#82) just
+got company.
+
+### Suites at this HEAD
+
+All green, the three planted-notice capture suites failing exactly as planted
+(#81 law). Full run of the 26-suite table: every capture suite (`capture:full`
+546 frames, selfTest **95/95** every frame, worst frame **150 ≤ 250 draws**,
+100,324 tris; determinism 8/8 byte-identical; spots, patriot and weak paths
+PASS; all three planted captures exit 1 as planted), `capture:slice`,
+`capture:demo` with their determinism and planted runs, `gate` PASS with every
+plant still biting, `check:mobile` PASS, `seed:coverage` (rarest spot
+`sink-sit.bar` at 8.8% of runs — well inside the spread law), stress
+(**77/0 full, 72/0 slice**, selfTest 95/95 after reload and LIVE from the
+player-camera view), all three bot suites winning (full 10/10, Patriot 5/5,
+slice 5/5, seed-11 queues unchanged), every audio and music suite, and the
+build (68 files). The selfTest count moved 94 → 95 with the new
+`decoy-on-furniture` check (see the spot table in `docs/LEVEL_LAYOUT.md`);
+`package.json` and `stress-playtest.mjs` carry the new number. No re-baseline:
+seed 11's staged frames are canonically staged (`canonicalDecoy()` pins the
+pick on every capture stage, and the capture and determinism suites pass
+unchanged at this HEAD), and the determinism suites byte-compare two full headless runs at
+this HEAD.

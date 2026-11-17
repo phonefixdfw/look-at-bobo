@@ -424,7 +424,7 @@ moment type (labels, voice, pose anims key off it). Decoys now *prefer* a
 different room than Bobo's new spot (legality unchanged: never Bobo's spot,
 ≥ 1.2 m, facing).
 
-## Respawns (8) and decoy spots (13)
+## Respawns (8) and decoy spots (21)
 
 Spawns: living (0.98,−1.5)+0.6 · living (−1.5,−1.8)+2.6 · living
 (−2.2,1.7)−2.2 · hall (−0.55,3.5)0 · bathroom (−2.3,3.3)+1.9 · bedroom
@@ -442,6 +442,34 @@ chairSeat, −3.58, `sit`, the deck chair's lazy twin), **d-balcony-deck**
 *share* a Bobo spot — `pickDecoySpot`'s legality filter (never Bobo's live
 spot, ≥ 1.2 m, facing) is what keeps the pair honest — so the pad and the
 deck chair can wrong-cat exactly like the couch does.
+
+Issue #89: the decoy gets onto furniture. Eight more spots, every one on a
+SUPPORT_DEFS patch a 22 lb cat can honestly weigh down, and the pool is
+21 (11 floor, 10 furniture). The furniture rule: a decoy that shares a
+**named support** with a Bobo spot stands within 1.2 m of it, so the
+legality filter makes the pair un-drawable — the two cats can never stand
+on one surface in one run (`decoy-on-furniture` enforces all of this, plus
+on-patch, paws-on-support and the head+body aim ray):
+
+| decoy | room | x, z | support (top) | pose | shares the support with |
+|---|---|---|---|---|---|
+| `d-sofa-back` | living | (−3.16, −0.28) | sofaBackTop (0.85) | loaf | `couch-loaf.sofa-back` (0.63 m along the back) |
+| `d-chair-s` | dining | (4.06, 2.83) | diningSeatS (0.45) | sit | `sink-sit.chair-s` (same patch, 0.00 m) — and all four `sink-sit.chair-*` seats sit ≤ 1.10 m off it |
+| `d-bed-foot` | bedroom | (−0.755, 7.45) | blanketTop (0.58) | loaf | `blanket-biscuits.blanket` (0.41 m) |
+| `d-desk-chair` | bedroom | (−2.0, 6.28) | deskChair (0.47) | sit | `laundry-nap.desk-chair` (0.02 m) |
+| `d-bar-loaf` | kitchen | (4.0, 0.4) | barTop (1.05) | loaf | `sink-sit.bar` (0.55 m) |
+| `d-toilet` | bathroom | (−1.825, 2.705) | toiletLid (0.425) | sit | nobody — the support #49 kept honest finally has a cat |
+| `d-tv-stand` | living | (2.19, −1.2) | tvTop (0.45) | side | nobody — clear of the panel's base stem |
+| `d-coffee` | living | (−1.6, −0.75) | coffeeTop (0.45) | side | nobody — the pot and the books lie south |
+
+Selection is unchanged uniform law over the legal pool — no weights were
+added, the furniture *is* now half the pool: over 10 000 seeded runs (one
+decoy draw per round, `pickSpotCycle` runs) the furniture share is 46 %
+and no single spot clears 5.8 % (at 500 runs the worst spot reaches
+6.4 %); the decoy shares Bobo's room in 0 of 10 000
+rounds, the #53 rule doing the work ("prefer another room whenever any
+other room has a legal spot" — with 21 spots over 8 rooms there is always
+one). Numbers in docs/PLAYTEST_NOTES.md.
 
 ## Full-flat colliders (16 in Step 8 — 43 today)
 
