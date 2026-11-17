@@ -251,6 +251,7 @@ export function buildFullApartment(scene) {
     ['bedroom', oak],
     ['kitchen', kitchenTile],
     ['entry', kitchenTile],
+    ['dining', kitchenTile], // issue #81: the same porcelain, three rooms deep
     ['bathroom', bathTile],
     ['balcony', concrete],
   ]);
