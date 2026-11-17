@@ -43,16 +43,18 @@ const livingTop = (group) => Math.max(...LIVING_PIECES.filter((p) => p.group ===
 const bathTop = (id) => Math.max(...BATH_PIECES.filter((p) => p.id === id).flatMap((p) => p.parts.map((b) => b.y1)));
 
 /** Named support planes a decor piece may rest on: { y } for a top surface,
- *  { hang } for a bar to drape over. The mesh builds to these, the checks
- *  measure against these. */
+ *  { hang } for a bar to drape over, and `restOn` naming the COLLIDERS whose
+ *  footprint the host IS — a duvet lies ON the bed, and the bed's collider
+ *  is the bed, so the `decor-off-openings` check lets those pieces stand.
+ *  The mesh builds to these, the checks measure against these. */
 export const DECOR_HOSTS = {
-  floor: { y: 0 },
-  'coffee-table': { y: livingTop('coffee-table') }, // 0.45 — SIGHT_HEIGHTS agrees
-  bed: { y: BED_SUPPORTS.bedTop.top }, // 0.50 — the coverlet plane itself
-  dresser: { y: BEDROOM_DIMS.dresser.top }, // 0.78
-  wardrobe: { y: BEDROOM_DIMS.wardrobe.h }, // 2.10
-  'vanity-rim': { y: bathTop('vanity') }, // 0.87 — the bowl rim's lip, the flat tile the folded stack sits on
-  'towel-bar': { hang: bathTop('towel-bar') }, // 1.165 — the bar's top, where the duck-egg towel drapes too
+  floor: { y: 0, restOn: [] },
+  'coffee-table': { y: livingTop('coffee-table'), restOn: ['coffee-table'] }, // 0.45 — SIGHT_HEIGHTS agrees
+  bed: { y: BED_SUPPORTS.bedTop.top, restOn: ['bed'] }, // 0.50 — the coverlet plane itself
+  dresser: { y: BEDROOM_DIMS.dresser.top, restOn: ['dresser'] }, // 0.78
+  wardrobe: { y: BEDROOM_DIMS.wardrobe.h, restOn: ['wardrobe'] }, // 2.10
+  'vanity-rim': { y: bathTop('vanity'), restOn: ['vanity'] }, // 0.87 — the bowl rim's lip, the flat tile the folded stack sits on
+  'towel-bar': { hang: bathTop('towel-bar'), restOn: [] }, // 1.165 — the bar's top, where the duck-egg towel drapes too
 };
 
 /** The wall planes the pieces hang ON, from the same faces every other
@@ -119,8 +121,12 @@ export const DECOR = [
   P('art-living-sofa-n', 'living', 'art', 'art-a1', bx(-3.28, 1.28, -1.05, -3.245, 1.84, -0.63), { wall: 'living.w' }),
   // the north pier between the window (x ≤ −0.3) and the slider (x ≥ 0.85)
   P('art-living-npier', 'living', 'art', 'art-a2', bx(0.10, 1.25, -2.90, 0.60, 1.85, -2.867), { wall: 'living.n' }),
-  // the east pier between the kitchen doorway (z ≤ 0.3) and the window (z ≥ 1.0)
-  P('art-living-epier', 'living', 'art', 'art-a3', bx(2.367, 1.22, 0.45, 2.40, 1.78, 0.88), { wall: 'living.e' }),
+  // the pier between the kitchen doorway (z ≤ 0.3) and the window (z ≥ 1.0)
+  // turned out to be the parked kitchen leaf's run (it lies along the same
+  // plaster, z 0.38 … 1.24 — measured off the door geometry) — so this piece
+  // hangs on the SOUTH plaster instead: east of the hall door (x ≥ 0.45) and
+  // its parked leaf (which runs west), above the dining set's reach.
+  P('art-living-dine', 'living', 'art', 'art-a3', bx(0.75, 1.28, 2.067, 1.25, 1.84, 2.10), { wall: 'living.s' }),
   // the south wall west of the hall opening (x ≥ 0.45), clear of the
   // living-hall leaf parked along the same plaster (x −1.31 … −0.45)
   P('art-living-south', 'living', 'art', 'art-a4', bx(-2.62, 1.28, 2.067, -2.14, 1.84, 2.10), { wall: 'living.s' }),
@@ -243,7 +249,9 @@ export function decorPlan() {
       room: p.room,
       kind: p.kind,
       box: p.box,
-      restY: host ? host.y : null,
+      host: p.host ?? null,
+      restY: host ? host.y ?? null : null,
+      restOn: host ? host.restOn : p.wall ? [] : p.bar ? [] : null,
       hangY: p.bar ? DECOR_HOSTS[p.bar].hang : null,
       wallPlane: p.wall ? DECOR_WALLS[p.wall] : null,
       wallKey: p.wall ?? null,
