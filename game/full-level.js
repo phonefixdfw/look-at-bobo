@@ -611,10 +611,10 @@ export const DECOY_SPOTS = [
   // fold or a top takes a loaf, a low wide top takes a sprawl.
   { id: 'd-chair-s', room: 'dining', pos: [4.06, 'diningSeatS', 2.83], faceYaw: 1.57, pose: 'sit' }, // the south chair, facing south up the room like its Bobo twin; all four seats are within 1.2 m of it, so no dining cat can share a chair line
   { id: 'd-bed-foot', room: 'bedroom', pos: [-0.755, 'blanketTop', 7.45], faceYaw: -1.57, pose: 'loaf' }, // the foot-of-bed fold north of Bobo's blanket spot (0.47 m — never drawable together), loafed along the fold
-  { id: 'd-desk-chair', room: 'bedroom', pos: [-2.0, 'deskChair', 6.28], faceYaw: 3.14, pose: 'sit' }, // the human's seat by the desk, turned to the door like its Bobo twin (5 cm off it — the filter splits them)
+  { id: 'd-desk-chair', room: 'bedroom', pos: [-2.0, 'deskChair', 6.28], faceYaw: 0.0, pose: 'sit' }, // the human's seat by the desk, turned east down the desk line at the walk between desk and bed — 5 cm off its Bobo twin, the filter splits them
   { id: 'd-bar-loaf', room: 'kitchen', pos: [4.0, 'barTop', 0.4], faceYaw: 3.0, pose: 'loaf' }, // the bar's west end facing back down it into the kitchen — 0.55 m from Bobo's east-end sit, never both
   { id: 'd-toilet', room: 'bathroom', pos: [-1.825, 'toiletLid', 2.705], faceYaw: 3.14, pose: 'sit' }, // the closed lid, facing south into the room (support #49 kept honest: the FIRST spot to use it)
-  { id: 'd-tv-stand', room: 'living', pos: [2.19, 'tvTop', -1.2], faceYaw: -1.57, pose: 'side' }, // sprawled full length on the TV stand, clear of the panel's base stem (z −1.78…−1.62)
+  { id: 'd-tv-stand', room: 'living', pos: [2.19, 'tvTop', -1.2], faceYaw: 1.57, pose: 'side' }, // sprawled full length on the TV stand facing south along it, clear of the panel's base stem (z −1.78…−1.62)
   { id: 'd-coffee', room: 'living', pos: [-1.6, 'coffeeTop', -0.75], faceYaw: -1.57, pose: 'side' }, // the coffee table's clear north half — the pot and the books are south of him
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */

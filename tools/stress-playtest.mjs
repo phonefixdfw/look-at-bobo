@@ -64,6 +64,7 @@ const PAGE = arg('page', 'game/slice.html');
 // issue #81: full gained hall-width-in-band + dining-walkways + the three dining real-scale rows and a doorway case (+4: 87 → 91).
 // issue #82: full gained heat-pad-rests-on-cushion + cat-props-clear-the-plan (91 → 93); slice stays 46.
 // issue #88: full gained spot-pool-spread (93 → 94); slice stays 46.
+// issue #89: full gained decoy-on-furniture (94 → 95); slice stays 46.
 const CHECKS = Number(arg("checks", 51));
 
 const server = await startStaticServer({ root: REPO, port: 0 });

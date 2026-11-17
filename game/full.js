@@ -172,7 +172,8 @@ function batThePen(pen, supports, t) {
  * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, and
  * the three door/wood checks issue #65 added, and the four bathroom/entry
  * checks issue #67 added, and the `findable` hiding guarantee issue #70
- * added, so the full page reports 82. */
+ * added, so the full page reports 82, and the `decoy-on-furniture` promise
+ * issue #89 appended makes it 95. */
 /** Door frames are rendered ONCE per page by `doorways-read-open`: they
  *  check static geometry, and selfTest runs per capture frame — re-rendering
  *  six extra frames every time starves the live frame loop under load (the
@@ -556,6 +557,81 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'the three issue #82 footprints cover no spawn cell, no floor spot, no decoy',
       bad.length === 0 && rects.length === 3,
       'issue #82: the litter tray, the bowls and the bigger bin leave every route, spot and spawn open',
+    );
+  }
+
+  /* Issue #89 — the furniture decoys: the lazy 22 lb cat may now be furniture
+   * furniture-deep, and the furniture promises are mechanical. At least eight
+   * furniture decoy spots over four rooms or more; every point inside its own
+   * SUPPORT_DEFS patch (a decoy cannot rot into a decoy in mid-air); paws on
+   * their own support and head+body aimable from the nearest vantage, probed
+   * on the decoy rig itself; a decoy that shares a NAMED support with a Bobo
+   * spot always stands within DECOY_MIN_DIST of it, so the engine's per-round
+   * filter makes the pair un-drawable — the two cats can never stand on one
+   * surface in one run; and no furniture decoy crowds the heat pad unless it
+   * is the heat pad's own decoy. (Reach and facing are measured for every
+   * decoy, these included, by the engine's walk-reachable and
+   * cats-face-the-room sweeps; the cat-care footprints by the row above.) */
+  {
+    const furn = DECOY_SPOTS.filter((s) => s.pos[1] !== 'floor');
+    const bad = [];
+    const fRooms = new Set(furn.map((s) => s.room));
+    if (furn.length < 8) bad.push(`only ${furn.length} furniture decoy spots`);
+    if (fRooms.size < 4) bad.push(`furniture decoys cover only ${fRooms.size} rooms`);
+    for (const s of furn) {
+      const d = SUPPORT_DEFS[s.pos[1]];
+      if (!d) { bad.push(`${s.id} names a support the builder does not make`); continue; }
+      if (s.pos[0] < d.x0 - 1e-9 || s.pos[0] > d.x1 + 1e-9 || s.pos[2] < d.z0 - 1e-9 || s.pos[2] > d.z1 + 1e-9) {
+        bad.push(`${s.id} off its own patch`);
+      }
+    }
+    const probe = buildCat('decoy');
+    const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: LEVEL.MOVE.playerRadius });
+    const seen = grid.flood(grid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1]));
+    const los = [
+      ...wallBoxes,
+      ...LEVEL.COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: 1.05 })),
+    ];
+    const rc = new THREE.Raycaster();
+    const from = new THREE.Vector3();
+    const to = new THREE.Vector3();
+    for (const s of furn) {
+      const y = supports[s.pos[1]] ?? 0;
+      setCatPose(probe, s.pose ?? 'sprawl');
+      probe.root.position.set(s.pos[0], y, s.pos[2]);
+      probe.root.rotation.y = catRootYaw(s.faceYaw);
+      probe.root.updateMatrixWorld(true);
+      const g = contactGap(probe, s.pos[1], supports);
+      if (!(g.gap >= -0.001 && g.gap <= 0.002)) bad.push(`${s.id} paws ${g.gap.toFixed(4)} off ${s.pos[1]} ("${g.who}")`);
+      const a = bestApproach(grid, seen, { x: s.pos[0], z: s.pos[2], y, los, eye: LEVEL.MOVE.eye });
+      if (!a) { bad.push(`${s.id}: no approach`); continue; }
+      from.set(a.x, LEVEL.MOVE.eye, a.z);
+      const pv = probe.pivots[probe.current];
+      for (const part of ['head', 'body']) {
+        pv[part].getWorldPosition(to);
+        rc.set(from, to.clone().sub(from).normalize());
+        if (!rc.intersectObjects([probe.root], true).some((h) => h.object.isMesh)) bad.push(`${s.id}: ${part} misses from its approach`);
+      }
+    }
+    for (const s of furn) {
+      for (const m of SPOTS ?? []) {
+        if (m.spot[1] !== s.pos[1]) continue;
+        const d = Math.hypot(s.pos[0] - m.spot[0], s.pos[2] - m.spot[2]);
+        if (d >= DECOY_MIN_DIST) bad.push(`${s.id} shares ${s.pos[1]} with ${m.id} at ${d.toFixed(2)} m — one surface, two cats, same run`);
+      }
+    }
+    const hp = SUPPORT_DEFS.heatPad;
+    for (const s of furn) {
+      if (s.pos[1] === 'heatPad') continue;
+      const m = SPOT_CLEAR.radius + SPOT_CLEAR.gap;
+      if (s.pos[0] > hp.x0 - m && s.pos[0] < hp.x1 + m && s.pos[2] > hp.z0 - m && s.pos[2] < hp.z1 + m) bad.push(`${s.id} crowds the heat pad`);
+    }
+    add(
+      'decoy-on-furniture',
+      bad.length ? bad.join(', ') : `${furn.length}/${DECOY_SPOTS.length} decoy spots on furniture over ${fRooms.size} rooms — every point on its patch, paws on its own support, aimable from its approach, never one surface with Bobo in one run, heat pad clear`,
+      '≥ 8 furniture decoys · ≥ 4 rooms · on-patch · contact −0.001..+0.002 m · head+body ray-hit · shared supports < 1.2 m apart · pad clear',
+      bad.length === 0,
+      'issue #89: the decoy is on furniture now — and a 22 lb scenery cat still never doubles up with the real one',
     );
   }
 
