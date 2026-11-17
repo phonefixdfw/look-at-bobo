@@ -1684,3 +1684,70 @@ seeded `hash1`-painted once at boot, never in the render path); `gate` PASS;
 slice + demo byte-identical; `check:mobile` PASS; bots 10/10 with the ending
 text exact; `playtest:stress:full` at `--checks 87`; audio 23/23;
 `capture:full:weak` clean under swiftshader; `build` stamps 124 URLs.
+
+## 30. Issue #81 — a wider hall and the flat's first real dining room
+
+**What the pass changed.** The hallway is the issue's own 2.40 m
+(x −1.20 … 1.20 — `hall-width-in-band` reads it off the shell's ROOMS rect),
+paid for 0.30 m at a time by the bathroom (now 1.98 × 2.98 = 5.90 m²) and the
+entry's old west band. And the flat has a **dining room** where the void east
+of the entry used to be: x 2.60 … 5.52, z 0.80 … 4.40, **9.99 m² usable**,
+with the issue's furniture at the issue's sizes — round table Ø 1.05 with
+its top at 0.75, four chairs (seat 0.45, back 0.86) on a 0.55 m ring with
+their seats tucked 0.20 under the rim, an emissive-only pendant on the
+table's centre, a 1.28 × 0.40 sideboard back to the new south wall under a
+new south window (sill 0.90 — the kitchen's under-window precedent), and
+framed art on the window's east pier. Two cased doors: 0.90 into the
+kitchen's south wall, 1.22 into the living room's south-east corner. Net
+interior is now **79.59 m²**.
+
+**How it plays.** The corridor stops reading like one: two bodies pass
+without either turning sideways, the console-and-print end view survives the
+wider room, and the runner no longer walls the skirting in. The dining room
+is reachable from all eleven spawns (`dining-reachable-from-every-spawn`)
+through the wide arm off the kitchen or the corner door by the living-room
+rug, and Bobo lives there now: `sink-sit.table` sits the near card of the
+ring and `hall-chase.dining` loafs in the wide arm's north-east corner —
+both yaws measured off `bestApproach`, the `cats-face-the-room` vantage,
+not eyeballed. Walking the kitchen door's lane and looking west you see the
+table lamp lit against the afternoon and the four chair backs in a ring:
+the shot the issue was written for.
+
+**The honest trade-offs.** (1) The entry ships **1.40 × 1.68** against the
+issue's "≥ 1.4 × 1.7" ask: its south face is the exterior band's inner face
+at z 3.90 and its north line is the hallway doorway's jamb — the extra 2 cm
+of depth would have been plaster, and the 0.86 leaf's room (case 1.32 … 2.34,
+leaf 1.40 … 2.26) still takes the coat bench AND the 1.20 m turning circle.
+(2) The bathroom's toilet slid 0.30 m west to hold the #67 clear-path rows
+in the narrowed room; the only plaster left on that north wall then made
+the towel bar run over the tank — 36 cm above the lid, which is exactly
+where a small bathroom puts a second bar. (3) The kitchen bar + stools
+rode 0.44 m east (and the bar shortened 0.20) because the kitchen→dining
+doorway stood on its old west end. (4) The hall+entry fill light moved to
+hang under the entry pendant: at the widened hall the old point grazed the
+door leaf's face and the `front-door-shut-and-found` pixel probe read it as
+a black hole; one metre north of the door it exists to light, it reads.
+
+**What it cost.** Two new merged statics (the dining room's plaster and its
+furniture bucket) plus the room's details — and the flat came out **under**
+its old worst frame: capture:full's worst frame is **149 of 150 draws** —
+the heaviest frame in the flat is the new dining view itself (sink-sit,
+t=0, 98,948 tris) — with the win/overview next at 148 / 100,204 tris;
+#69's was 150 with zero margin, so the cap has a draw of room again. The
+pendant is emissive, so `realLights` stays at 6. Zero new lights, zero new
+textures; slice, talking demo and every earlier suite stay byte-identical.
+
+**Bugs the checks caught before any pixels did.** The dining chair ring at
+the loose 0.62 m radius the first cut used left a 0.24 m centre channel —
+`dining-walkways` (row 58's own maths) failed it by name, and the tuck
+under the rim is what bought the aisle back. And the `decor-off-openings`
+collider clause talked the table vase off the `sink-sit.table` capsule
+before it was ever placed.
+
+**Suites.** `capture:full` 546 frames **91/91 PASS** (four new issue-#81
+checks, three new `furniture-real-scale` rows, 87 → 91); worst frame 149 ≤
+150; `capture:full:determinism` 8/8 byte-identical; planted-fault runs
+still fail by name; `gate` PASS; slice + demo byte-identical;
+`check:mobile` PASS; bots 10/10 with the ending text exact;
+`playtest:stress:full` at `--checks 91`; audio/music PASS;
+`capture:full:weak` clean under swiftshader; `build` stamps every URL.
