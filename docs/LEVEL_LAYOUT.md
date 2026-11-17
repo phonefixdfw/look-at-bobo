@@ -674,7 +674,9 @@ one draw per run); the pad holds ~25 % like every couch-loaf alternate.
 bowls+mat +1 in the kitchen's detail merge; the kitchen carcass mesh gives
 back a slot (untagged pieces now fold nameless into the merge, one more
 material bucket absorbed). Worst frame lands **150 / 150** — the budget
-exactly. Max draw per camera room over all 546 capture frames:
+of that day; the draw budget is now the one shared `DRAW_CALL_CAP = 250`
+(tools/capture.mjs, issue #87), so this table reads as headroom, not
+headroom-left-to-cap. Max draw per camera room over all 546 capture frames:
 
 | room | living | dining | kitchen | bedroom | balcony | entry | hall |
 |---|---|---|---|---|---|---|---|
