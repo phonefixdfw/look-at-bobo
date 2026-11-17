@@ -212,6 +212,21 @@ neck band back onto the decoy (241 white verts, the old count) and
   honestly: `tools/draw-report.mjs --pixels` renders every frame of that
   matrix with the fold and the cull on and off, and all 507 came back
   byte-identical, so nothing here bought a draw call with a look.
+- **The lookalike decor spends exactly one of those draws (issue #69).**
+  Twenty-three pieces of black-and-white dressing — ten framed abstract
+  artworks, the cow-patch bedding, cushions, throw, bath mat, towels, the
+  black pot, B/W books and a storage box — share ONE 256 px canvas atlas
+  (game/full-decor-mesh.js) and therefore one material, one merge bucket,
+  one world-baked mesh. Its box spans five rooms, so `game/full-cull.js`
+  files it shared-never-hidden: it is drawn in every frame, exactly once.
+  Measured on the current 546-frame matrix: every single frame lands at
+  the no-decor number **+1** (worst frame 149 → **150 / 150**, the win
+  overview; the no-decor 149 reflects the furniture that landed after
+  #61's 147), +320 triangles worst-case, and `capture:full:weak` renders
+  the atlas under swiftshader with a clean console. Mipmapping is guarded
+  by ClampToEdge + a 1.5 px UV inset + a 2 px painted cell border, so no
+  black art smears into the cream cell next door at grazing angles (no
+  moire anywhere in the matrix).
 - No post-processing (`passes: 1`). Small cat parts and small props have
   `castShadow = false` — only big silhouettes need to shadow.
 - The page implements the `window.LC` contract (`docs/CAPTURE.md`) with the

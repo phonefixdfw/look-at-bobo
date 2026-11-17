@@ -51,6 +51,33 @@
 ## Other characters
 - **The decoy cat (above)**, added by Brandon's design change, is the only other character in scope. No other humans or animals (aligns with "not goals": no multiplayer; vision describes a solo apartment search). If Brandon later wants another presence (e.g. offscreen owner voice), that remains an optional future change.
 
+## Lookalike decor — scenery that borrows the joke, never steals it (issue #69)
+The flat now wears black-and-white dressing (docs/LEVEL_LAYOUT.md, "Lookalike
+decor"): framed abstract ink art, a cow-patch duvet, patchwork cushions, a
+check throw, striped towels, a black pot with white rings. From the corner of
+the eye some of it reads "is that Bobo?" for a beat — that is the decoy's joke
+echoed in the walls, not a second fake cat. The line stays where the decoy's
+line is:
+
+- **A lookalike is DECOR.** It never stands, never poses, has no eyes, ears,
+  whiskers, forehead dash, bib or blaze — the markings the cat builder draws
+  and nothing else may. Its patterns are blobs, rings, rules, checks and
+  patches; its darkest black is a cool near-black that deliberately is *not*
+  Bobo's `furBlack` token, so even the colour tell stays the cat's. It is one
+  untagged, unnamed mesh: nothing in the game can aim at it, and pointing at
+  it can never spend a point or shout "DAG!" at a pillow.
+- **A lookalike is scenery for the FIND too.** Every piece keeps a 0.21 m
+  capsule around every cat spot clear up to a seated eye line, and the whole
+  collection is added to the `findable` sight model — a black canvas may add
+  shadow, it may not take a findable spot away (`decor-findable-clear`).
+- **The decoy cat remains the ONLY false target.** He is the one moving,
+  breathing, three-times-Bobo's-fur cat that costs a point. The decor's job
+  is the half-second of doubt that makes the apartment feel like Bobo's, not
+  a hunting minigame.
+
+`decor-not-a-cat-tell` pins the mechanical half of that list; the patterns
+themselves are reviewed against this page.
+
 ## Casting / reference needs (provisional defaults accepted; real references still TBD if not supplied)
 - **Partially supplied:** one Bobo photo is on file ([`docs/reference/bobo-01.png`](reference/bobo-01.png), shows him at ~10 lb). **Still wanted:** a recent ~15 lb photo, more angles (side/back/tail/belly), a pose video if you have one, and a photo of the decoy cat if he has one — each would replace an assumption, none is invented in the meantime. Without them, art proceeds from the written description + this photo only.
 - **Accepted provisional default / Step 1 direction:** Use **generic "normal cat stuff"** (lounging, rolling over, stretching, napping, curling up, etc.) as placeholders. **No claims are made about Bobo's specific real habits**; Bobo-specific habits remain not specified until references or descriptions are provided.
