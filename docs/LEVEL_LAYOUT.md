@@ -488,7 +488,7 @@ Four checks came with it, in `game/full.js`:
 |---|---|
 | `bath-clear-path` | a 0.60 m body has a flooded route from the flat's root to 0.40 m off every fixture, and ≥ 2 m² of standable floor (measured 2.67 m², against 0.24 m² before the enlargement) |
 | `bath-luma-in-band` | the bathroom's mean luma is 0.7 … 1.5 of the median of the played rooms and 90 … 200 absolute, so it is neither the dark room again nor a milky one |
-| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (2 % / 178 since #81; 4 % / 128 at #67) |
+| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (4 % / 139 since #81; 4 % / 128 at #67 — and a live boot at 800×500 reads even brighter, 2 % / 178) |
 | `front-door-shut-and-found` | `door-front` is built shut, its leaf is `LEAF_W` in the cased 1.02 m opening, the entry camera sees it, and no walk rect is reachable past it |
 
 The three pixel checks render once per page and remember it, the way
