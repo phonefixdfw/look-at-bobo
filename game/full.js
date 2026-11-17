@@ -18,7 +18,8 @@ import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/rea
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
-import { OPENINGS, ROOM_BY_ID, BAND_T, LEAF_W } from './full-shell.js';
+import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W, SUPPORT_DEFS } from './full-shell.js';
+import { diningGapReport } from './full-dining.js';
 import { woodTextureAudit } from '../src/polish.js';
 import { SPLASH } from './splash.js';
 
@@ -417,6 +418,19 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'bath-mirror',
       'towel-bar',
       'bath-mat',
+      // issue #81: the dining set. All three rows exist in SCALE_RANGES and
+      // every one is tagged by game/full-dining-mesh.js through the pieces'
+      // own `scale` field — the table claims its row once, each of the four
+      // chairs re-measures the chair row, and the sideboard its own.
+      'dining-table',
+      'dining-chair',
+      'sideboard',
+      // issue #82: the cat-care props. The pad on the sofa's south cushion,
+      // the two bowls measured as one pair, and the low tray on the bath
+      // strip — all tagged by their own builders, so all three are measured.
+      'heat-pad',
+      'food-bowl',
+      'litter-box',
     ];
     const boxes = new Map(); // row -> [[label, Box3]]
     const groups = new Map(); // group -> [label, Box3] to union
@@ -483,6 +497,68 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     );
   }
 
+  /* Issue #82 — the heat pad's own claim: the `heatPad` support is not a
+   * number floated over the sofa, it IS the drawn pad. Measured off the
+   * built mesh: the pad's bottom rests on the cushion's top (0.45) and its
+   * top is the support a cat stands on (0.48). `every-moment-contact` proves
+   * the loaf touches 0.48; this proves 0.48 is real furniture. */
+  {
+    const sup = SUPPORT_DEFS.heatPad;
+    const cush = SUPPORT_DEFS.cushion;
+    let box = null;
+    scene.traverse((o) => {
+      const t = o.userData?.scale;
+      if (!o.isMesh || (t !== 'heat-pad' && !(Array.isArray(t) && t.includes('heat-pad')))) return;
+      o.updateWorldMatrix(true, false);
+      const b = new THREE.Box3().setFromObject(o);
+      box = box ? box.union(b) : b;
+    });
+    const ok = !!box && Math.abs(box.max.y - sup.top) < 0.001 && Math.abs(box.min.y - cush.top) < 0.001;
+    add(
+      'heat-pad-rests-on-cushion',
+      box ? `pad ${box.min.y.toFixed(3)}…${box.max.y.toFixed(3)} m` : 'no heat-pad mesh carries the row',
+      `pad bottom = cushion top ${cush.top}, pad top = heatPad support ${sup.top} (±0.001)`,
+      ok,
+      'issue #82: three cm of warmth is the support itself: neither floating nor sunken',
+    );
+  }
+
+  /* Issue #82 — the three cat-care footprints (the tray, the bowls and the
+   * bigger bin) leave the flat's plan open: no spawn's stand cell inside a
+   * body pad, no floor spot inside a body pad, no decoy standing inside a
+   * raw box. The walk-graph checks re-run against these colliders anyway;
+   * this prints the tightest spawn gap so the clearances are a number. */
+  {
+    const pad = 0.3; // MOVE.playerRadius: how far a collider's pad reaches
+    const props = ['litter-box', 'pet-bowls', 'kitchen-bin'];
+    const rects = LEVEL.COLLIDERS.filter((c) => props.includes(c.id));
+    const bad = [];
+    let minSpawn = Infinity;
+    let tight = '';
+    const outside = (r, x, z, m) => x < r.x0 - m || x > r.x1 + m || z < r.z0 - m || z > r.z1 + m;
+    for (const s of LEVEL.SPAWNS) {
+      for (const r of rects) {
+        if (!outside(r, s.pos[0], s.pos[1], pad)) bad.push(`spawn at ${s.room} inside ${r.id}'s body pad`);
+        const d = Math.max(r.x0 - s.pos[0], s.pos[0] - r.x1, r.z0 - s.pos[1], s.pos[1] - r.z1);
+        if (d < minSpawn) { minSpawn = d; tight = `${s.room} spawn ↔ ${r.id}`; }
+      }
+    }
+    for (const sp of LEVEL.SPOTS) {
+      if (sp.spot[1] !== 'floor') continue; // furniture-top spots ride their own support
+      for (const r of rects) if (!outside(r, sp.spot[0], sp.spot[2], pad)) bad.push(`${sp.id} inside ${r.id}'s body pad`);
+    }
+    for (const d of LEVEL.DECOY_SPOTS) {
+      for (const r of rects) if (!outside(r, d.pos[0], d.pos[2], 0)) bad.push(`${d.id} stands inside ${r.id}`);
+    }
+    add(
+      'cat-props-clear-the-plan',
+      bad.length ? bad.join(', ') : `tightest spawn gap ${minSpawn.toFixed(2)} m (${tight}); every floor spot and decoy clear`,
+      'the three issue #82 footprints cover no spawn cell, no floor spot, no decoy',
+      bad.length === 0 && rects.length === 3,
+      'issue #82: the litter tray, the bowls and the bigger bin leave every route, spot and spawn open',
+    );
+  }
+
   /* Issue #46 — row 58 through the living room: the routes between the real
    * furniture, measured off the footprints the pieces were drawn from. The
    * walk graph (walk-reachable, above) already drags a 0.30 m body through
@@ -514,6 +590,114 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'row 58: 0.90 m on the routes, 0.60 tolerated only in front of the tub and the toilet',
       short.length === 0,
       'issue #49: the last two rooms measured in the ruler\'s own units',
+    );
+  }
+
+  /* Issue #81 — `hall-width-in-band`: the hallway is the issue's own number,
+   * 2.40 m, measured from the shell's ROOMS rect, not from a typed literal.
+   * The two interior faces are printed so the runner, the console and the
+   * issue's 1.4 m passing-clearance story can all be read off one line. */
+  {
+    const hall = ROOMS.find((r) => r.id === 'hall');
+    const w = hall.x1 - hall.x0;
+    const ok = Math.abs(w - 2.4) <= 0.005 && Math.abs(hall.x0 + 1.2) <= 0.005 && Math.abs(hall.x1 - 1.2) <= 0.005;
+    add(
+      'hall-width-in-band',
+      `hall ${w.toFixed(2)} m across: plaster x ${hall.x0.toFixed(2)} … ${hall.x1.toFixed(2)}`,
+      'the issue\'s 2.40 m hallway (±0.005), the faces at ±1.20',
+      ok,
+      'issue #81: the widened hall measured from the shell\'s own room rect',
+    );
+  }
+
+  /* Issue #81 — `dining-adjacent-and-sized`: the new room is at least the
+   * issue's 7 m² of USABLE floor — the rect, less the sealed entry band
+   * (`E-ent-1`) that cuts its west corner off, read from WALL_DEFS so the
+   * subtraction follows the slab as built — and it is ADJACENT to both rooms
+   * the issue names: it shares a wall band with each, and through that band
+   * a door at least 0.80 m clear. Nothing is retyped: rect, slab and doors
+   * all come from the shell tables the builders draw from. */
+  {
+    const din = ROOMS.find((r) => r.id === 'dining');
+    const ent = WALL_DEFS.find((s) => s.id === 'E-ent-1');
+    const slot = (ent.x1 - din.x0) * (ent.z1 - Math.max(ent.z0, din.z0));
+    const area = (din.x1 - din.x0) * (din.z1 - din.z0) - slot;
+    const bad = [];
+    if (!(area >= 7)) bad.push(`usable floor ${area.toFixed(2)} m² < 7 m²`);
+    const doorways = (other, axis, band0, band1) => {
+      const os = OPENINGS.filter(
+        (o) => o.kind !== 'window' && ((o.room === 'dining' && o.toRoom === other) || (o.room === other && o.toRoom === 'dining')),
+      );
+      if (!os.length) return [`no door between dining and ${other}`];
+      const p = [];
+      for (const o of os) {
+        if (o.axis !== axis) p.push(`${o.id} runs axis ${o.axis}, not ${axis}`);
+        else if (o.fixed < band0 - 0.001 || o.fixed > band1 + 0.001) p.push(`${o.id} face ${o.fixed} off the shared band ${band0}…${band1}`);
+        else if (o.hi - o.lo < 0.8) p.push(`${o.id} clear ${(o.hi - o.lo).toFixed(2)} < 0.80`);
+      }
+      return p;
+    };
+    const kit = ROOMS.find((r) => r.id === 'kitchen');
+    const liv = ROOMS.find((r) => r.id === 'living');
+    bad.push(...doorways('kitchen', 'z', kit.z1, din.z0));
+    bad.push(...doorways('living', 'x', liv.x1, din.x0));
+    const dk = OPENINGS.find((o) => o.id === 'door-kitchen-dining');
+    const dl = OPENINGS.find((o) => o.id === 'door-living-dining');
+    add(
+      'dining-adjacent-and-sized',
+      bad.length ? bad.join(', ') : `${area.toFixed(2)} m² usable (${((din.x1 - din.x0) * (din.z1 - din.z0)).toFixed(2)} rect − ${slot.toFixed(2)} sealed band) · kitchen door ${(dk.hi - dk.lo).toFixed(2)} m, living door ${(dl.hi - dl.lo).toFixed(2)} m, both in their shared bands`,
+      '≥ 7 m² of usable floor, a shared wall band and a ≥ 0.80 m door to both the kitchen and the living room',
+      bad.length === 0,
+      'issue #81: the new room\'s size and adjacency measured off the shell, not off the plan',
+    );
+  }
+
+  /* Issue #81 — `dining-reachable-from-every-spawn`: the engine's
+   * `walk-reachable` row proves ONE spawn map reaches everywhere; this one
+   * asks the issue's actual question — that a run started at any of the
+   * eleven spawns can WALK into the dining room, entering both arms of its
+   * L (the wide kitchen end and the table end by the sideboard). Grid maths,
+   * same build as every other reach row here. */
+  {
+    const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: LEVEL.MOVE.playerRadius });
+    const targets = LEVEL.WALK_RECTS.filter((r) => r.room === 'dining').map((r) => ({
+      id: r.id,
+      idx: grid.nearCell((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2),
+    }));
+    const bad = [];
+    for (const sp of LEVEL.SPAWNS) {
+      const start = grid.cellAt(sp.pos[0], sp.pos[1]);
+      if (start < 0 || !grid.free[start]) {
+        bad.push(`${sp.room} spawn not standable`);
+        continue;
+      }
+      const seen = grid.flood(start);
+      for (const t of targets) if (!seen[t.idx]) bad.push(`${sp.room} spawn ✗ ${t.id}`);
+    }
+    add(
+      'dining-reachable-from-every-spawn',
+      bad.length ? bad.join(', ') : `${LEVEL.SPAWNS.length} spawns × ${targets.length} dining cells (${targets.map((t) => t.id).join(', ')}) all flood through`,
+      'every spawn\'s flood contains a standable cell of every dining-side walk rect — both arms of the L and both threshold pads',
+      bad.length === 0,
+      'issue #81: the new room is a room you get to, not a diorama',
+    );
+  }
+
+  /* Issue #81 — `dining-walkways`: the table set through row 58, measured
+   * the same way as the living and bath rows, off the FOOT rects the pieces
+   * and colliders are both drawn from. The ring's centre channel is the
+   * tight honest register — 0.31 m of channel IS 0.69 m of physical aisle
+   * between a chair flank and the plaster in a 2.92 m room — and the two
+   * door lanes hold the 0.60 band the bathroom set. */
+  {
+    const rows = diningGapReport();
+    const short = rows.filter((r) => r.min != null && !(r.m >= r.min));
+    add(
+      'dining-walkways',
+      short.length ? short.map((r) => `${r.name} ${r.m.toFixed(2)} < ${r.min}`).join(', ') : rows.map((r) => `${r.name} ${r.m.toFixed(2)} m`).join(' · '),
+      'row 58: 0.30+ chair-ring aisles (the 2.92 m room\'s honest register), 0.60 on the door lanes',
+      short.length === 0,
+      'issue #81: the dining set measured in the ruler\'s own units',
     );
   }
 
@@ -906,17 +1090,23 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const raycaster = new THREE.Raycaster();
     // one clear standing pose per parked leaf, aimed at the leaf's face
     // centre (poses worked against the collider rects in docs/LEVEL_LAYOUT.md:
-    // living-hall from the open floor, living-kitchen from the dining gap —
-    // the ray passes over the 0.75 m table — bedroom from mid-room, over the
-    // desk chair and clear of the dresser).
+    // living-hall from the open floor, bedroom from mid-room, over the
+    // desk chair and clear of the dresser). Issue #81: living-kitchen's leaf
+    // is gone — that opening went cased, and a cased opening has no face to
+    // read.
     const LEAF_CAMS = {
       'door-living-hall': { pos: [-0.2, 1.5, 0.9], yaw: 2.510, pitch: -0.342, fov: 55 },
-      'door-living-kitchen': { pos: [1.35, 1.5, 0.9], yaw: -1.56, pitch: -0.471, fov: 55 },
       'door-hall-bedroom': { pos: [-1.5, 1.45, 6.8], yaw: -1.065, pitch: -0.153, fov: 55 },
     };
     const readPatch = (ndc) => {
       const x = Math.round(((ndc.x + 1) / 2) * canvas.width);
-      const y = Math.round(((1 - ndc.y) / 2) * canvas.height);
+      // gl.readPixels counts rows from the BOTTOM of the framebuffer, so NDC
+      // y maps straight onto it — the old `(1 - ndc.y) / 2` read the vertically
+      // mirrored pixel. Latent since issue #65 wrote this helper (the mirrored
+      // row happened to be a plausible surface, so it passed); #81's lighting
+      // shift exposed the mirror as a false `doorways-read-open` fail at
+      // 800x500, where the stress harness runs.
+      const y = Math.round(((ndc.y + 1) / 2) * canvas.height);
       if (x < 5 || y < 5 || x > canvas.width - 6 || y > canvas.height - 6) return null;
       const buf = new Uint8Array(4 * 9 * 9);
       gl.readPixels(x - 4, y - 4, 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
@@ -1254,7 +1444,13 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     };
     const readPatch = (ndc) => {
       const x = Math.round(((ndc.x + 1) / 2) * canvas.width);
-      const y = Math.round(((1 - ndc.y) / 2) * canvas.height);
+      // gl.readPixels counts rows from the BOTTOM of the framebuffer, so NDC
+      // y maps straight onto it — the old `(1 - ndc.y) / 2` read the vertically
+      // mirrored pixel. Latent since issue #65 wrote this helper (the mirrored
+      // row happened to be a plausible surface, so it passed); #81's lighting
+      // shift exposed the mirror as a false `doorways-read-open` fail at
+      // 800x500, where the stress harness runs.
+      const y = Math.round(((ndc.y + 1) / 2) * canvas.height);
       if (x < 5 || y < 5 || x > canvas.width - 6 || y > canvas.height - 6) return null;
       const buf = new Uint8Array(4 * 9 * 9);
       gl.readPixels(x - 4, y - 4, 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
@@ -1296,10 +1492,15 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
           if (Math.abs(w - LEAF_W) > 0.005) problems.door.push(`leaf is ${w.toFixed(2)} m wide, not the flat's ${LEAF_W} m leaf`);
           if (hole && w < 0.8 * (hole.hi - hole.lo)) problems.door.push(`leaf covers only ${(100 * w / (hole.hi - hole.lo)).toFixed(0)}% of the ${((hole.hi - hole.lo) * 100).toFixed(0)} cm case`);
           if (bb.z0 < 3.8 || bb.z1 > 4.1) problems.door.push(`leaf at z ${bb.z0.toFixed(2)}…${bb.z1.toFixed(2)}, not in the south band`);
-          const outside = LEVEL.WALK_RECTS.some((r) => 1.76 >= r.x0 && 1.76 <= r.x1 && 4.1 >= r.z0 && 4.1 <= r.z1);
+          const mid = hole ? (hole.lo + hole.hi) / 2 : 1.83;
+          const outside = LEVEL.WALK_RECTS.some((r) => mid >= r.x0 && mid <= r.x1 && 4.1 >= r.z0 && 4.1 <= r.z1);
           if (outside) problems.door.push('a walk rect crosses the front door');
         }
-        const centre = new THREE.Vector3(1.76, 1.2, 3.9);
+        // the leaf's face centre, derived from the shell's own case (issue #81
+        // slid the door to x 1.32 … 2.34; the old literal 1.76 followed it to
+        // 1.83 without being retyped)
+        const frontHole = OPENINGS.find((o) => o.id === 'door-front');
+        const centre = new THREE.Vector3(frontHole ? (frontHole.lo + frontHole.hi) / 2 : 1.83, 1.2, 3.9);
         const pc = centre.clone().project(camera);
         const px = readPatch(pc);
         if (pc.z > 1 || !px) problems.door.push('the leaf centre is off-screen from the entry view');

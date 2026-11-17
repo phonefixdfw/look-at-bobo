@@ -85,11 +85,35 @@ function stoolParts(p) {
   return [[p.x0, seatY, p.z0, p.x1, p.y1, p.z1], ...legs, ...frame]; // seat slab + legs + footrest
 }
 
+/** The cat's two bowls, turned from the piece's envelope: a pair of 8 cm
+ *  steel bowls standing on the mat at the envelope's z-thirds (issue #82).
+ *  One mesh, so the ruler measures the pair as one row. */
+function bowlParts(p) {
+  const r = 0.08;
+  const dz = (p.z1 - p.z0) / 3;
+  const x = (p.x0 + p.x1) / 2;
+  return [p.z0 + dz, p.z0 + 2 * dz].map((z) =>
+    new THREE.CylinderGeometry(r, r * 0.86, p.y1 - p.y0, 14).translate(x, (p.y0 + p.y1) / 2, z));
+}
+
 function pieceGeometry(p) {
   if (p.shape === 'cyl') {
     const r = (p.x1 - p.x0) / 2;
     const g = new THREE.CylinderGeometry(r, r, p.y1 - p.y0, 18);
     g.translate(...centre(p));
+    return g;
+  }
+  if (p.parts === 'bowls') {
+    const geos = bowlParts(p);
+    const g = new THREE.BufferGeometry();
+    const pos = [];
+    const nor = [];
+    for (const one of geos.map((x) => x.toNonIndexed())) {
+      pos.push(...one.attributes.position.array);
+      nor.push(...one.attributes.normal.array);
+    }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     return g;
   }
   if (p.parts) {

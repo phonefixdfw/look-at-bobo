@@ -1685,64 +1685,194 @@ slice + demo byte-identical; `check:mobile` PASS; bots 10/10 with the ending
 text exact; `playtest:stress:full` at `--checks 87`; audio 23/23;
 `capture:full:weak` clean under swiftshader; `build` stamps 124 URLs.
 
-## 30. Issue #87 — the draw-call cap becomes one shared constant, and it is 250
+## 30. Issue #81 — a wider hall and the flat's first real dining room
 
-**What was asked.** Brandon (2026-11-16): "Let's raise it to 250 limit." Issue #69's
-decor had left the flat at exactly 150 of 150 — the ceiling reached with zero
-margin — and the ask was headroom, not content.
+**What the pass changed.** The hallway is the issue's own 2.40 m
+(x −1.20 … 1.20 — `hall-width-in-band` reads it off the shell's ROOMS rect),
+paid for 0.30 m at a time by the bathroom (now 1.98 × 2.98 = 5.90 m²) and the
+entry's old west band. And the flat has a **dining room** where the void east
+of the entry used to be: x 2.60 … 5.52, z 0.80 … 4.40, **9.99 m² usable**,
+with the issue's furniture at the issue's sizes — round table Ø 1.05 with
+its top at 0.75, four chairs (seat 0.45, back 0.86) on a 0.55 m ring with
+their seats tucked 0.20 under the rim, an emissive-only pendant on the
+table's centre, a 1.28 × 0.40 sideboard back to the new south wall under a
+new south window (sill 0.90 — the kitchen's under-window precedent), and
+framed art on the window's east pier. Two cased doors: 0.90 into the
+kitchen's south wall, 1.22 into the living room's south-east corner. Net
+interior is now **79.59 m²**.
 
-**What changed.** One number in `tools/capture.mjs`: `export const
-DRAW_CALL_CAP = 250`, the draw budget for EVERY page — slice, talking demo,
-style test and full flat alike. The flat's own `FULL_GAME_DRAW_CALLS` (issue
-#59's 180, brought back to 150 by #61) retired into it, and an explicit
-`--budget drawCalls=…` still overrides everything as it always did. Zero
-content changes: no mesh, material, merge rule or cull rule was touched.
-Merging (`game/full-merge.js`) and per-room culling (`game/full-cull.js`) stay
-the preferred way to pay for geometry — the cap is a ceiling, not a target.
+**How it plays.** The corridor stops reading like one: two bodies pass
+without either turning sideways, the console-and-print end view survives the
+wider room, and the runner no longer walls the skirting in. The dining room
+is reachable from all eleven spawns (`dining-reachable-from-every-spawn`)
+through the wide arm off the kitchen or the corner door by the living-room
+rug, and Bobo lives there now: `sink-sit.table` sits the near card of the
+ring and `hall-chase.dining` loafs in the wide arm's north-east corner —
+both yaws measured off `bestApproach`, the `cats-face-the-room` vantage,
+not eyeballed. Walking the kitchen door's lane and looking west you see the
+table lamp lit against the afternoon and the four chair backs in a ring:
+the shot the issue was written for.
 
-**Weak GPUs keep the ceiling they already shipped under.** The old cap lives on
-as `LOW_QUALITY_DRAW_CALL_CAP = 150`, which the tool swaps in when a page
-reports `quality: 'low'` through `LC.comfort()` (the `?quality=low` path,
-issue #25). Chosen because 150 is exactly the cap that path was always measured
-under (worst 122 — about 25 draws lighter at the same frame), phones were
-granted no headroom, and 150 stays proportionally below the main cap (60 % of
-250). `?cull=off` and `?merge=off` behaviour is unchanged, and no capture run
-boots a page at `?quality=low`, so no existing baseline could move.
+**The honest trade-offs.** (1) The entry ships **1.40 × 1.68** against the
+issue's "≥ 1.4 × 1.7" ask: its south face is the exterior band's inner face
+at z 3.90 and its north line is the hallway doorway's jamb — the extra 2 cm
+of depth would have been plaster, and the 0.86 leaf's room (case 1.32 … 2.34,
+leaf 1.40 … 2.26) still takes the coat bench AND the 1.20 m turning circle.
+(2) The bathroom's toilet slid 0.30 m west to hold the #67 clear-path rows
+in the narrowed room; the only plaster left on that north wall then made
+the towel bar run over the tank — 36 cm above the lid, which is exactly
+where a small bathroom puts a second bar. (3) The kitchen bar + stools
+rode 0.44 m east (and the bar shortened 0.20) because the kitchen→dining
+doorway stood on its old west end. (4) The hall+entry fill light moved to
+hang under the entry pendant: at the widened hall the old point grazed the
+door leaf's face and the `front-door-shut-and-found` pixel probe read it as
+a black hole; one metre north of the door it exists to light, it reads.
 
-**Worst frame per room, measured at this HEAD against the 250 cap** — the
-headroom record later features will plan against, unchanged from the #69 matrix
-exactly as it should be (this issue moved the ceiling, not the flat):
+**What it cost.** Two new merged statics (the dining room's plaster and its
+furniture bucket) plus the room's details — and the flat came out **under**
+its old worst frame: capture:full's worst frame is **149 of 150 draws** —
+the heaviest frame in the flat is the new dining view itself (sink-sit,
+t=0, 98,948 tris) — with the win/overview next at 148 / 100,204 tris;
+#69's was 150 with zero margin, so the cap has a draw of room again. The
+pendant is emissive, so `realLights` stays at 6. Zero new lights, zero new
+textures; slice, talking demo and every earlier suite stay byte-identical.
 
-| Room (camera room) | Worst frame | tris at that frame | Which frame |
-|---|---|---|---|
-| living | **150** | 98,940 | win / overview |
-| kitchen | 130 | 97,216 | sink-sit / kitchen |
-| bedroom | 125 | 98,482 | win / desk |
-| balcony | 115 | 80,370 | sink-sit / balcony |
-| entry | 98 | 95,696 | blanket-biscuits / entry |
-| hall | 95 | 95,572 | blanket-biscuits / door-hall-bedroom |
-| bathroom | 83 | 68,186 | desk-pen / bathroom |
+**Bugs the checks caught before any pixels did.** The dining chair ring at
+the loose 0.62 m radius the first cut used left a 0.24 m centre channel —
+`dining-walkways` (row 58's own maths) failed it by name, and the tuck
+under the rim is what bought the aisle back. And the `decor-off-openings`
+collider clause talked the table vase off the `sink-sit.table` capsule
+before it was ever placed.
 
-The flat's worst frame is **150 of 250** — a hundred draws of headroom on the
-heaviest view (the overview, which sees the whole flat and loses nothing to
-culling). A feature wanting more than that on this view still comes with
-merging or culling work, exactly as before.
+**One bug the stress harness caught in the checker itself.** The full stress
+suite boots at 800×500 — a smaller canvas than the capture's 1280×720 — and on
+the first full chain it failed `doorways-read-open` on `door-living-hall`
+("hole pixel is leaf-coloured, distance 36") while every capture run passed
+91/91 on the same build. The flat was fine; the probe was not. `readPatch`
+mapped NDC to pixels with `(1 - ndc.y) / 2` — top-left canvas arithmetic —
+while `gl.readPixels` counts rows from the **bottom** of the framebuffer:
+every pixel `doorways-read-open` and the `front-door-shut-and-found` probe
+measured was the vertically mirrored one. Latent since issue #65 wrote the
+helper, because on the old geometry the mirrored row happened to be a
+plausible surface for all three doors and the leaf; #81's widened hall and
+moved fill shifted what the mirror saw, and at the stress resolution the
+mirrored hall floor landed within 36 RGB units of the walnut leaf's face —
+a false positive. Corrected to `(ndc.y + 1) / 2` at both sites, 91/91 passes
+at 800×500 *and* 1280×720. The fix is read-only — it changes no render, and
+`capture:full:determinism` is re-proved on the fixed HEAD. Honest footnote:
+with the true mapping the probe **fails origin/main's `door-living-kitchen`
+hole** — the ray clause passes, but the kitchen floor beyond that opening
+shares the walnut leaf's palette and lands distance 7 off the parked leaf's
+face colour; the mirror had been hiding the collision all along. #81 cases
+that opening, so this branch's three live doorways all read open for real.
+If a future leaf ever stands in front of same-palette oak again, the honest
+lever is the leaf's face colour or a per-door threshold with a written
+reason — not the mapping.
 
-**The `over-budget` plant moved with the ceiling, or it stopped being a
-fault.** Its +170 pinned boxes reached only 240 on the slice's 70-draw win
-frame — UNDER 250, so the budget tripwire would have been quietly passing the
-run that exists to prove the budget catches overruns. `game/engine.js` now
-pins **300** boxes: slice `win/first-person` = **370 > 250 → exit 1**, full
-flat `win/first-person` = **395 > 250 → exit 1**, still caught by the tool's
-own budget line, still failing by design. The loop runs only under
-`?plant=over-budget`, which no baseline uses — determinism was re-run after
-this edit and stayed byte-identical.
+**Where the harnesses learned #70's rule.** With the pool at 31, the stress
+run's seed-11 round 3 now draws `laundry-nap.bath-tub` — and the stress aim
+rule, written before #70, demands a props-visible centre ray the drawn curtain
+legitimately never grants from any vantage within 3.4 m (dense sweep: zero).
+#70's own contract is that cover hides the EYE, never the SHOUT: the
+crosshair find-ray (cat meshes only) must land, and `findable` polices it at
+selfTest. Both harnesses now apply each rule to its kind of spot — hidden
+ones proven through `aimProbe()` where `aimAt` parks the player, exactly how a
+real find works — including the hidden DECOY spot (`d-kitchen`) and the audio
+tool's aim lines, which have been a 22/23-or-23/23 coin flip on live random
+seeds since #66 (a hidden draw trips the visual rule on `main` too).
+`LC.spot` grew a `hide` field and decoy-id resolution so the tools read the
+level's row instead of re-typing it. And the shout-at-nothing check waits for
+the pulse to paint (it rides the render loop) instead of betting a fixed
+120 ms, which a loaded swiftshader frame can outlast.
 
-**Suites at this HEAD.** `capture:full` 546 frames PASS · selfTest 87/87 every
-frame · budget PASS (worst frame 150 ≤ 250; worst tris 99,740 ≤ 150k);
-`capture:full:determinism` 8/8 byte-identical, re-run after the plant edit;
-`gate` PASS — every planted fault still fails by design; `check:mobile` PASS
-(121 checks); `build` PASS (66 files, 2.98 MB, 126 URLs stamped). Held for the
-PR to record as skipped (constant-only diff: the cap loosens, pixels cannot):
-slice/demo captures and their determinism, `capture:full:spots|patriot|weak`,
-bots, stress, audio/music, seed:coverage.
+**Suites.** `capture:full` 546 frames **91/91 PASS** (four new issue-#81
+checks, three new `furniture-real-scale` rows, 87 → 91); worst frame 149 ≤
+150; `capture:full:determinism` 8/8 byte-identical; planted-fault runs
+still fail by name; `gate` PASS; slice + demo byte-identical;
+`check:mobile` PASS; bots 10/10 with the ending text exact;
+`playtest:stress:full` at `--checks 91`; audio/music PASS;
+`capture:full:weak` clean under swiftshader; `build` stamps every URL.
+
+## 31. Issue #82 — cat care: litter box, bowls, a bigger bin, and the yellow heat pad
+
+**What the pass changed.** Brandon's 2026-11-16 playtest facts shipped as
+data and geometry, recorded verbatim in docs/CHARACTERS.md: *"the flat has
+a litter box and food bowls; BOTH Bobo and the decoy like lying on the
+yellow heat pad on the couch; Bobo likes to sit in chairs; the decoy likes
+the patio (the balcony)"*, plus *"There can be a trash can near the
+kitchen."* — and the rule that nothing gets gross: *"Plain, clean, cute:
+no mess or gross detail."* Built: the little kitchen bin replaced by the
+issue's bigger one (0.35 dia × 0.62, lid + pedal, east run's south corner —
+old lid/pedal details moved, not duplicated); two porcelain bowls (Ø 0.16)
+on a 0.34 × 0.55 feeding mat at the pass wall south of the counter return;
+an open litter tray (0.46 × 0.32 × 0.15) in the bathroom; a folded yellow
+heat pad (0.55 × 0.40 × 0.03, fabric 0xf2b63f, cord behind the sofa) on the
+couch's south cushion; six new Bobo spots (`couch-loaf.heatpad`, four
+`sink-sit.chair-*`, `laundry-nap.desk-chair`) and three new decoy lazy
+spots (balcony chair, balcony deck, the pad itself — `d-heatpad`). Pool
+31 → **37**, decoys 10 → **13**, colliders 41 → 43 (`pet-bowls`,
+`litter-box`).
+
+**How it plays.** Seed 11 — the run everybody used to get — now lands
+`sink-sit.chair-n` and `couch-loaf.heatpad` inside its first ten finds, and
+the bot's spot cycle still reads 10/10 distinct with every catch changing
+rooms. The pad loaf is a real beat: a yellow rectangle on the couch with a
+cat curled on it reads at a glance, and the decoy can own that same pad on
+a run that does not put Bobo there. The chairs face the aisles, not the
+table — a sitter aimed at a round table shows nobody a face.
+
+**The litter box found its spot by failing three checks.** The first
+placement — the open floor between tub and bath bin — failed
+`bath-clear-path` (clear bath floor dropped to 1.99 m² against the 2 m²
+floor), `findable` (it pinched the tub cat's ring) and `decor-off-openings`
+(it clipped `mat-bath`) before any pixel was cut. The tray now stands in
+the pocket between the tub's flank and the east wall (x −1.66 … −1.34,
+z 4.44 … 4.90): cells the tub already shadowed, so the walk flood, the
+line-of-sight model and the decor rules all shrug. Bowls learned the same
+lesson quietly — the mat envelope started at x 3.48 and the raw mat box ate
+the `d-kitchen` decoy's shoulder room; it ships at 3.44.
+
+**The chair that faced the wrong way.** `chair-s` at an intuitive 3.93 was
+135° off its approach the first time `cats-face-the-room` swept the pool:
+the south chair now sits its sitter facing west across the room (1.57).
+And the desk-chair nap is deliberately a `laundry-nap`, not a `sink-sit`:
+the run draw locks the bedroom to exactly five of the ten types, and
+laundry-nap is one of the five — a sixth bedroom sink-sit spot would break
+`run-draw-legal`'s alternation bound where a fourth laundry-nap spot is
+free.
+
+**What it cost.** The pad's yellow fabric is the one prop that buys its own
+draw (atlas materials can't wear a second colour); its cord folds into the
+living room's dark-detail merge, and the kitchen's carcass merge gives a
+slot back the same way (untagged pieces fold nameless). Worst frame lands
+on **150 of 150** — the budget exactly, no more and no less; per-room max
+over all 546 frames: living 150 · dining 149 · kitchen 129 · bedroom 125 ·
+balcony 115 · entry 103 · hall 96. Zero new lights, zero new textures,
+slice and demo byte-identical.
+
+**Bugs the checks caught before any pixels did.** Two new selfTests came
+out of the issue's own asks: `heat-pad-rests-on-cushion` pins pad bottom to
+cushion top (0.45) and support to mesh top (0.48 ± 1 mm), and
+`cat-props-clear-the-plan` fails the build if any cat prop's rect covers a
+spawn, a floor moment spot or a decoy. Full check count 91 → **93**.
+
+**Where the harness learned #70's rule again.** With 37 spots, seed 11's
+DAG! round is now `laundry-nap.bath-tub` — the curtain spot — and the
+re-look shout after the DAG! reported the bot's own invariant as a failure
+(`ray wall/prop`) even though the catch landed: the bot was still reading
+the props-visible centre ray, the exact rule #81 corrected in the stress
+harness. The bot now applies #70's rule per kind of spot — hidden rounds
+report the engine's crosshair find-ray (`cat-bobo through shower-curtain`),
+open rounds keep the strict visual ray.
+
+**Suites.** `capture:full` 546 frames **93/93 PASS**, worst frame **150 ≤
+150**; `capture:full:determinism` 8/8 byte-identical; `capture:full:spots`
+PASS (three new spot moments added, the stale #81-era `window-bird.e-window`
+moment dropped); `capture:full:weak` clean under swiftshader;
+`capture:full:planted` caught by name; `gate` PASS; `check:mobile` PASS;
+`playtest:stress:full` at `--checks 93` — 77 PASS / 0 FAIL; bots PASS on
+slice, full and forced-Patriot (10/10, spot cycle 10/10, ending text
+exact); `seed:coverage` PASS over 500 seeds — every spot drawn, rarest
+`sink-sit.fridge` **8.8 %**, the nine-way chairs land 9.4 … 13.2 %, pad loaf
+24.0 %, desk-chair nap 27.8 %; `audio:fullcheck` at the documented live-seed
+coin flip (22/23, exit 0, same footnote as #81); `build` stamps every URL.

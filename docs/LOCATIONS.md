@@ -41,3 +41,21 @@ These areas are implied by the generic "normal cat stuff" placeholder moments (r
 - Any areas that must be included/excluded?
 
 **Accepted provisional defaults:** Use a simple one-bedroom with living area + kitchenette, bedroom, bathroom, short hallway, and one large window (balcony optional) containing the generic placeholder props. Treat all placements as provisional until real layout/details are provided; do not invent real-Bobo/apartment specifics.
+
+## Owner-supplied specifics (Brandon, 2026-11-16, issue #82)
+
+Brandon's playtest notes settle a few "still TBD" cells with facts, quoted
+where they land (full text in docs/CHARACTERS.md): **the flat has a litter
+box and food bowls**; **both cats like the yellow heat pad on the couch**;
+**Bobo likes to sit in chairs**; **the decoy likes the patio (the
+balcony)**; and **"There can be a trash can near the kitchen."** — all
+built to the rule "plain, clean, cute: no mess or gross detail". In the
+full flat that means: an open litter tray in the bathroom's tub-flank
+pocket, two bowls on a mat at the kitchen pass wall, a lidded bin on the
+east counter run's corner, a yellow heat pad on the sofa's south cushion
+(Bobo spot *and* decoy spot, never in the same run), four dining chairs
+and the desk chair as sitting spots, and three lazy decoy spots on the
+balcony (chair seat, deck floor, the existing rail beat). Exact real
+placements stay provisional — the game positions these to the built plan
+(docs/LEVEL_LAYOUT.md, "Issue #82"); nothing else about the real apartment
+is claimed.

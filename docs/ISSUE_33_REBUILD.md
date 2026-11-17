@@ -51,7 +51,7 @@ deliberately toy-sized prop fails the run).
 | 25 | Toaster | 0.26 × 0.18 × 0.19 | 0.15 … 0.24 high |
 | 26 | Coffee maker | 0.20 × 0.26 × 0.36 | 0.28 … 0.45 high |
 | 27 | Dish rack | 0.40 × 0.30 × 0.15 | 0.10 … 0.22 high |
-| 28 | Trash bin | 0.30 dia × 0.42 | 0.28 … 0.50 high |
+| 28 | Trash bin | 0.35 dia × 0.62, lid + pedal (issue #82: Brandon's *bigger* bin; was 0.30 dia × 0.42) | w 0.33 … 0.37, h 0.58 … 0.66 (row lifted with the piece) |
 | 29 | Dining table | 0.75 high top, 4 legs, top 0.04 | 0.71 … 0.80 |
 | 30 | Chair seat / back | 0.45 / 0.86 | seat 0.40 … 0.50, back 0.78 … 0.95 |
 | 31 | Breakfast bar top | 1.05 with a 0.30 overhang | 0.98 … 1.15 |
@@ -86,6 +86,9 @@ deliberately toy-sized prop fails the run).
 | 60 | Cardboard box (the game's hero prop) | 0.60 × 0.44 × 0.42, floor y 0.02 (`boxFloor`) | 0.4 … 0.7 |
 | 61 | Player eye height | 1.62 (`MOVE.eye`, unchanged) | — |
 | 62 | Player collision radius | 0.30 (`MOVE.playerRadius`, unchanged) | — |
+| 63 | Heat pad (issue #82) | 0.55 × 0.40 × 0.03 folded fabric, top y 0.48 on the south cushion (`heatPad`) | w 0.52 … 0.6, d 0.38 … 0.44, h 0.02 … 0.06, top 0.46 … 0.5 |
+| 64 | Food/water bowls (issue #82, pair = one row) | two porcelain bowls 0.16 dia × 0.08 on a 0.34 × 0.55 × 0.012 mat | w 0.33 … 0.36 across both rims, d 0.15 … 0.17 (one bowl), h 0.06 … 0.08 |
+| 65 | Litter box (issue #82) | open tray 0.46 × 0.32 × 0.15, bath tub-to-bin pocket | w 0.46 … 0.54, d 0.30 … 0.34, h 0.13 … 0.18 |
 
 ## 2. The floor plan (real scale)
 
@@ -93,13 +96,19 @@ Conventions unchanged: metres, right-handed, floor y = 0, **forward is −z**
 (north), x east. Interior faces are what the walk rects hug (0.08 m inset, the
 issue #27 rule). Wall bands: exterior 0.20, interior 0.12, ceiling y 2.50.
 
-Net interior area **68.7 m²** (living 28.5, kitchen 10.5, hall 5.4, entry 2.3,
-bathroom 6.8, bedroom 15.2) ≈ **739 sq ft**, plus a **2.5 m² balcony**
-(outdoor) — inside the issue's 65–80 m² / 700–850 sq ft target. The bathroom's
-3.8 m² became 6.8 m² in issue #67 (it took the service void behind its own
-south wall); before that this read 65.7 m² / 707 sq ft. Gross is *measured* off
-the built wall boxes by the scale selfTest and recorded in
-`docs/LEVEL_LAYOUT.md`; this table is the ruler, never the measurement.
+Net interior area **79.6 m²** (living 28.5, kitchen 10.5, dining 9.99, hall
+7.15, entry 2.35, bathroom 5.90, bedroom 15.2) ≈ **857 sq ft**, plus a
+**2.5 m² balcony** (outdoor) — inside the issue's 65–80 m² target (its
+700–850 sq ft band is the same idea rounded the other way: 80 m² IS 861 sq
+ft, so the m² number is the binding one and 79.6 still clears it). The
+bathroom's 3.8 m² became 6.8 m² in issue #67 (it took the service void
+behind its own south wall); issue #81 then grew the hall to 2.40 m, sold
+0.30 m back off the bathroom and the entry's old bands, and spent the flat's
+east room on the new **dining room** — its usable 9.99 m² is the 2.92 × 3.60
+rect less the 0.24 × 2.18 the sealed entry band (`E-ent-1`) cuts off its west
+edge. Before #67 this read 65.7 m² / 707 sq ft. Gross is *measured* off the
+built wall boxes by the scale selfTest and recorded in `docs/LEVEL_LAYOUT.md`;
+this table is the ruler, never the measurement.
 
 **One deliberate deviation from the issue's sketch:** the living room is
 5.70 × 5.00 (28.5 m²), not the ≈4.5 × 5 first pencilled. At 4.50 wide the
@@ -116,36 +125,41 @@ inside the target area.
  z=−4.40 ╞═══════════════════╪══════════════════╪════════════════════════╡ railing
          │                   │  1.90 × 1.30     │            railing 1.00│
  z=−3.10 ╞═══════════════════╧═════════╗ ╔══════╧════════════════════════╡
-         │   LIVING + DINING           ║ ║  glass door (clear 1.30)       │
+         │   LIVING                    ║ ║  glass door (clear 1.30)       │
          │                             ╚═╝                                │
          │  sofa W · coffee table · rug      ╔══════════╗   KITCHEN       │
          │  box · floor lamp · plant         ║pass-thru ║   3.00 × 3.50   │
   x=−3.30│  TV + bookshelf N/E · table  ═N   ║ (0.90)   ║   window over   │
-         │  dining table SE            window║          ║   the sink ·    │
+         │                             window║          ║   the sink ·    │
          │                                   ║          ║   L-counters ·  │
          │                                   ╩          ║   uppers · sink │
   x=2.40 ├── door (0.90) ═══════════════════════════════╩═══╡ x=2.52       │
- z=2.10  │        │      ╔════╤════════════════════════════╗║              │
-         └────────┼──────╢    │  HALL 1.80 × 2.98          ║║              │
-                  │      ║    │  console · hooks · mats    ║║              │
-         ┌────────┴──────╨────╢         ╔════╤═════════════╬╝              │
-         │ BATHROOM 2.28×2.98 ║console  ║    ║ENTRY        ║              │
-         │ door-less by plan: ║runner   ║    ║1.38 × 1.68  ║              │
-         │ an open doorway in ║         ║    ║mat · hooks  ║              │
-         │ its E wall, 0.90   ║         ║    ║console      ║              │
-         │ vanity · toilet (N)║         ║    ║front door   ║              │
-         │ W window, sill 1.50║         ║    ║(S, sealed)  ║              │
-  z=3.90 │ mat + tub along the║         ║    ║             ║              │
-  z=4.02 │ S wall · bin at SE ║         ║    ╚═════════════╝              │
-         │ +1.30 m of a sealed║E-hall-3 ║ ← the hall’s east band now      │
-         │ service void, once:║z 3.90 → ║ runs z 3.90 → 5.20. Before      │
-         │ no room’s. The tub ║5.20     ║ #67 it stopped at 3.90 —        │
-         │ now runs its length║         ║ open sky, the “dark nothing”.   │
-         │                    ║         ║ Now plaster, merged into        │
-         │                    ║         ║ the mesh: 0 extra draws         │
-  z=5.20 ╞════════════════════╪════╤════╪═══════════════════╡             │
+ z=0.80  │                                ┌── door 0.90 (N) ──► DINING    │
+         │                                │                 2.92 × 3.60   │
+ z=2.10  │        │      ╔════╤═══════════╪════════════════════╗          │
+         └────────┼──────╢    │  HALL 2.40 × 2.98              ║  9.99 m² │
+                  │      ║    │  console · hooks · mats        ║  usable  │
+         ┌────────┴──────╨────╢         ╔════╤═════════════════╬╝ (10.51  │
+         │ BATHROOM 1.98×2.98 ║console  ║    ║ENTRY        door ║  − 0.52 │
+         │ door-less by plan: ║runner   ║    ║1.40 × 1.68  1.22 ║  sealed │
+         │ an open doorway in ║         ║    ║mat · bench       ║  band)  │
+         │ its E wall, 0.85   ║         ║    ║hooks · console   ║         │
+         │ vanity · toilet (N)║         ║    ║front door        ║  round  │
+         │ W window, sill 1.50║         ║    ║(S, sealed)       ║  table  │
+  z=3.90 │ mat + tub along the║         ║    ║                  ║  Ø 1.05 │
+  z=4.02 │ S wall · bin at SE ║         ║    ╚══════════════════╣  · 4    │
+         │ +1.30 m of a sealed║E-hall-3 ║ ← the hall's east band ║  chairs │
+         │ service void, once:║z 3.90 → ║ runs z 3.90 → 5.20.   ║         │
+         │ no room's. The tub ║5.20     ║ Issue #81 grew the    ║  S wall │
+         │ now runs its length║         ║ hall 1.80 → 2.40: the ║  window │
+         │                    ║         ║ old void east of the  ║  over a │
+         │                    ║         ║ entry became mostly   ║  side-  │
+         │                    ║         ║ dining (see above).   ║  board  │
+  z=4.40 ╞════════════════════╪═════════╩═══════════════════════╣ · art   │
+         │                    ║         ║ (S band, exterior)    ║         │
+  z=5.20 ╞════════════════════╪════╤════╪═══════════════════════╡═════════╡
          │  BEDROOM 3.80 × 4.00 · this band IS the          │             │
-         │  bathroom’s south wall + the hall’s end ·        │             │
+         │  bathroom's south wall + the hall's end ·        │             │
          │  ╤ = the 0.90 bedroom door                       │             │
          │  bed (headboard flush W) · nightstand · dresser  │             │
          │  closet E · desk N (the keyboard moment) ·       │             │
@@ -158,11 +172,12 @@ Room rectangles (interior faces, x0 z0 → x1 z1):
 
 | room | x | z | area | notes |
 |---|---|---|---|---|
-| living | [−3.30, 2.40] | [−2.90, 2.10] | 28.5 m² | N window + the balcony glass door, E window, S doorway to the hall |
-| kitchen | [2.52, 5.52] | [−2.90, 0.60] | 10.5 m² | N window over the sink; doorway + pass-through to the living room |
-| hall | [−0.90, 0.90] | [2.22, 5.20] | 5.4 m² | the spine: living, bathroom, entry, bedroom; east band built all the way to 5.20 since issue #67 |
-| entry (vestibule) | [1.02, 2.40] | [2.22, 3.90] | 2.3 m² | front door (S band, z 3.90, sealed) + the bench, hooks and console issue #67 drew |
-| bathroom | [−3.30, −1.02] | [2.22, 5.20] | 6.8 m² | was [2.22, 3.90] / 3.8 m²: took its service void (issue #67). Door-less on purpose (issue #31 rule): the player can never be trapped |
+| living | [−3.30, 2.40] | [−2.90, 2.10] | 28.5 m² | N window + the balcony glass door, E window, S doorway to the hall; since issue #81 the E wall's south half carries the door to the dining room |
+| kitchen | [2.52, 5.52] | [−2.90, 0.60] | 10.5 m² | N window over the sink; doorway + pass-through to the living room; since issue #81 a cased 0.90 door in its south wall to the dining room (the bar rode 0.44 m east out of its lane) |
+| dining | [2.60, 5.52] | [0.80, 4.40] | 9.99 m² usable (10.51 rect − 0.52 sealed band) | issue #81's new room: round table Ø 1.05 top 0.75, four chairs (seat 0.45, back 0.86), emissive pendant, sideboard on the S wall under the new S window, art on the S pier. Doors: kitchen (N, 0.90, cased), living (W, 1.22, cased) |
+| hall | [−1.20, 1.20] | [2.22, 5.20] | 7.15 m² | the spine: living, bathroom, entry, bedroom; **2.40 m wide since issue #81** (was 1.80); east band built all the way to 5.20 since issue #67 |
+| entry (vestibule) | [1.32, 2.72] | [2.22, 3.90] | 2.35 m² | front door (S band, z 3.90, sealed; the case rode 0.07 east with the widened hall: x 1.32 … 2.34, leaf 1.40 … 2.26) + the bench, hooks and console issue #67 drew, all walked 0.30–0.32 m east by issue #81 |
+| bathroom | [−3.30, −1.32] | [2.22, 5.20] | 5.90 m² | was [2.22, 3.90] / 3.8 m² pre-#67, 6.8 m² [−1.02] post-#67; issue #81 gave the hall's widening 0.30 m off this face. The #67 clear-path rows all still pass (aisle 0.90, tub/toilet fronts 0.60); the toilet moved 0.30 m west to hold them, which made the towel bar run over the tank — the over-the-toilet bar a small bathroom really ships. Door-less on purpose (issue #31 rule): the player can never be trapped. Issue #82's litter tray (0.46 × 0.32 × 0.15) stands in the tub-flank pocket x −1.66 … −1.34 z 4.44 … 4.90 — cells the tub already shadowed, so every clear-path row still passes |
 | bedroom | [−2.60, 1.20] | [5.32, 9.32] | 15.2 m² | S window, closet, desk. Its N band (z 5.20 … 5.32) runs wider than the room, x −3.30 → 1.40: it is the bathroom's south face and the hall's end (issue #67) |
 | balcony | [0.55, 2.45] | [−4.40, −3.10] | 2.5 m² | outdoor decking, railing 1.00 m, glass door off the living room |
 
@@ -181,14 +196,17 @@ Openings (2.05 tall unless noted; every walkable one stays open all game):
 | `door-living-kitchen` | kitchen W wall (x 2.40–2.52) | z ∈ [−0.68, 0.38] | z ∈ [−0.60, 0.30], x ∈ [2.30, 2.62] | 0.90 |
 | `pass-kitchen` | same wall, over the counter | z ∈ [−1.90, −1.00], y 0.95–1.55 | (not walkable) | 0.90 |
 | `door-hall-bedroom` | bedroom N wall (z 5.20–5.32) | x ∈ [−0.53, 0.53] | x ∈ [−0.45, 0.45], z ∈ [5.10, 5.42] | 0.90 |
-| `open-hall-bath` | hall W wall (x −1.02–−0.90) | z ∈ [2.42, 3.48] | z ∈ [2.50, 3.40], x ∈ [−1.12, −0.80] | 0.90 (cased, no leaf) |
-| `open-hall-entry` | hall E wall (x 0.90–1.02) | z ∈ [2.52, 3.58] | z ∈ [2.60, 3.50], x ∈ [0.80, 1.12] | 0.90 (cased, no leaf) |
-| `door-front` | entry E wall (x 2.40–2.60) | z ∈ [2.72, 3.80] | (closed leaf — never walkable) | 0.92 as built |
+| `door-kitchen-dining` ★ | kitchen S wall (z 0.60–0.80) | x ∈ [2.68, 3.58] | x ∈ [2.68, 3.58], z ∈ [0.68, 1.00] | 0.90 (cased, no leaf — issue #81) |
+| `door-living-dining` ★ | living E wall (x 2.40–2.60) | z ∈ [0.80, 2.02] | x ∈ [2.22, 2.70], z ∈ [0.80, 2.02] | 1.22 (cased, no leaf — issue #81; its south jamb is `M-liv-s3`, the 0.12 stub the entry's east band left over) |
+| `open-hall-bath` | hall W wall (x −1.32–−1.20) | z ∈ [2.60, 3.45] | x ∈ [−1.50, −1.02], z ∈ [2.60, 3.45] | 0.85 (cased, no leaf; faces moved with the #81 hall) |
+| `open-hall-entry` | hall E wall (x 1.20–1.32) | z ∈ [2.60, 3.45] | x ∈ [1.02, 1.50], z ∈ [2.60, 3.45] | 0.85 (cased, no leaf; ditto) |
+| `door-front` | entry S wall (z 3.90, ext band) | x ∈ [1.32, 2.34] (rode 0.07 east with the widened hall) | (closed leaf 1.40 … 2.26 — never walkable) | 1.02 case, 0.86 leaf |
 | `door-balcony` | living N wall (z −3.10–−2.90) | x ∈ [0.77, 2.23] | x ∈ [0.85, 2.15], z ∈ [−3.04, −2.80] | 1.30 (1.46 glass sliding door) |
 
 Windows (sill 0.90 / head 2.10 unless noted): living N x∈[−2.10,−0.30];
 living E z∈[1.00,1.95]; kitchen N x∈[3.40,4.90] sill 0.95 head 1.75;
-bedroom S x∈[−1.90,−0.20]; bathroom W z∈[2.60,3.30] sill 1.50 head 2.05.
+bedroom S x∈[−1.90,−0.20]; bathroom W z∈[2.60,3.30] sill 1.50 head 2.05;
+dining S x∈[3.40,4.35] (issue #81, over the sideboard).
 No window is a route and none is a fall risk: the room rects stop short of
 them, so the player only ever sees the sky through glass it is meant to look
 out of.
@@ -335,3 +353,24 @@ Status log (append one line per step; re-read this if context is lost):
   and the corridor also got the furniture their colliders had promised since
   this plan was written (`coat-bench`, `hall-console`), which is what the ASCII
   above has always claimed the hall had.
+- 2026-11-16 — issue #81 grew the spine and spent the east void. The hall is
+  **2.40 m wide** (x −1.20 … 1.20, the issue's own ruler), financed by 0.30 m
+  off each of its flanks: the bathroom gives back x −1.32 … −1.02
+  (**1.98 × 2.98 = 5.90 m²**, every #67 clear-path row still passes — the
+  toilet slid 0.30 west to hold the fronts, which is what parks the towel bar
+  over the tank), and the entry's old west band dissolves into the corridor
+  (**1.40 × 1.68** is what the 1.40 × 1.70 ask ships at: the room's south
+  face is the exterior band's inner face at z 3.90 and the north jamb line
+  is the doorway's — 2 cm of the 1.70 would have been plaster). The
+  front-door case rode 0.07 east so its west jamb sits flush on the widened
+  hall's east band: case x 1.32 … 2.34, leaf 1.40 … 2.26 centred on 1.83.
+  And the void east of the entry is now the **dining room** (issue #81):
+  x 2.60 … 5.52, z 0.80 … 4.40, **9.99 m² usable** — round table Ø 1.05
+  top 0.75, four chairs seat 0.45 / back 0.86 on a 0.55 m ring, an
+  emissive-only pendant at shade-top 1.90, sideboard under the new south
+  window, art on the window's east pier; a 0.90 cased door into the kitchen
+  (the bar rode 0.44 m east to keep its lane) and a 1.22 cased door into the
+  living room's south-east corner. Net interior **79.59 m²**. Four checks
+  police it — `hall-width-in-band`, `dining-adjacent-and-sized`,
+  `dining-reachable-from-every-spawn`, `dining-walkways` — and
+  `furniture-real-scale` gained its three dining rows, 87 → 91.

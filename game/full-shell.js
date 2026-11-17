@@ -52,14 +52,33 @@ export const SLIDER_HEAD = 2.1;
 export const ROOMS = [
   { id: 'living', x0: -3.3, z0: -2.9, x1: 2.4, z1: 2.1, label: 'living room' },
   { id: 'kitchen', x0: 2.52, z0: -2.9, x1: 5.52, z1: 0.6, label: 'kitchen' },
-  { id: 'hall', x0: -0.9, z0: 2.22, x1: 0.9, z1: 5.2, label: 'hallway' },
-  { id: 'entry', x0: 1.02, z0: 2.22, x1: 2.4, z1: 3.9, label: 'entry' },
-  // Issue #67: the bathroom took the service void that used to sit behind its
-  // south wall — the band x [−3.30, −1.02], z [3.90, 5.20] was sealed plaster
-  // on three sides that no room owned. It is 2.28 × 2.98 = 6.8 m² now, and the
-  // party wall it ends on is the bedroom's own north band (M-bed), so no other
-  // room's rect, doorway or window moved.
-  { id: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.02, z1: 5.2, label: 'bathroom' },
+  // Issue #81: the hallway widened to a real 2.40 m (it was 1.80), taking
+  // 0.30 m off the bathroom's east band and 0.32 m off the entry's west side.
+  // Every hall opening kept its z position; the bands moved with it.
+  { id: 'hall', x0: -1.2, z0: 2.22, x1: 1.2, z1: 5.2, label: 'hallway' },
+  // Issue #81: the entry grew east into the old east void to keep its 1.40 m
+  // width after the hall took 0.30 m off its west side — 1.40 × 1.68 m, the
+  // front door (kept sealed, kept its 1.02 m case) now centred at x 1.83.
+  { id: 'entry', x0: 1.32, z0: 2.22, x1: 2.72, z1: 3.9, label: 'entry' },
+  // Issue #67: the bathroom took the service void behind its old south wall.
+  // Issue #81 gave 0.30 m of its east band back to the hall: 1.98 × 2.98 =
+  // 5.9 m², still above the issue's 5 m² minimum. The toilet stepped 0.30 m
+  // west with the plaster so the doorway field keeps its width (game/full-bath.js).
+  { id: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.32, z1: 5.2, label: 'bathroom' },
+  // Issue #81: the dining room, built in the sealed void east of the entry
+  // and south of it — L-shaped, and the rect below is its bounding box. The
+  // entry's new east band pokes into the rect's west edge south of the wide
+  // arm (x [2.6, 2.84], z [2.22, 4.4]); `subtract` takes that protrusion back
+  // out of every area number, so the real floor is 2.92 × 1.42 + 2.68 × 2.18
+  // = 9.99 m², above the issue's 7 m². (The south face first went up at the
+  // entry door line, z 3.90, for an 8.65 m² room; the issue's own numbers —
+  // a 1.05 m table, four chairs and a sideboard — want the extra half metre,
+  // so the face rides south into the void to 4.40.) It touches the kitchen
+  // and the living room, and only them, through two cased openings; the
+  // south exterior band carries its window (the living room's east window,
+  // `win-living-e`, was on the plaster the kitchen/dining door cuts through
+  // and came down with it).
+  { id: 'dining', x0: 2.6, z0: 0.8, x1: 5.52, z1: 4.4, label: 'dining room', subtract: 0.24 * 2.18 },
   { id: 'bedroom', x0: -2.6, z0: 5.32, x1: 1.2, z1: 9.32, label: 'bedroom' },
   // Outdoor, reached only through the living room's slider. Bounded by 1.10 m
   // parapets and a railing on top of the far one: no fall, and the camera can
@@ -68,10 +87,11 @@ export const ROOMS = [
 ];
 
 export function roomArea(room) {
-  return (room.x1 - room.x0) * (room.z1 - room.z0);
+  return (room.x1 - room.x0) * (room.z1 - room.z0) - (room.subtract ?? 0);
 }
-/** Net interior floor area (m²): 68.68 as built since issue #67, inside
- *  issue #33's 65–80 band (it was 65.67 while the bathroom stopped at z 3.90). */
+/** Net interior floor area (m²): 78.25 as built since issue #81 (it was 68.68
+ *  while the hall was 1.80 m wide and the east void was sealed plaster), inside
+ *  issue #33's 65–80 band. */
 export function netInteriorArea() {
   return ROOMS.filter((r) => !r.outdoor).reduce((sum, r) => sum + roomArea(r), 0);
 }
@@ -132,20 +152,47 @@ export const WALL_DEFS = [
   pier('N-kit-win-h', 'z', 3.4, 4.9, -3.1, 'wall-ext', 'kitchen', 1.75, WALL_H),
 
   // ── the kitchen's south and east exterior lines ─────────────────────────
-  pier('S-kit-1', 'z', 2.4, 5.72, 0.6, 'wall-ext', 'kitchen'),
+  // Issue #81: the kitchen half of the old south band stops at x 3.66 — its
+  // west end, x [2.60, 3.66], is now the cased kitchen→dining doorway (clear
+  // 0.90 m at x [2.68, 3.58]); the corner post at x [2.40, 2.60] stays with
+  // the living room's east line below, and the casing jambs fill the rest.
+  pier('S-kit-1', 'z', 3.66, 5.72, 0.6, 'wall-ext', 'kitchen'),
+  pier('S-kit-h', 'z', 2.6, 3.66, 0.6, 'wall-ext', 'kitchen', DOOR_HEAD, WALL_H),
   pier('E-kit-1', 'x', -3.1, 0.8, 5.52, 'wall-ext', 'kitchen'),
 
+  // ── the dining room's south and east exterior lines (issue #81) ─────────
+  // The old sealed east void becomes a room. Its south face started as the
+  // entry's door line carried east (z 3.90), but that made an 8.6 m² room —
+  // under the issue's 7 m² only after the notch, and too tight to walk four
+  // sides of a table — so the face rides south into the void to z 4.40:
+  // the room gains 0.50 m, the sideboard gets its wall under the window,
+  // and the old line's stubs behind the wall never see a camera. The face
+  // carries the dining window where the living room's removed east window
+  // used to look into nothing; the east face is the kitchen's line carried
+  // south (x 5.52 … 5.72).
+  pier('S-din-1', 'z', 2.34, 3.4, 4.4, 'wall-ext', 'entry'),
+  pier('D-win-s', 'z', 3.4, 4.35, 4.4, 'wall-ext', 'dining', 0, 0.9),
+  pier('D-win-h', 'z', 3.4, 4.35, 4.4, 'wall-ext', 'dining', 2.1, WALL_H),
+  pier('S-din-2', 'z', 4.35, 5.72, 4.4, 'wall-ext', 'dining'),
+  pier('E-din-1', 'x', 0.8, 4.6, 5.52, 'wall-ext', 'dining'),
+
   // ── the living room's east line, x 2.40 … 2.60 ──────────────────────────
-  // The kitchen half is the interior party wall (with the doorway into it),
-  // and north of the kitchen the same line turns exterior and carries the
-  // window over the breakfast table.
+  // The kitchen half is the interior party wall (with the doorway into it).
+  // Issue #81: north of the kitchen this line is the dining room's west wall
+  // and carries the cased living→dining door (structural gap z [0.72, 2.10],
+  // clear 1.22 m at z [0.80, 2.02] — twice the old window's width and the
+  // wide opening the issue asks for between the two rooms). The window over
+  // the old breakfast table, `win-living-e`, stood on exactly this plaster and
+  // came down with it; the dining room's new south window took its place.
+  // The opening's south jamb is `M-liv-s3`'s west end, not a pier of this
+  // line: the M-liv band at z [2.10, 2.22] already covers x [0.53, 2.84],
+  // so plaster here would grow INTO the cased door's clear (its leaf-free
+  // case runs to z 2.02 and the casing to 2.10).
   pier('E-liv-1', 'x', -2.9, -0.68, 2.4, 'wall-int', 'living'),
   pier('E-liv-2', 'x', 0.38, 0.6, 2.4, 'wall-int', 'living'),
   pier('E-liv-3', 'x', -2.9, 0.6, 2.4, 'wall-int', 'living', DOOR_HEAD, WALL_H),
-  pier('E-liv-4', 'x', 0.6, 1.0, 2.4, 'wall-ext', 'living'),
-  pier('E-liv-5', 'x', 1.95, 3.9, 2.4, 'wall-ext', 'living'),
-  pier('E-liv-win-s', 'x', 1.0, 1.95, 2.4, 'wall-ext', 'living', 0, 0.9),
-  pier('E-liv-win-h', 'x', 1.0, 1.95, 2.4, 'wall-ext', 'living', 2.1, WALL_H),
+  pier('E-liv-4', 'x', 0.6, 0.72, 2.4, 'wall-ext', 'living'),
+  pier('E-din-h', 'x', 0.72, 2.1, 2.4, 'wall-ext', 'dining', DOOR_HEAD, WALL_H),
 
   // ── the flat's west exterior line, x −3.50 … −3.30 ──────────────────────
   // Living room and bathroom, then the piece that seals the unlit service
@@ -156,15 +203,31 @@ export const WALL_DEFS = [
   pier('W-bath-win-s', 'x', 2.6, 3.3, -3.5, 'wall-ext', 'bathroom', 0, 1.5),
   pier('W-bath-win-h', 'x', 2.6, 3.3, -3.5, 'wall-ext', 'bathroom', 2.05, WALL_H),
 
-  // ── the wall between the living room and the hall/entry, z 2.10 … 2.22 ──
+  // ── the living room / hall party wall, z 2.10 … 2.22 ────────────────────
+  // Issue #81: the east pier now meets the dining room's west band at x 2.60,
+  // and `M-liv-s3` fills the small corner from there to the entry's new east
+  // band at x 2.84 — it is the north jamb of the living→dining doorway.
   pier('M-liv-s1', 'z', -3.3, -0.53, 2.1, 'wall-int', 'living'),
-  pier('M-liv-s2', 'z', 0.53, 2.4, 2.1, 'wall-int', 'living'),
+  pier('M-liv-s2', 'z', 0.53, 2.6, 2.1, 'wall-int', 'living'),
   pier('M-liv-s-h', 'z', -0.53, 0.53, 2.1, 'wall-int', 'living', DOOR_HEAD, WALL_H),
+  pier('M-liv-s3', 'z', 2.6, 2.84, 2.1, 'wall-int', 'dining'),
 
   // ── the entry: south exterior wall with the (shut) front door ───────────
-  pier('S-ent-1', 'z', 1.02, 1.25, 3.9, 'wall-ext', 'entry'),
-  pier('S-ent-2', 'z', 2.27, 2.6, 3.9, 'wall-ext', 'entry'),
-  pier('S-ent-h', 'z', 1.25, 2.27, 3.9, 'wall-ext', 'entry', DOOR_HEAD, WALL_H),
+  // Issue #81 carried this line east across the old east void (S-din-1 above
+  // continues it to the dining window). The door keeps its 1.02 m case and
+  // its leaf — only the case slid 0.07 m east, to x [1.32, 2.34], so its west
+  // jamb sits flush on the widened hall's east band instead of buried in it.
+  // `S-ent-1` is now the 12 cm corner post between that band and the case.
+  pier('S-ent-1', 'z', 1.2, 1.32, 3.9, 'wall-ext', 'entry'),
+  pier('S-ent-h', 'z', 1.32, 2.34, 3.9, 'wall-ext', 'entry', DOOR_HEAD, WALL_H),
+
+  // ── the entry's east wall (issue #81) ────────────────────────────────────
+  // The wall the dining room hangs on: it seals the entry's east side, gives
+  // the dining room's south arm its west face (x 2.84), and closes the slot
+  // between the two rooms. It runs the whole depth, living-wall band to
+  // dining south band, with no opening — the entry is reached from the hall
+  // alone, and an opening here would give the dining room a third neighbour.
+  pier('E-ent-1', 'x', 2.22, 4.4, 2.72, 'wall-int', 'entry'),
 
   // ── the bathroom: the east wall to the hall with a door-less cased opening
   //    (a room you can walk into and never leave is issue #31's bug, so nothing
@@ -173,23 +236,25 @@ export const WALL_DEFS = [
   //    band (M-bed, z 5.20), so the sealed service void behind it became floor.
   //    Nothing else had to be built — W-2 already ran to z 5.52 and E-bath-2 to
   //    5.20, which is how the void was sealed in the first place. ──
-  pier('E-bath-1', 'x', 2.22, 2.52, -1.02, 'wall-int', 'bathroom'),
-  pier('E-bath-2', 'x', 3.53, 5.2, -1.02, 'wall-int', 'bathroom'),
-  pier('E-bath-h', 'x', 2.52, 3.53, -1.02, 'wall-int', 'bathroom', DOOR_HEAD, WALL_H),
+  // Issue #81: the plaster face moved west to x −1.32 with the hall's
+  // widening; the opening kept its z span (2.42 … 3.48 structural).
+  pier('E-bath-1', 'x', 2.22, 2.52, -1.32, 'wall-int', 'bathroom'),
+  pier('E-bath-2', 'x', 3.53, 5.2, -1.32, 'wall-int', 'bathroom'),
+  pier('E-bath-h', 'x', 2.52, 3.53, -1.32, 'wall-int', 'bathroom', DOOR_HEAD, WALL_H),
 
   // ── the hall: west wall to the bathroom (the opening above is E-bath),
   //    east wall to the entry (its own cased opening), south wall to the
   //    bedroom (its door is the gap in M-bed) ──
-  pier('E-hall-1', 'x', 2.22, 2.52, 0.9, 'wall-int', 'hall'),
-  pier('E-hall-2', 'x', 3.53, 3.9, 0.9, 'wall-int', 'hall'),
-  // Issue #67: the east band stopped at z 3.90, the entry's south face. Past
-  // that the corridor had no wall at all, so from the hall you looked straight
-  // out into the sky — the "ends in a dark nothing" of the issue. The band
-  // x [0.90, 1.02], z [3.90, 5.20] is unowned service space on the far side,
-  // never seen from any room, but it is what closes the corridor on the console
-  // table and the bedroom door.
-  pier('E-hall-3', 'x', 3.9, 5.2, 0.9, 'wall-int', 'hall'),
-  pier('E-hall-h', 'x', 2.52, 3.53, 0.9, 'wall-int', 'hall', DOOR_HEAD, WALL_H),
+  pier('E-hall-1', 'x', 2.22, 2.52, 1.2, 'wall-int', 'hall'),
+  pier('E-hall-2', 'x', 3.53, 3.9, 1.2, 'wall-int', 'hall'),
+  // Issue #67: the east band stops at z 3.90, the entry's south face. Past
+  // that the corridor is closed on the console table and the bedroom door by
+  // the band x [1.20, 1.32], z [3.90, 5.20] — service space on the far side,
+  // never seen from any room. Issue #81: both faces moved 0.30 m east with
+  // the widening (the entry moved 0.32 east, leaving the 12 cm S-ent-1 post);
+  // the opening kept its z span (2.42 … 3.48 structural).
+  pier('E-hall-3', 'x', 3.9, 5.2, 1.2, 'wall-int', 'hall'),
+  pier('E-hall-h', 'x', 2.52, 3.53, 1.2, 'wall-int', 'hall', DOOR_HEAD, WALL_H),
 
   // ── the bedroom: 3.80 × 4.00 with a window on the south exterior wall ──
   pier('M-bed-1', 'z', -3.3, -0.53, 5.2, 'wall-int', 'bedroom'),
@@ -229,23 +294,39 @@ export const OPENINGS = [
   // For the `door` kind, `swingHi` names the hinge jamb (true: the leaf lies
   // along the plaster beyond `hi`, false: beyond `lo`) and `swingOut` lies the
   // leaf against toRoom's plaster instead of o.room's. They are chosen so the
-  // leaf has a clear run of wall: living-hall west (open floor), living-kitchen
-  // north (clear to the window), hall-bedroom east AND bedroom-side — the hall
-  // has only 37 cm of plaster either side of that opening, and the bedroom's
-  // north face is clear east to the corner (issue #65, docs/LEVEL_LAYOUT.md).
+  // leaf has a clear run of wall: living-hall west (open floor), hall-bedroom
+  // east AND bedroom-side — the hall has only 37 cm of plaster either side of
+  // that opening, and the bedroom's north face is clear east to the corner
+  // (issue #65, docs/LEVEL_LAYOUT.md).
   { id: 'door-living-hall', kind: 'door', room: 'living', toRoom: 'hall', axis: 'z', fixed: 2.1, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD, swingHi: false },
-  { id: 'door-living-kitchen', kind: 'door', room: 'living', toRoom: 'kitchen', axis: 'x', fixed: 2.4, lo: -0.6, hi: 0.3, sill: 0, head: DOOR_HEAD, swingHi: true },
+  // Issue #81: living-kitchen went `cased` with the dining room. Its only
+  // remaining leaf-park run — north of the opening, z [0.38, 1.24] — is now
+  // the living→dining doorway's own bridge rect, so a leaf there would stand
+  // in a walkable opening (`doors-read-open` rightly fails it), and the flat's
+  // rule is that nothing may ever be shut or stand in a way. A cased opening
+  // keeps the trim and loses the leaf, same as the bathroom's and the dining
+  // room's.
+  { id: 'door-living-kitchen', kind: 'cased', room: 'living', toRoom: 'kitchen', axis: 'x', fixed: 2.4, lo: -0.6, hi: 0.3, sill: 0, head: DOOR_HEAD },
   { id: 'door-hall-bedroom', kind: 'door', room: 'hall', toRoom: 'bedroom', axis: 'z', fixed: 5.2, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD, swingHi: true, swingOut: true },
-  { id: 'open-hall-bath', kind: 'cased', room: 'hall', toRoom: 'bathroom', axis: 'x', fixed: -0.9, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
-  { id: 'open-hall-entry', kind: 'cased', room: 'hall', toRoom: 'entry', axis: 'x', fixed: 0.9, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
+  { id: 'open-hall-bath', kind: 'cased', room: 'hall', toRoom: 'bathroom', axis: 'x', fixed: -1.2, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
+  { id: 'open-hall-entry', kind: 'cased', room: 'hall', toRoom: 'entry', axis: 'x', fixed: 1.2, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
+  // Issue #81: the dining room's two wide cased openings (issue: "an opening
+  // wide enough to walk through into the dining room" — both get more than a
+  // metre of clear width) and its south window. Neither has a leaf, so
+  // neither can be shut and neither parks one (the cased convention the
+  // bathroom and entry openings already keep).
+  { id: 'door-kitchen-dining', kind: 'cased', room: 'kitchen', toRoom: 'dining', axis: 'z', fixed: 0.6, lo: 2.68, hi: 3.58, sill: 0, head: DOOR_HEAD },
+  { id: 'door-living-dining', kind: 'cased', room: 'living', toRoom: 'dining', axis: 'x', fixed: 2.4, lo: 0.8, hi: 2.02, sill: 0, head: DOOR_HEAD },
   { id: 'slider-balcony', kind: 'slider', room: 'living', toRoom: 'balcony', axis: 'z', fixed: -2.9, lo: 0.85, hi: 2.15, sill: 0, head: SLIDER_HEAD },
-  { id: 'door-front', kind: 'sealed', room: 'entry', toRoom: 'outside', axis: 'z', fixed: 3.9, lo: 1.25, hi: 2.27, sill: 0, head: DOOR_HEAD },
+  { id: 'door-front', kind: 'sealed', room: 'entry', toRoom: 'outside', axis: 'z', fixed: 3.9, lo: 1.32, hi: 2.34, sill: 0, head: DOOR_HEAD },
 
   { id: 'win-living-n', kind: 'window', room: 'living', axis: 'z', fixed: -2.9, lo: -2.1, hi: -0.3, sill: 0.9, head: 2.1 },
-  { id: 'win-living-e', kind: 'window', room: 'living', axis: 'x', fixed: 2.4, lo: 1.0, hi: 1.95, sill: 0.9, head: 2.1 },
+  // Issue #81: `win-living-e` came down — its plaster is the living→dining
+  // doorway now, and the dining room's south window below faces the same way.
   { id: 'win-kitchen-n', kind: 'window', room: 'kitchen', axis: 'z', fixed: -2.9, lo: 3.4, hi: 4.9, sill: 0.95, head: 1.75 },
   { id: 'win-bedroom-s', kind: 'window', room: 'bedroom', axis: 'z', fixed: 9.32, lo: -1.9, hi: -0.2, sill: 0.9, head: 2.1 },
   { id: 'win-bath-w', kind: 'window', room: 'bathroom', axis: 'x', fixed: -3.3, lo: 2.6, hi: 3.3, sill: 1.5, head: 2.05 },
+  { id: 'win-dining-s', kind: 'window', room: 'dining', axis: 'z', fixed: 4.4, lo: 3.4, hi: 4.35, sill: 0.9, head: 2.1 },
 ];
 
 /** --------------------------------------------------------------------------
@@ -257,9 +338,17 @@ export const OPENINGS = [
 export const FLOORS = [
   { id: 'living', room: 'living', x0: -3.3, z0: -2.9, x1: 2.4, z1: 2.1, finish: 'oak' },
   { id: 'kitchen', room: 'kitchen', x0: 2.52, z0: -2.9, x1: 5.52, z1: 0.6, finish: 'tile' },
-  { id: 'hall', room: 'hall', x0: -0.9, z0: 2.22, x1: 0.9, z1: 5.2, finish: 'oak' },
-  { id: 'entry', room: 'entry', x0: 1.02, z0: 2.22, x1: 2.4, z1: 3.9, finish: 'tile' },
-  { id: 'bathroom', room: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.02, z1: 5.2, finish: 'tile' },
+  { id: 'hall', room: 'hall', x0: -1.2, z0: 2.22, x1: 1.2, z1: 5.2, finish: 'oak' },
+  { id: 'entry', room: 'entry', x0: 1.32, z0: 2.22, x1: 2.72, z1: 3.9, finish: 'tile' },
+  { id: 'bathroom', room: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.32, z1: 5.2, finish: 'tile' },
+  // Issue #81: the dining floor is the room's L — its NORTH half (the kitchen
+  // end, z 0.80 … 2.22) runs the full 2.92 m width and carries the living
+  // door's floor; its south half starts at the entry's east band (x 2.84),
+  // which cuts the L's notch out of the bounding box. Two rects, one finish,
+  // so the tile reads continuous across the step like the room is. (The
+  // entry's own floor gained the same 0.32 m.)
+  { id: 'dining-n', room: 'dining', x0: 2.6, z0: 0.8, x1: 5.52, z1: 2.22, finish: 'tile' },
+  { id: 'dining-s', room: 'dining', x0: 2.84, z0: 2.22, x1: 5.52, z1: 4.4, finish: 'tile' },
   { id: 'bedroom', room: 'bedroom', x0: -2.6, z0: 5.32, x1: 1.2, z1: 9.32, finish: 'oak' },
   { id: 'balcony', room: 'balcony', x0: 0.43, z0: -4.52, x1: 2.57, z1: -3.1, finish: 'concrete' },
 ];
@@ -294,15 +383,34 @@ export const CEILINGS = FLOORS.filter((f) => f.room !== 'balcony').map((f) => ({
 export const SUPPORT_DEFS = {
   // living room
   cushion: { x0: -3.0, z0: -0.93, x1: -2.46, z1: 0.73, top: 0.45 },
+  // issue #82: the yellow heat pad on the south cushion — its own patch at the
+  // pad's own top (0.48, the pad is 3 cm of warming), fully inside `cushion`,
+  // so the pad cat stands on furniture twice over and the pad never floats.
+  heatPad: { x0: -2.93, z0: 0.08, x1: -2.53, z1: 0.63, top: 0.48 },
   sofaBackTop: { x0: -3.28, z0: -1.1, x1: -3.04, z1: 0.9, top: 0.85 },
   coffeeTop: { x0: -1.87, z0: -0.97, x1: -1.33, z1: 0.17, top: 0.45 },
   boxFloor: { x0: -2.3, z0: 1.4, x1: -1.85, z1: 1.75, top: 0.001 },
   tvTop: { x0: 2.0, z0: -2.38, x1: 2.38, z1: -0.87, top: 0.45 },
-  diningTop: { x0: 0.77, z0: 1.12, x1: 2.33, z1: 1.88, top: 0.75 },
+  // dining room (issue #81) — the round table's top patch, inset a step from
+  // the table's edge (the cat's 0.21 m spot capsule has to land ON the wood),
+  // centre (4.06, 2.28), diameter 1.05, top 0.75. The old `diningTop` named a
+  // breakfast-table support in the living room that no spot ever used; the
+  // name moved with the room.
+  diningTop: { x0: 3.56, z0: 1.78, x1: 4.56, z1: 2.78, top: 0.75 },
+  // issue #82: the four dining chairs' own seats — game/full-dining.js's
+  // CHAIRS cardinals (centres 0.55 m off the table, 0.44 × 0.45 footprint),
+  // seat top 0.45. Each patch is exactly one drawn chair's seat slab, so a
+  // cat drawn to a chair stands on that chair.
+  diningSeatN: { x0: 3.84, z0: 1.505, x1: 4.28, z1: 1.955, top: 0.45 },
+  diningSeatE: { x0: 4.39, z0: 2.055, x1: 4.83, z1: 2.505, top: 0.45 },
+  diningSeatS: { x0: 3.84, z0: 2.605, x1: 4.28, z1: 3.055, top: 0.45 },
+  diningSeatW: { x0: 3.29, z0: 2.055, x1: 3.73, z1: 2.505, top: 0.45 },
   // kitchen
   counterTop: { x0: 2.52, z0: -2.88, x1: 4.93, z1: -2.32, top: 0.9 },
   counterTopW: { x0: 2.54, z0: -2.28, x1: 3.1, z1: -1.07, top: 0.9 },
-  barTop: { x0: 3.32, z0: 0.22, x1: 4.88, z1: 0.58, top: 1.05 },
+  // issue #81: the bar stepped 0.44 m east (its old west end stood where the
+  // kitchen→dining doorway's jamb now is) and gave up 0.20 m of length
+  barTop: { x0: 3.76, z0: 0.22, x1: 5.12, z1: 0.58, top: 1.05 },
   // balcony (docs/CHARACTERS.md: Bobo does go outside)
   chairSeat: { x0: 1.93, z0: -3.87, x1: 2.42, z1: -3.33, top: 0.42 },
   // bathroom — issue #49: the counter grew to its ruler footprint (0.90 ×
@@ -323,6 +431,10 @@ export const SUPPORT_DEFS = {
   blanketTop: { x0: -0.89, z0: 7.16, x1: -0.63, z1: 8.57, top: 0.58 },
   nightstandTop: { x0: -2.58, z0: 6.57, x1: -2.17, z1: 7.03, top: 0.55 },
   deskTop: { x0: -2.53, z0: 5.34, x1: -1.17, z1: 6.0, top: 0.75 },
+  // issue #82: the desk chair's own cushion (game/full-bedroom.js's
+  // chair-seat + chair-cushion, 0.40 × 0.38 at top 0.47) — the rolled-up
+  // chair by the desk is where a cat naps in a human's seat.
+  deskChair: { x0: -2.18, z0: 6.1, x1: -1.78, z1: 6.48, top: 0.47 },
   kbTop: { x0: -2.13, z0: 5.74, x1: -1.57, z1: 5.9, top: 0.79 },
   laundryTop: { x0: 0.64, z0: 8.82, x1: 1.0, z1: 9.18, top: 0.55 },
 };
