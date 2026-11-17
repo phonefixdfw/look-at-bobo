@@ -319,6 +319,11 @@ export const CURTAIN = {
   rodZ: 4.43, // hung just inside the tub's north face
   x0: -3.28, // tucked behind the west plaster
   x1: -1.72, // bracket post at the tub's east end
+  clothX1: -2.15, // where the gathered cloth ends (issue #70): the ROD spans
+  // x0..x1 like always, but the 15 folds are bunched into x0..clothX1, leaving
+  // an open 0.43 m of doorway at the east end — behind that cloth is the tub,
+  // and behind that gap is how the cat stays findable. The fold boxes live in
+  // one merged mesh, so gathering changes numbers, not draw calls.
   yBottom: 0.62, // 7 cm over the rim — cloth, not a fence
   yTop: 1.94,
   folds: 15, // panels across the run

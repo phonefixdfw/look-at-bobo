@@ -1480,3 +1480,71 @@ rather than light sources, because the flat is at the `realLights <= 6` cap and
 the honest way to light five rooms with four fills is to place them where two
 rooms share one. The bathroom keeps no door: the player who cannot be trapped
 also cannot be locked in a bright one.
+
+## 27. Issue #70 — partial hiding: Bobo behind the curtain (findable, always)
+
+**Asked for (Brandon, 2026-11-16):** the finds are all "out in the open".
+Give the flat hiding spots — Bobo (and the decoy) partly behind shower
+curtains, plants, furniture — with one hard rule: a hidden cat must stay
+*findable*, and the draw-call budget is what it is.
+
+**The budget said zero, so it got zero.** The worst full-flat frame sits at
+**149 of 150** draw calls, so a "hiding" feature that added even one curtain
+panel or one leaf would blow the cap. The whole thing shipped as **data plus
+two prop edits**: no new mesh is drawn for hiding anywhere. The edits are
+re-cuts of geometry that already draws — the shower curtain's 15 folds now
+bunch within `CURTAIN.clothX1` (−2.15) instead of spreading the rod's full
+0.94 m (denser bellows = gathered, the rod still spans the whole rim), and
+`big-plant`'s fronds grew 0.36 → 0.50 m with the same 26 leaves.
+
+**What hides what** — measured in-page, on the shipped build, by the
+`findable` check itself (`id / visible-ring / nearest vantage`):
+
+| spot | behind | visible ring | vantage | before / note |
+|---|---|---|---|---|
+| `laundry-nap.bath-tub` (new) | `shower-curtain` | **5 %** | 1.14 m | unhidden tub cat: 38 % |
+| `window-bird.n-window` | `big-plant` | 42 % | 0.90 m | unhidden: 59 % |
+| `hall-chase.bath-mat` | `tub` | 29 % | 0.90 m | 0.55 m rim is the cover |
+| `blanket-biscuits.dresser-gap` (new) | `dresser` | 28 % | 0.90 m | floor nook south of the dresser |
+| `sink-sit.counter-return` | `counter-w` | 26 % | 0.90 m | loaf behind the run's west flank |
+| `d-kitchen` (decoy) | `counter-w` | 24 % | 0.90 m | decoys may hide too — never Bobo's spot |
+
+The centrepiece: the laundry nap moved **into the tub** for once — a `side`
+nap on the well floor (new `tubWell` support, the `vanityTop` precedent in
+`full-shell.js`), back to the gathered cloth. Five percent of everything a
+player could stand and still be inside the flat can see that cat at all;
+the find is the gap at the cloth's east end.
+
+**"Hide" is data the build measures.** A spot gains `hide: '<prop>'`;
+`HIDE_PROPS` gives each prop an axis-aligned box at its **true drawn
+height** — `SIGHT_HEIGHTS` carries a row for all 38 `COLLIDERS` (a missing
+row fails the check by name), the curtain box comes from the `CURTAIN`
+constants and is not a collider (cloth is walk-through; the walking model
+did not change anywhere). The engine's own LOS clips colliders at eye
+height (1.05 m) for the AI; the new `findable` check raycasts the cat's aim
+point over **true** tops plus the hide box, around a 24-point ring 2.2 m
+out clipped to the flat's walkable rects. Fails-the-build, in order: a
+hiding spot with no vantage at all ("partly hidden, never unfindable"); a
+`hide` that hides nothing (≥ 50 % of the ring still sees the cat); more
+than 25 % of the pool hiding (5/30 = 17 % today); fewer than 6 hiding spots
+(existing). The shout itself needed no exemption code — `catUnderCrosshair`
+only raycasts the two cat roots, so no prop can ever block a find.
+
+**Rejected by measurement, on the record.** A coat-bench hide for
+`d-entry`: the bench's true-height box changes no ring percentage — it is
+simply too low to cover a sitting cat, so no `hide` was claimed. A hall-door
+nook behind the console: that corner's blindness is walls, not furniture —
+its unfindability predates the console and a hide there would have had to
+be exempted rather than fixed. A bath-mat hide "behind the vanity": the
+vanity is on the far wall — geometrically nonsense; the mat's honest cover
+is the tub's flank. Growing the dresser and bench boxes to make better
+numbers: rejected — boxes must equal what is drawn, which is why
+`SIGHT_HEIGHTS` exists.
+
+**The pool stayed legal.** `SPOTS` 28 → 30. `blanket-biscuits.dresser-gap`
+is deliberately a `blanket-biscuits` spot, not `couch-loaf`: every spot of
+that type is already a bedroom one, so the alternation `run-draw-legal`
+polices (never six same-room catches in the ten) can never be forced. 2 000
+seeded draws verified legal; both new spots land in ≈ 34 % of runs, far over
+the `pool-coverage-over-random-seeds` floor. `capture:full:spots` and
+`capture:full:patriot` stage named ids — every one still exists.

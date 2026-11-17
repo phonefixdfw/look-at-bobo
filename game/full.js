@@ -13,7 +13,7 @@
 import * as LEVEL from './full-level.js';
 import { livingGapReport } from './full-living.js';
 import { bathGapReport, FOOT } from './full-bath.js';
-import { buildGrid, nearestStandable, bestApproach } from '../src/reach.js';
+import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
@@ -169,7 +169,8 @@ function batThePen(pen, supports, t) {
  * #53 added) and the rest of the full page's stack (furniture scale, title
  * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, and
  * the three door/wood checks issue #65 added, and the four bathroom/entry
- * checks issue #67 added, so the full page reports 81. */
+ * checks issue #67 added, and the `findable` hiding guarantee issue #70
+ * added, so the full page reports 82. */
 /** Door frames are rendered ONCE per page by `doorways-read-open`: they
  *  check static geometry, and selfTest runs per capture frame — re-rendering
  *  six extra frames every time starves the live frame loop under load (the
@@ -249,6 +250,76 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       '≥3 side/back moments + ≥1 lying decoy, head+body ray-hit from an approach',
       lying.length >= 3 && lyingDecoy.length >= 1 && lbad.length === 0,
       'pointing still works on a lying cat (issue #27)',
+    );
+  }
+
+  // Issue #70: PARTIAL HIDING means partial. Every spot whose `hide` names a
+  // prop is re-measured with the sight maths at each prop's TRUE drawn height
+  // (SIGHT_HEIGHTS — the engine's own 1.05 clip is right for walking AI and
+  // wrong here: a 0.86 m vanity must hide what it really hides, and a grown
+  // plant what it NOW hides), plus the hide box itself (cloth like the shower
+  // curtain is not a collider — nothing else would ever block for it). The
+  // test: with the cover in place, `bestApproach` — the very function the
+  // engine's hint system uses — must still return a vantage that sees the
+  // cat. A spot that becomes unfindable behind its own prop fails the build,
+  // by name. The visible-ring percentage rides along in the value so the
+  // capture report carries the per-spot evidence ("how hidden" next to "is
+  // findable"). Hiding never blocks the SHOUT either, and that part is not
+  // measured but structural: catUnderCrosshair raycasts against the two cat
+  // roots only — no prop is ever between the crosshair and the cat.
+  {
+    const bad = [];
+    const lines = [];
+    const hidden = [...(SPOTS ?? []), ...DECOY_SPOTS].filter((s) => s.hide);
+    if (hidden.length) {
+      const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: LEVEL.MOVE.playerRadius });
+      const seen = grid.flood(grid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1]));
+      const noRow = LEVEL.COLLIDERS.filter((c) => LEVEL.SIGHT_HEIGHTS[c.id] === undefined).map((c) => c.id);
+      if (noRow.length) bad.push(`SIGHT_HEIGHTS missing rows: ${noRow.join(', ')}`);
+      const losTrue = [
+        ...wallBoxes,
+        ...LEVEL.COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: LEVEL.SIGHT_HEIGHTS[c.id] ?? 1.05 })),
+      ];
+      const eye = LEVEL.MOVE.eye;
+      for (const s of hidden) {
+        const prop = LEVEL.HIDE_PROPS[s.hide];
+        if (!prop) { bad.push(`${s.id}: hide "${s.hide}" names no HIDE_PROPS row`); continue; }
+        const [x, sup, z] = s.spot ?? s.pos;
+        const y = supports[sup] ?? 0;
+        const los = [...losTrue, ...prop.boxes.map((b) => ({ id: `hide:${s.hide}`, ...b }))];
+        const a = bestApproach(grid, seen, { x, z, y, los, eye });
+        if (!a) { bad.push(`${s.id}: UNFINDABLE behind ${s.hide}`); continue; }
+        // how hidden: reachable ring cells (the approach band, 0.9…3.4 m)
+        // that can see the cat at all, behind its cover
+        let vis = 0, ring = 0;
+        const c0 = grid.cellAt(x, z);
+        const i0 = Math.floor(c0 / grid.cols), j0 = c0 % grid.cols;
+        for (let i = i0 - 34; i <= i0 + 34 && ring < 1e9; i++) {
+          for (let j = j0 - 34; j <= j0 + 34; j++) {
+            const idx = i * grid.cols + j;
+            if (i < 0 || j < 0 || idx < 0 || idx >= grid.free.length) continue;
+            if (!grid.free[idx] || !seen[idx]) continue;
+            const c = grid.centre(idx);
+            const d = Math.hypot(c.x - x, c.z - z);
+            if (d < 0.9 || d > 3.4) continue;
+            ring++;
+            if (lineClear(los, c.x, eye, c.z, x, y + 0.3, z)) vis++;
+          }
+        }
+        const share = ring ? vis / ring : 0;
+        if (share >= 0.5) bad.push(`${s.id}: ${s.hide} hides nothing (${Math.round(share * 100)}% of the ring sees him)`);
+        lines.push(`${s.id}/${Math.round(share * 100)}%/${a.dist.toFixed(2)}m`);
+      }
+      const pool = SPOTS ?? [];
+      const hiddenBobo = pool.filter((s) => s.hide).length;
+      if (hiddenBobo > pool.length / 4) bad.push(`hiding pool grew past a quarter (${hiddenBobo}/${pool.length})`);
+    }
+    add(
+      'findable',
+      bad.length ? bad.join(', ') : `${lines.length} hiding spots all findable — id/visible-ring%/nearest-vantage: ${lines.join(' ')}`,
+      'every `hide` spot has a vantage that sees it; <50% of the ring sees a hiding cat; ≤25% of the pool hides',
+      !bad.length && hidden.length >= 6,
+      'issue #70: partly hidden, never unfindable — and the shout ray only ever tests the cat meshes, so props cannot block a find',
     );
   }
 

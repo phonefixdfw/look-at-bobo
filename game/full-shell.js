@@ -308,6 +308,10 @@ export const SUPPORT_DEFS = {
   // bathroom — issue #49: the counter grew to its ruler footprint (0.90 ×
   // 0.48), the support is the marble's top face inside that footprint
   vanityTop: { x0: -3.28, z0: 2.24, x1: -2.42, z1: 2.68, top: 0.86 },
+  // issue #70: the tub's well floor — FOOT.tub (game/full-bath.js row 56)
+  // inset 6 cm past the rim rails, top 0.52 under the 0.55 rim. The laundry-
+  // nap cat naps here, behind the gathered shower curtain.
+  tubWell: { x0: -3.24, z0: 4.51, x1: -1.76, z1: 5.14, top: 0.52 },
   // issue #49: the lid moved with the toilet to the north wall — the closed
   // lid of the real piece, top 0.425 (no spot uses it yet; it stays honest)
   toiletLid: { x0: -2.0, z0: 2.54, x1: -1.65, z1: 2.87, top: 0.425 },

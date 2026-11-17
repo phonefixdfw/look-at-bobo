@@ -24,7 +24,7 @@ import { MOVE } from './level.js';
 import { KITCHEN_COLLIDERS } from './full-kitchen.js';
 import { KITCHEN_DETAILS_COLLIDERS } from './full-kitchen-details.js';
 import { LIVING_COLLIDERS } from './full-living.js';
-import { BATH_COLLIDERS, BALCONY_COLLIDERS } from './full-bath.js';
+import { BATH_COLLIDERS, BALCONY_COLLIDERS, CURTAIN } from './full-bath.js';
 import { BEDROOM_COLLIDERS } from './full-bedroom.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
@@ -126,6 +126,70 @@ export const COLLIDERS = [
   ...BALCONY_COLLIDERS,
 ];
 
+/** The height each collider's DRAWN piece actually reaches (y, from the
+ *  finish floor), keyed by the same id as COLLIDERS. The engine's sight model
+ *  clips every push box at y 1.05 so a person sees over a chair but not a
+ *  fridge (LOS_TOP in game/engine.js) — right for walking AI, wrong for
+ *  proving a cat is visible, where a 0.86 m vanity must hide what it really
+ *  hides and a grown plant must hide what it NOW hides. The `findable` check
+ *  in game/full.js re-runs the sight maths at these heights and fails by name
+ *  if a collider has no row here, so this table cannot drift silently.
+ *  Every number is the tallest drawn box of that piece (builders' `piece()`
+ *  calls / the ruler); the big-plant row is the issue #70 grown fronds. */
+export const SIGHT_HEIGHTS = {
+  'sofa': 0.85, 'coffee-table': 0.45, 'side-table': 0.55, 'floor-lamp': 1.55,
+  'tv-stand': 0.45, 'bookshelf': 1.9, 'big-plant': 1.15, 'cardboard-box': 0.45,
+  'dining-table': 0.75, 'chair-a': 0.9, 'chair-b': 0.9,
+  'counter-n': 0.9, 'counter-w': 0.9, 'counter-e': 0.9, 'fridge': 1.8,
+  'kitchen-bar': 1.05, 'bar-stool-a': 0.62, 'bar-stool-b': 0.62, 'kitchen-bin': 0.5,
+  'hall-console': 0.78, 'coat-bench': 0.62,
+  'vanity': 0.86, 'toilet': 0.8, 'tub': 0.55, 'bath-bin': 0.45,
+  'bed': 0.58, 'nightstand': 0.55, 'nightstand-south': 0.55, 'dresser': 0.78,
+  'wardrobe': 2.1, 'desk': 0.75, 'desk-chair': 0.41, 'laundry-basket': 0.37,
+  'bedroom-plant': 0.9,
+  'balcony-railing': 1.05, 'balcony-chair': 0.8, 'balcony-table': 0.72, 'balcony-plant': 0.95,
+};
+
+/** --------------------------------------------------------------------------
+ *  The props that partly cover a hiding cat — issue #70. A spot names its
+ *  cover in `hide` (see the SPOTS note above); this table says what that
+ *  cover is made of, as sight boxes in world space, derived from the SAME
+ *  builder numbers that draw the prop. Two of these are not colliders at all:
+ *  the shower curtain is cloth you can walk through, and the plant's canopy
+ *  spreads past its push box. The `findable` check in game/full.js adds these
+ *  boxes (at TRUE height, per SIGHT_HEIGHTS) to the sight model and demands a
+ *  vantage that still sees the cat — so "partly hidden" can never rot into
+ *  "unfindable". `hide` that names a prop missing here is a hard failure.
+ *  -------------------------------------------------------------------------- */
+const colliderById = Object.fromEntries(COLLIDERS.map((c) => [c.id, c]));
+
+/** Sight box for a drawn prop: its collider footprint, optionally widened
+ *  (leaf canopies spill), from y0 up to the piece's true drawn height. */
+function sightBox(id, { pad = 0, y0 = 0, y1 = SIGHT_HEIGHTS[id] } = {}) {
+  const c = colliderById[id];
+  return { x0: c.x0 - pad, x1: c.x1 + pad, z0: c.z0 - pad, z1: c.z1 + pad, y0, y1 };
+}
+
+export const HIDE_PROPS = {
+  // the gathered cloth (issue #70): folds are bunched into CURTAIN.x0..clothX1
+  // by game/full-bath-mesh.js, and the sight test must respect exactly that —
+  // the open rod gap east of clothX1 is what keeps the tub cat findable.
+  'shower-curtain': {
+    boxes: [{
+      x0: CURTAIN.x0, x1: CURTAIN.clothX1,
+      z0: CURTAIN.rodZ - CURTAIN.depth, z1: CURTAIN.rodZ + CURTAIN.depth,
+      y0: CURTAIN.yBottom, y1: CURTAIN.yTop,
+    }],
+  },
+  // the grown fronds spread about 0.10 m past the plant's push box in every
+  // direction and stand 1.15 over the floor — the box the leaves actually fill
+  'big-plant': { boxes: [sightBox('big-plant', { pad: 0.1 })] },
+  // plain furniture covers: the pieces' own footprints at their true heights.
+  'dresser': { boxes: [sightBox('dresser')] },
+  'counter-w': { boxes: [sightBox('counter-w')] },
+  'tub': { boxes: [sightBox('tub')] },
+};
+
 /** The ten moment TYPES — docs/STORY.md's generic list, invented-generic only:
  *  every one is Bobo doing a thing cats do. What makes a moment its own is the
  *  procedural rig write keyed by id in game/full.js, so a type can be staged on
@@ -180,9 +244,16 @@ export const CANONICAL_EVENT_MOMENT = 'box-sit';
  *    open      the spot is measured over or through its own support (in a box,
  *              on a counter), so the sight checks treat that support the way
  *              they already do: a cat on the counter is not hidden by it.
- *  `hide` — a prop that partly covers him (plants, the shower curtain, a table
- *  leg) — arrives with chunk 3, together with the `findable` check that proves
- *  "partly" never means "hidden".
+ *  `hide` — the prop that partly covers him (issue #70): named here, built in
+ *  HIDE_PROPS above, and proven by the `findable` check in game/full.js — the
+ *  sight maths re-run at the props' TRUE heights (SIGHT_HEIGHTS) with the
+ *  hide box added must still find a place a player can stand and see him, so
+ *  "partly" can never rot into "unfindable". Six spots hide today: the tub
+ *  behind the gathered shower curtain, the north window behind the grown
+ *  houseplant, the nook south of the dresser, the counter return, the bath
+ *  mat behind the tub's flank, and the d-kitchen decoy behind the counter.
+ *  None of them blocks the aim ray: `catUnderCrosshair` raycasts against the
+ *  two cats only, so a shout lands through any of these props.
  *  -------------------------------------------------------------------------- */
 function spot(type, place, room, pose, pos, faceYaw, extra) {
   return Object.assign({ id: `${type}.${place}`, type, room, pose, spot: pos, faceYaw }, extra || {});
@@ -192,7 +263,7 @@ export const SPOTS = [
   // ── living room (6) ──────────────────────────────────────────────────────
   spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
-  spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71),
+  spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71, { hide: 'big-plant' }), // issue #70: bedded at the foot of its grown houseplant — 42% of the ring around him can see him at all, and `findable` proves he is never invisible
   spot('window-bird', 'e-window', 'living', 'sit', [1.72, 'floor', 0.55], 1.51),
   spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], 3.04), // #53: was yaw −0.1 — the pool facing sweep caught him staring at the balcony (96° off the only approach); a cat sitting in the doorway looking back into the room is the same moment, readable
   spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
@@ -201,11 +272,11 @@ export const SPOTS = [
   spot('couch-loaf', 'balcony-chair', 'balcony', 'loaf', [2.15, 'chairSeat', -3.6], 1.77, { open: true }),
   // ── kitchen (5) — the room that read like a playset ──────────────────────
   spot('sink-sit', 'sink', 'kitchen', 'sit', [4.15, 'counterTop', -2.6], -2.92, { open: true }),
-  spot('sink-sit', 'counter-return', 'kitchen', 'loaf', [2.82, 'counterTopW', -1.5], 3.02, { open: true }),
+  spot('sink-sit', 'counter-return', 'kitchen', 'loaf', [2.82, 'counterTopW', -1.5], 3.02, { open: true, hide: 'counter-w' }), // issue #70: loafed on the return's own counter, body half behind the run's west flank — 26% of the ring sees him, `findable` holds the guarantee
   spot('sink-sit', 'fridge', 'kitchen', 'sit', [5.2, 'floor', -1.75], 1.4),
   spot('sink-sit', 'bar', 'kitchen', 'side', [4.1, 'barTop', 0.4], -0.14, { open: true }),
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
-  // ── hall + entry + bathroom (6) — the entry gained the dash spot that used
+  // ── hall + entry + bathroom (7) — the entry gained the dash spot that used
   //    to sit in the living room (issue #53: `spot-pool-covers-rooms` needs ≥ 2
   //    per room and the entry had one; the living room, with the most, gave it
   //    up. A zoomie at the front door is the same moment in a better place.) ──
@@ -215,9 +286,15 @@ export const SPOTS = [
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
   spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.5, 'floor', 3.0], 1.57),
-  spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 4.12], 1.22), // issue #67: rode the tub south onto the mat's new place at its face. It turned west-north-west, along the tub's face: with the room opened up, the nearest place a player can stand and see him is now the tile west of him, not the doorway band the old cramped room left (issue #59's -1.67)
+  spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 4.12], 1.22, { hide: 'tub' }), // issue #67: rode the tub south onto the mat's new place at its face. It turned west-north-west, along the tub's face: with the room opened up, the nearest place a player can stand and see him is now the tile west of him, not the doorway band the old cramped room left (issue #59's -1.67). Issue #70: he lies with his back to the tub's flank — the 0.55 rim is his cover from half the room (29% of the ring sees him)
   spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], 3.1416, { open: true }), // issue #67: the room opened up south of him, so his nearest vantage is now the open tile due south (issue #59 had him facing the old east band)
-  // ── bedroom (9) — issue #48 turned the bed head-west. The five spots on
+  // issue #70's centrepiece: the laundry basket's nap moved into the TUB for
+  // once — on the well floor (support tubWell), behind the shower curtain
+  // gathered across the north half of the rim. 5% of the reachable ring
+  // around him can see him at all; the gap at the curtain's east end is where
+  // he's found, and `findable` fails the build if that gap ever closes up.
+  spot('laundry-nap', 'bath-tub', 'bathroom', 'side', [-2.55, 'tubWell', 4.85], -0.44, { hide: 'shower-curtain' }),
+  // ── bedroom (10) — issue #48 turned the bed head-west. The five spots on
   //    the moved pieces came with it (mirrored across the room's middle and
   //    nudged 0.20 m south for the longer head clearance); the desk, desk-end,
   //    keyboard and laundry ones are where they were — those pieces stayed.
@@ -231,6 +308,13 @@ export const SPOTS = [
   spot('bed-stretch', 'bed-foot', 'bedroom', 'side', [-1.0, 'bedTop', 8.45], -1.43, { open: true }),
   spot('blanket-biscuits', 'blanket', 'bedroom', 'sit', [-0.755, 'blanketTop', 7.855], 0, { open: true }),
   spot('blanket-biscuits', 'wardrobe', 'bedroom', 'loaf', [0.15, 'floor', 8.2], -0.03),
+  // issue #70: a corner nook south of the dresser, on the floor east of the
+  // door-to-window lane — the dresser's flank and the plaster leave a shallow
+  // shadow: 28% of the ring sees this loaf, the lane is his findable front
+  // (0.9 m). Deliberately a blanket-biscuits spot: every spot of this type is
+  // already a bedroom one, so a run can still never draw six bedroom rooms
+  // (the `run-draw-legal` alternation — see the pickSpotCycle note).
+  spot('blanket-biscuits', 'dresser-gap', 'bedroom', 'loaf', [0.95, 'floor', 6.85], 2.62, { hide: 'dresser' }),
   spot('laundry-nap', 'nightstand', 'bedroom', 'side', [-2.35, 'nightstandTop', 6.8], -0.28, { open: true }),
 ];
 
@@ -358,7 +442,7 @@ export const DECOY_SPOTS = [
   { id: 'd-living', room: 'living', pos: [-1.45, 'floor', 1.8], faceYaw: 0.06 },
   { id: 'd-tv', room: 'living', pos: [0.9, 'floor', -2.0], faceYaw: 0.21 },
   { id: 'd-dining', room: 'living', pos: [0.0, 'floor', 1.6], faceYaw: 1.67, pose: 'side' },
-  { id: 'd-kitchen', room: 'kitchen', pos: [3.5, 'floor', -1.5], faceYaw: -3.14 }, // 1.28 m off the sink spot (was 1.185 — illegal pair)
+  { id: 'd-kitchen', room: 'kitchen', pos: [3.5, 'floor', -1.5], faceYaw: -3.14, hide: 'counter-w' }, // 1.28 m off the sink spot (was 1.185 — illegal pair). Issue #70: dozed on the floor east of the west counter's flank — 24% of the ring sees him; `findable` holds the promise for decoys too
   { id: 'd-bar', room: 'kitchen', pos: [4.05, 'floor', -0.62], faceYaw: 1.36, pose: 'side' },
   { id: 'd-hall', room: 'hall', pos: [0.35, 'floor', 3.0], faceYaw: 1.23 },
   { id: 'd-entry', room: 'entry', pos: [2.0, 'floor', 2.5], faceYaw: 1.9 },
