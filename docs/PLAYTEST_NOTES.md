@@ -2150,3 +2150,72 @@ seed 11's staged frames are canonically staged (`canonicalDecoy()` pins the
 pick on every capture stage, and the capture and determinism suites pass
 unchanged at this HEAD), and the determinism suites byte-compare two full headless runs at
 this HEAD.
+
+## 35. Issue #83 — the street outside replaces the flat blue (2026-11-17)
+
+**Asked for (issue #83):** *"The balcony currently looks at flat blue. Give
+it a real view: a stylized Uptown Dallas street — buildings of different
+heights, rooftops, parked cars — built in code, ONE merged mesh and ONE
+canvas atlas ≤512 px, visible only from the balcony / living-room street
+windows, no new real lights, still under the draw budget; `?quality=low`
+gets a simpler two-layer version of the same skyline."*
+
+**Delivered:** `game/full-street.js` (plain data: cards in world
+coordinates, palette, cull list) + `game/full-street-mesh.js` (paints one
+512 px atlas at boot and merges every card into one `BufferGeometry`). One
+mesh, one unlit `MeshBasicMaterial` draw, 38 triangles, atlas 512×512 — all
+four claims pinned by the new `street-backdrop-built` selfTest. Painted
+from seed 20261117 so every frame it appears in is byte-reproducible
+(`capture:full:determinism` unchanged in spirit, re-run green).
+
+- **What you can see through the glass:** near rooftops with parapets and
+  HVAC below, the street itself with three rows of parked cars and lane
+  dashes, a storefront row with awnings, a midrise band, and the Uptown
+  skyline (pointed crown, sphere-tip tower, masts) on the warm haze
+  horizon. The sky keeps the exact old flat-blue colours at its top — the
+  fix had to read as the same daytime, layered.
+- **Cars are painted, not animated.** The card allowed it ("static is fine
+  if animation costs draw calls"): one painted street costs a single draw
+  no matter how many cars it contains; real cars would each cost a rig, a
+  shadow, and a slice of the light budget this page doesn't have spare.
+- **Depth is faked the honest way:** the atlas rows are depth bands of one
+  street and each card samples the row that belongs at its distance, with
+  the quad's bottom edge rooted where the sightline crosses the card. The
+  street plane sits 9.3 m below the balcony (stage-set maths: the balcony
+  slab and railing hide the seam); its UVs are swapped so the painted
+  roadway cross-section runs east-west across the canyon and the cars run
+  north-south down it — the first pass didn't, and the smoke renders caught
+  8-metre cars floating on the side walls. Cars got parked where the
+  over-the-rail view actually lands (z −14…−20) after reading those frames.
+- **Culling grew an invite list.** `createRoomCull` knew only "hide from
+  these rooms" (blinds, curtains); now a group tagged `userData.cullRooms =
+  ['living','balcony']` shows ONLY from those rooms, fail-open outside every
+  rect, and `?cull=off` still shows everything — `street-culled-to-views`
+  parks the camera in all eight rooms plus outside and reads the answers.
+- **New capture view `street`** — the balcony, leaning on the rail, due
+  north, pitched −0.55 ("look slightly down the street"): road, parked
+  cars, storefronts, midrise. 0.71 m off the balcony view, so
+  `views-distinct` holds. It joins the matrix, which grows 546 → **585
+  frames**. The frames that look at the street re-baseline deliberately:
+  the flat blue the old balcony frames matched is the thing this card
+  removed; there are no committed PNG baselines, so nothing "broke" — the
+  determinism suites just re-prove themselves at this HEAD.
+- **No new lights, no audio, no walkables.** The mesh is `MeshBasicMaterial`
+  + vertex colours (the blinds' trick); the checks assert unlit-ness, and
+  `street-clear-of-the-walk` scans every backdrop vertex against the two
+  walk rects so the street can never become a floating room object. No
+  findable tags exist in the group (same check family).
+- **Four new selfTests, 95 → 99:** `street-backdrop-built`,
+  `street-culled-to-views`, `street-view-not-flat-blue` (street + balcony
+  frames < 35% old-sky palette, < 25% near-black — the full capture run
+  measured old-sky 11% street / 5% balcony, near-black 0% / 8%), and
+  `street-clear-of-the-walk`. `playtest:stress:full` carries `--checks 99`.
+
+**Suites at this HEAD.** `capture:full` PASS — 585 frames, 99/99, budget
+151 draws / 100 348 triangles / 1 pass, console clean. `determinism`,
+`weak` (93 draws on low), `spots` and `patriot` PASS; `planted` exits 1
+by design (every planted fault caught). `gate`, `build` and `check:mobile`
+PASS — low quality holds under `LOW_QUALITY_DRAW_CALL_CAP` because the
+culling makes only street-seeing frames pay for the card.
+`playtest:bot:full` wins 10/10 with console clean; `playtest:stress:full`
+is 77 PASS / 0 FAIL at `--checks 99`.

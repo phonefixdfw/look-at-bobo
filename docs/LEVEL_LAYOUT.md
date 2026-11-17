@@ -795,25 +795,28 @@ curtains keep their `cullGroups` exclusions. On low quality this is how
 the two-row street stays inside `LOW_QUALITY_DRAW_CALL_CAP`: only the
 street-seeing frames pay for it.
 
-**New capture view `street`** (15th): eye `[1.5, 1.62, −3.6]` = standing at
-the window, yaw 0, pitch −0.34 (the issue's "look slightly down the
-street"), fov 55, handheld off (a still, so the paint-comparison checks
-have a stable frame). 0.604m from the balcony view, which keeps
-`views-distinct` honest. The capture matrix grows 546 → **585 frames**,
-and the balcony/street frames re-baseline deliberately: the blue sky they
-used to match is the thing this card removed.
+**New capture view `street`** (15th): eye `[1.5, 1.62, −4.15]` = leaning on
+the balcony rail, yaw 0, pitch −0.55 (over the rail and down at the
+street — the issue's "look slightly down the street"), fov 55, handheld
+off (a still, so the paint-comparison checks have a stable frame). 0.71 m
+from the balcony view, which keeps `views-distinct` honest. The capture
+matrix grows 546 → **585 frames**, and the balcony/street frames
+re-baseline deliberately: the blue sky they used to match is the thing
+this card removed.
 
-**Draw budget.** Worst frame moves from 150/250 to **151/250** (dining
-view — the street adds +1 draw to every street-seeing frame, and the
-diorama pays it too on full quality because it sees the window). Max draw
-per camera room over all 585 frames:
+**Draw budget.** Worst frame moves from 150/250 to **151/250** (`overview`
+— the dollhouse camera sees the window, so the street adds +1 draw there
+and on every other street-seeing frame; `dining` comes in second at 149).
+Max draws per camera room, measured over all 585 frames of
+`npm run capture:full`:
 
 | room | living | dining | kitchen | bedroom | balcony | entry | hall |
 |---|---|---|---|---|---|---|---|
-| max draws | **151** | **151** | 129 | 125 | 116 | 103 | 96 |
+| max draws | **151** | 149 | 129 | 125 | 116 | 103 | 96 |
 
 **Checks.** Four new selfTests — `street-backdrop-built` (built, one draw,
-atlas ≤512), `street-culled-to-views` (culled in diorama/bedroom/kitchen,
+atlas ≤512), `street-culled-to-views` (visible iff the camera stands in
+living/balcony or outside every rect; every other room culls it, and
 `?cull=off` brings it back), `street-view-not-flat-blue` (old-sky palette
 share of the street/balcony frames < 35 %, near-black < 25 %),
 `street-clear-of-the-walk` (no `findable` tag, no card inside a walk rect)
