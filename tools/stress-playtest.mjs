@@ -65,6 +65,8 @@ const PAGE = arg('page', 'game/slice.html');
 // issue #82: full gained heat-pad-rests-on-cushion + cat-props-clear-the-plan (91 → 93); slice stays 46.
 // issue #88: full gained spot-pool-spread (93 → 94); slice stays 46.
 // issue #89: full gained decoy-on-furniture (94 → 95); slice stays 46.
+// issue #85: full gained the eleven robot-vacuum rows — route legal/dwell/deterministic,
+//            ride rate/rules/rides/findable/after-catch, one-draw, gate-off, soft (105 → 116); slice stays 46.
 const CHECKS = Number(arg("checks", 51));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
