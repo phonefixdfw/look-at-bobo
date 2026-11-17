@@ -67,14 +67,18 @@ export const ROOMS = [
   { id: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.32, z1: 5.2, label: 'bathroom' },
   // Issue #81: the dining room, built in the sealed void east of the entry
   // and south of it — L-shaped, and the rect below is its bounding box. The
-  // entry's new east band pokes into the rect's north-west corner (x [2.6,
-  // 2.84], z [2.22, 3.9]); `subtract` takes that protrusion back out of every
-  // area number, so the real floor is 2.92 × 1.42 + 2.68 × 1.68 = 8.65 m²,
-  // above the issue's 7 m². It touches the kitchen and the living room, and
-  // only them, through two cased openings; the south exterior band carries
-  // its window (the living room's east window, `win-living-e`, was on the
-  // plaster the kitchen/dining door cuts through and came down with it).
-  { id: 'dining', x0: 2.6, z0: 0.8, x1: 5.52, z1: 3.9, label: 'dining room', subtract: 0.24 * 1.68 },
+  // entry's new east band pokes into the rect's west edge south of the wide
+  // arm (x [2.6, 2.84], z [2.22, 4.4]); `subtract` takes that protrusion back
+  // out of every area number, so the real floor is 2.92 × 1.42 + 2.68 × 2.18
+  // = 9.99 m², above the issue's 7 m². (The south face first went up at the
+  // entry door line, z 3.90, for an 8.65 m² room; the issue's own numbers —
+  // a 1.05 m table, four chairs and a sideboard — want the extra half metre,
+  // so the face rides south into the void to 4.40.) It touches the kitchen
+  // and the living room, and only them, through two cased openings; the
+  // south exterior band carries its window (the living room's east window,
+  // `win-living-e`, was on the plaster the kitchen/dining door cuts through
+  // and came down with it).
+  { id: 'dining', x0: 2.6, z0: 0.8, x1: 5.52, z1: 4.4, label: 'dining room', subtract: 0.24 * 2.18 },
   { id: 'bedroom', x0: -2.6, z0: 5.32, x1: 1.2, z1: 9.32, label: 'bedroom' },
   // Outdoor, reached only through the living room's slider. Bounded by 1.10 m
   // parapets and a railing on top of the far one: no fall, and the camera can
@@ -157,15 +161,20 @@ export const WALL_DEFS = [
   pier('E-kit-1', 'x', -3.1, 0.8, 5.52, 'wall-ext', 'kitchen'),
 
   // ── the dining room's south and east exterior lines (issue #81) ─────────
-  // The old sealed east void becomes a room: its south face is the entry's
-  // door line carried east (z 3.90 … 4.10), carrying the dining window where
-  // the living room's removed east window used to look into nothing; its east
-  // face is the kitchen's line carried south (x 5.52 … 5.72).
-  pier('S-din-1', 'z', 2.34, 3.4, 3.9, 'wall-ext', 'entry'),
-  pier('D-win-s', 'z', 3.4, 4.35, 3.9, 'wall-ext', 'dining', 0, 0.9),
-  pier('D-win-h', 'z', 3.4, 4.35, 3.9, 'wall-ext', 'dining', 2.1, WALL_H),
-  pier('S-din-2', 'z', 4.35, 5.72, 3.9, 'wall-ext', 'dining'),
-  pier('E-din-1', 'x', 0.8, 4.1, 5.52, 'wall-ext', 'dining'),
+  // The old sealed east void becomes a room. Its south face started as the
+  // entry's door line carried east (z 3.90), but that made an 8.6 m² room —
+  // under the issue's 7 m² only after the notch, and too tight to walk four
+  // sides of a table — so the face rides south into the void to z 4.40:
+  // the room gains 0.50 m, the sideboard gets its wall under the window,
+  // and the old line's stubs behind the wall never see a camera. The face
+  // carries the dining window where the living room's removed east window
+  // used to look into nothing; the east face is the kitchen's line carried
+  // south (x 5.52 … 5.72).
+  pier('S-din-1', 'z', 2.34, 3.4, 4.4, 'wall-ext', 'entry'),
+  pier('D-win-s', 'z', 3.4, 4.35, 4.4, 'wall-ext', 'dining', 0, 0.9),
+  pier('D-win-h', 'z', 3.4, 4.35, 4.4, 'wall-ext', 'dining', 2.1, WALL_H),
+  pier('S-din-2', 'z', 4.35, 5.72, 4.4, 'wall-ext', 'dining'),
+  pier('E-din-1', 'x', 0.8, 4.6, 5.52, 'wall-ext', 'dining'),
 
   // ── the living room's east line, x 2.40 … 2.60 ──────────────────────────
   // The kitchen half is the interior party wall (with the doorway into it).
@@ -299,7 +308,7 @@ export const OPENINGS = [
   { id: 'win-kitchen-n', kind: 'window', room: 'kitchen', axis: 'z', fixed: -2.9, lo: 3.4, hi: 4.9, sill: 0.95, head: 1.75 },
   { id: 'win-bedroom-s', kind: 'window', room: 'bedroom', axis: 'z', fixed: 9.32, lo: -1.9, hi: -0.2, sill: 0.9, head: 2.1 },
   { id: 'win-bath-w', kind: 'window', room: 'bathroom', axis: 'x', fixed: -3.3, lo: 2.6, hi: 3.3, sill: 1.5, head: 2.05 },
-  { id: 'win-dining-s', kind: 'window', room: 'dining', axis: 'z', fixed: 3.9, lo: 3.4, hi: 4.35, sill: 0.9, head: 2.1 },
+  { id: 'win-dining-s', kind: 'window', room: 'dining', axis: 'z', fixed: 4.4, lo: 3.4, hi: 4.35, sill: 0.9, head: 2.1 },
 ];
 
 /** --------------------------------------------------------------------------
@@ -314,12 +323,14 @@ export const FLOORS = [
   { id: 'hall', room: 'hall', x0: -1.2, z0: 2.22, x1: 1.2, z1: 5.2, finish: 'oak' },
   { id: 'entry', room: 'entry', x0: 1.32, z0: 2.22, x1: 2.72, z1: 3.9, finish: 'tile' },
   { id: 'bathroom', room: 'bathroom', x0: -3.3, z0: 2.22, x1: -1.32, z1: 5.2, finish: 'tile' },
-  // Issue #81: the dining floor is the room's L — its south half runs the
-  // full 2.92 m width, its north half starts at the entry's east band
-  // (x 2.84). Two rects, one finish, so the tile reads continuous across the
-  // step like the room is. (The entry's own floor gained the same 0.32 m.)
-  { id: 'dining-s', room: 'dining', x0: 2.84, z0: 0.8, x1: 5.52, z1: 2.22, finish: 'tile' },
-  { id: 'dining-n', room: 'dining', x0: 2.6, z0: 2.22, x1: 5.52, z1: 3.9, finish: 'tile' },
+  // Issue #81: the dining floor is the room's L — its NORTH half (the kitchen
+  // end, z 0.80 … 2.22) runs the full 2.92 m width and carries the living
+  // door's floor; its south half starts at the entry's east band (x 2.84),
+  // which cuts the L's notch out of the bounding box. Two rects, one finish,
+  // so the tile reads continuous across the step like the room is. (The
+  // entry's own floor gained the same 0.32 m.)
+  { id: 'dining-n', room: 'dining', x0: 2.6, z0: 0.8, x1: 5.52, z1: 2.22, finish: 'tile' },
+  { id: 'dining-s', room: 'dining', x0: 2.84, z0: 2.22, x1: 5.52, z1: 4.4, finish: 'tile' },
   { id: 'bedroom', room: 'bedroom', x0: -2.6, z0: 5.32, x1: 1.2, z1: 9.32, finish: 'oak' },
   { id: 'balcony', room: 'balcony', x0: 0.43, z0: -4.52, x1: 2.57, z1: -3.1, finish: 'concrete' },
 ];
@@ -360,10 +371,10 @@ export const SUPPORT_DEFS = {
   tvTop: { x0: 2.0, z0: -2.38, x1: 2.38, z1: -0.87, top: 0.45 },
   // dining room (issue #81) — the round table's top patch, inset a step from
   // the table's edge (the cat's 0.21 m spot capsule has to land ON the wood),
-  // centre (4.06, 2.30), diameter 1.05, top 0.75. The old `diningTop` named a
+  // centre (4.06, 2.28), diameter 1.05, top 0.75. The old `diningTop` named a
   // breakfast-table support in the living room that no spot ever used; the
   // name moved with the room.
-  diningTop: { x0: 3.56, z0: 1.8, x1: 4.56, z1: 2.8, top: 0.75 },
+  diningTop: { x0: 3.56, z0: 1.78, x1: 4.56, z1: 2.78, top: 0.75 },
   // kitchen
   counterTop: { x0: 2.52, z0: -2.88, x1: 4.93, z1: -2.32, top: 0.9 },
   counterTopW: { x0: 2.54, z0: -2.28, x1: 3.1, z1: -1.07, top: 0.9 },

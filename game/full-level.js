@@ -26,6 +26,7 @@ import { KITCHEN_DETAILS_COLLIDERS } from './full-kitchen-details.js';
 import { LIVING_COLLIDERS } from './full-living.js';
 import { BATH_COLLIDERS, BALCONY_COLLIDERS, CURTAIN } from './full-bath.js';
 import { BEDROOM_COLLIDERS } from './full-bedroom.js';
+import { DINING_COLLIDERS } from './full-dining.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
  *  so yaw = atan2(−dx, −dz) means "look towards (dx, dz)", and 0 looks north
@@ -53,9 +54,19 @@ export const WALK_RECTS = [
   // ── index 0: the living room, the root everything else floods back to ──
   { id: 'living', room: 'living', x0: -3.22, z0: -2.82, x1: 2.32, z1: 2.02 },
   { id: 'kitchen', room: 'kitchen', x0: 2.6, z0: -2.82, x1: 5.44, z1: 0.52 },
-  { id: 'hall', room: 'hall', x0: -0.82, z0: 2.3, x1: 0.82, z1: 5.12 },
-  { id: 'entry', room: 'entry', x0: 1.1, z0: 2.3, x1: 2.32, z1: 3.82 },
-  { id: 'bathroom', room: 'bathroom', x0: -3.22, z0: 2.3, x1: -1.1, z1: 5.12 }, // issue #67: 3.82 → 5.12, the same 8 cm inset off the bedroom's north band
+  { id: 'hall', room: 'hall', x0: -1.12, z0: 2.3, x1: 1.12, z1: 5.12 }, // issue #81: 2.40 m wide, same 8 cm inset
+  { id: 'entry', room: 'entry', x0: 1.4, z0: 2.3, x1: 2.64, z1: 3.82 }, // issue #81: moved 0.32 east, kept its 1.40 m width
+  { id: 'bathroom', room: 'bathroom', x0: -3.22, z0: 2.3, x1: -1.4, z1: 5.12 }, // issue #67: 3.82 → 5.12, the same 8 cm inset off the bedroom's north band; #81 gave its east 0.30 back to the hall
+  // Issue #81: the dining room's L, the same 8 cm inset off every face. The
+  // north half (the kitchen end — the wide arm of the L) keeps its west edge
+  // at the living→dining door's own west jamb (x 2.68), so a body walks
+  // through the middle of that opening; the south half starts at the entry's
+  // east band. The two rects TOUCH at z 2.22 — one room, no wall across it,
+  // and the 0.1 m grid straddles the seam cell-to-cell — but do not overlap:
+  // an overlap would hand the flood two standable cells inside the sealed
+  // slot west of the band (the grid knows colliders, not plaster).
+  { id: 'dining-n', room: 'dining', x0: 2.68, z0: 0.88, x1: 5.44, z1: 2.22 },
+  { id: 'dining-s', room: 'dining', x0: 2.92, z0: 2.22, x1: 5.44, z1: 4.32 },
   { id: 'bedroom', room: 'bedroom', x0: -2.52, z0: 5.4, x1: 1.12, z1: 9.24 },
   // The balcony's walkable strip stops short of the railing by the railing's
   // own push pad: no fall, no pressing the camera against the parapet, and the
@@ -65,8 +76,13 @@ export const WALK_RECTS = [
   { id: 'door-living-hall', room: 'living', x0: -0.45, z0: 1.92, x1: 0.45, z1: 2.4 },
   { id: 'door-living-kitchen', room: 'kitchen', x0: 2.22, z0: -0.6, x1: 2.7, z1: 0.3 },
   { id: 'door-hall-bedroom', room: 'hall', x0: -0.45, z0: 5.02, x1: 0.45, z1: 5.5 },
-  { id: 'open-hall-bath', room: 'hall', x0: -1.2, z0: 2.6, x1: -0.72, z1: 3.45 },
-  { id: 'open-hall-entry', room: 'hall', x0: 0.72, z0: 2.6, x1: 1.2, z1: 3.45 },
+  { id: 'open-hall-bath', room: 'hall', x0: -1.5, z0: 2.6, x1: -1.02, z1: 3.45 }, // issue #81: slid 0.30 west with the widened hall's face
+  { id: 'open-hall-entry', room: 'hall', x0: 1.02, z0: 2.6, x1: 1.5, z1: 3.45 }, // issue #81: slid 0.30 east with it
+  // Issue #81: the dining room's two cased openings, bridged like every
+  // other band. The kitchen one crosses the 0.20 m exterior band the same
+  // way the kitchen door crosses its 0.12 m one.
+  { id: 'door-kitchen-dining', room: 'dining', x0: 2.68, z0: 0.68, x1: 3.58, z1: 1.0 },
+  { id: 'door-living-dining', room: 'dining', x0: 2.22, z0: 0.8, x1: 2.7, z1: 2.02 },
   { id: 'slider-balcony', room: 'living', x0: 0.85, z0: -3.28, x1: 2.15, z1: -2.72 },
 ];
 
@@ -80,13 +96,15 @@ export const WALK_RECTS = [
 export const COLLIDERS = [
   // ── living room: the real-dimension furniture game/full-living.js draws
   //    (issue #46). LIVING_COLLIDERS is spliced in, so the push boxes ARE the
-  //    drawn footprints — one copy of each number, from the ruler. The
-  //    breakfast nook under the east window stays the placeholder it always
-  //    was: the dining set is a later row of #33, not this one. ──
+  //    drawn footprints — one copy of each number, from the ruler. Issue #81
+  //    deleted the breakfast nook's three placeholder boxes with the room
+  //    they were supposed to stand in: nothing ever drew them, and the real
+  //    dining set is the dining room's now. ──
   ...LIVING_COLLIDERS,
-  { id: 'dining-table', x0: 0.75, z0: 1.1, x1: 2.35, z1: 1.9 }, // the long bench side towards the east wall
-  { id: 'chair-a', x0: 0.22, z0: 1.42, x1: 0.69, z1: 1.89 },
-  { id: 'chair-b', x0: 1.35, z0: 0.62, x1: 1.82, z1: 1.09 },
+  // ── dining (issue #81): the round table, the four chairs and the
+  //    sideboard game/full-dining.js draws — the push boxes ARE the drawn
+  //    footprints, one copy of each number. ──
+  ...DINING_COLLIDERS,
   // ── kitchen: the run game/full-kitchen.js draws, footprints and all. The
   //    four boxes below ARE the drawn pieces (KITCHEN_COLLIDERS is spliced in,
   //    so there is no second copy of these numbers to drift): 0.60 m counters
@@ -101,9 +119,11 @@ export const COLLIDERS = [
   ...KITCHEN_COLLIDERS,
   ...KITCHEN_DETAILS_COLLIDERS,
   // ── hall + entry: a console table in the hall and a shallow coat bench in
-  //    the vestible, so the space in front of the front door stays real ──
-  { id: 'hall-console', x0: 0.58, z0: 4.0, x1: 0.9, z1: 4.6 },
-  { id: 'coat-bench', x0: 1.95, z0: 2.6, x1: 2.4, z1: 3.4 },
+  //    the vestible, so the space in front of the front door stays real.
+  //    Issue #81: both slid with their walls — the console 0.30 east onto the
+  //    widened hall's new east face, the bench 0.32 east onto the entry's. ──
+  { id: 'hall-console', x0: 0.88, z0: 4.0, x1: 1.2, z1: 4.6 },
+  { id: 'coat-bench', x0: 2.27, z0: 2.6, x1: 2.72, z1: 3.4 },
   // ── bathroom (door-less, so neither pad may cross the cased opening — that
   //    is issue #27's trap wearing a new costume). Issue #49: the vanity, the
   //    toilet, the tub and the bin are drawn pieces now — BATH_COLLIDERS is
@@ -139,7 +159,10 @@ export const COLLIDERS = [
 export const SIGHT_HEIGHTS = {
   'sofa': 0.85, 'coffee-table': 0.45, 'side-table': 0.55, 'floor-lamp': 1.55,
   'tv-stand': 0.45, 'bookshelf': 1.9, 'big-plant': 1.15, 'cardboard-box': 0.45,
-  'dining-table': 0.75, 'chair-a': 0.9, 'chair-b': 0.9,
+  // issue #81: the phantom breakfast nook's rows went with it; the dining
+  // set's chairs and sideboard are drawn now (the table row stays, 0.75).
+  'dining-table': 0.75, 'dining-chair-n': 0.86, 'dining-chair-e': 0.86,
+  'dining-chair-s': 0.86, 'dining-chair-w': 0.86, 'sideboard': 0.86,
   'counter-n': 0.9, 'counter-w': 0.9, 'counter-e': 0.9, 'fridge': 1.8,
   'kitchen-bar': 1.05, 'bar-stool-a': 0.62, 'bar-stool-b': 0.62, 'kitchen-bin': 0.5,
   'hall-console': 0.78, 'coat-bench': 0.62,
@@ -264,7 +287,9 @@ export const SPOTS = [
   spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
   spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71, { hide: 'big-plant' }), // issue #70: bedded at the foot of its grown houseplant — 42% of the ring around him can see him at all, and `findable` proves he is never invisible
-  spot('window-bird', 'e-window', 'living', 'sit', [1.72, 'floor', 0.55], 1.51),
+  // issue #81: the `e-window` spot went with the window — its plaster is the
+  // living→dining doorway now, and a cat cannot sit in a door pier. The
+  // dining room took the moment on: see the dining spots below.
   spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], 3.04), // #53: was yaw −0.1 — the pool facing sweep caught him staring at the balcony (96° off the only approach); a cat sitting in the doorway looking back into the room is the same moment, readable
   spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
   // ── balcony (2) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md) ──
@@ -274,7 +299,14 @@ export const SPOTS = [
   spot('sink-sit', 'sink', 'kitchen', 'sit', [4.15, 'counterTop', -2.6], -2.92, { open: true }),
   spot('sink-sit', 'counter-return', 'kitchen', 'loaf', [2.82, 'counterTopW', -1.5], 3.02, { open: true, hide: 'counter-w' }), // issue #70: loafed on the return's own counter, body half behind the run's west flank — 26% of the ring sees him, `findable` holds the guarantee
   spot('sink-sit', 'fridge', 'kitchen', 'sit', [5.2, 'floor', -1.75], 1.4),
-  spot('sink-sit', 'bar', 'kitchen', 'side', [4.1, 'barTop', 0.4], -0.14, { open: true }),
+  spot('sink-sit', 'bar', 'kitchen', 'side', [4.55, 'barTop', 0.4], -0.14, { open: true }), // issue #81: rode the bar's 0.44 m east shift (the kitchen→dining doorway took the bar's old west end)
+  // ── dining (2, issue #81) — the new room joins the pool with the two
+  //    moments the room reads for: a cat on the table, and a zoomie loaf at
+  //    its south end. Both are `open`: the room is young and the ring maths
+  //    of `findable` is not asked to survive its four chair-height islands
+  //    yet; a run still never visits the room twice back to back. ──
+  spot('sink-sit', 'table', 'dining', 'sit', [4.3, 'diningTop', 2.28], 1.57, { open: true }), // issue #81: rode the table's 6 cm south-shift to (4.06, 2.28)
+  spot('hall-chase', 'dining', 'dining', 'loaf', [4.9, 'floor', 1.15], 0.1, { open: true }), // issue #81: into the wide arm's north-east corner — clear of the ring's pads, looking back along the table
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
   // ── hall + entry + bathroom (7) — the entry gained the dash spot that used
   //    to sit in the living room (issue #53: `spot-pool-covers-rooms` needs ≥ 2
@@ -284,8 +316,8 @@ export const SPOTS = [
   // bathroom's east band is a nearer vantage than the hall's middle now.
   spot('hall-chase', 'hall', 'hall', 'loaf', [-0.35, 'floor', 3.3], 0.585),
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
-  spot('hall-chase', 'entry', 'entry', 'loaf', [1.45, 'floor', 3.4], 1.81),
-  spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.5, 'floor', 3.0], 1.57),
+  spot('hall-chase', 'entry', 'entry', 'loaf', [1.77, 'floor', 3.4], 1.81), // issue #81: rode the entry's 0.32 m east shift
+  spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.82, 'floor', 3.0], 1.57), // #81: same ride, kept clear of the moved bench
   spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 4.12], 1.22, { hide: 'tub' }), // issue #67: rode the tub south onto the mat's new place at its face. It turned west-north-west, along the tub's face: with the room opened up, the nearest place a player can stand and see him is now the tile west of him, not the doorway band the old cramped room left (issue #59's -1.67). Issue #70: he lies with his back to the tub's flank — the 0.55 rim is his cover from half the room (29% of the ring sees him)
   spot('hall-chase', 'vanity', 'bathroom', 'sit', [-2.65, 'vanityTop', 2.46], 3.1416, { open: true }), // issue #67: the room opened up south of him, so his nearest vantage is now the open tile due south (issue #59 had him facing the old east band)
   // issue #70's centrepiece: the laundry basket's nap moved into the TUB for
@@ -441,12 +473,12 @@ export function spotRoom(id) {
 export const DECOY_SPOTS = [
   { id: 'd-living', room: 'living', pos: [-1.45, 'floor', 1.8], faceYaw: 0.06 },
   { id: 'd-tv', room: 'living', pos: [0.9, 'floor', -2.0], faceYaw: 0.21 },
-  { id: 'd-dining', room: 'living', pos: [0.0, 'floor', 1.6], faceYaw: 1.67, pose: 'side' },
+  { id: 'd-dining', room: 'dining', pos: [3.35, 'floor', 1.3], faceYaw: 1.5, pose: 'side' }, // issue #81: the name finally got its room — this decoy stood in the living room's breakfast nook since #33; the nook is a wall now, and the dining room is real. West aisle, facing east across the room
   { id: 'd-kitchen', room: 'kitchen', pos: [3.5, 'floor', -1.5], faceYaw: -3.14, hide: 'counter-w' }, // 1.28 m off the sink spot (was 1.185 — illegal pair). Issue #70: dozed on the floor east of the west counter's flank — 24% of the ring sees him; `findable` holds the promise for decoys too
   { id: 'd-bar', room: 'kitchen', pos: [4.05, 'floor', -0.62], faceYaw: 1.36, pose: 'side' },
   { id: 'd-hall', room: 'hall', pos: [0.35, 'floor', 3.0], faceYaw: 1.23 },
   { id: 'd-entry', room: 'entry', pos: [2.0, 'floor', 2.5], faceYaw: 1.9 },
-  { id: 'd-bath', room: 'bathroom', pos: [-1.35, 'floor', 3.2], faceYaw: 1.57, pose: 'side' }, // issue #67: moved into the new open floor (the old point came within 1.2 m of the moved mat spot) and turned to the room
+  { id: 'd-bath', room: 'bathroom', pos: [-1.65, 'floor', 3.2], faceYaw: 1.57, pose: 'side' }, // issue #67: moved into the new open floor (the old point came within 1.2 m of the moved mat spot) and turned to the room; issue #81: gave the widened hall its 0.30 back
   { id: 'd-bedroom', room: 'bedroom', pos: [-0.55, 'floor', 6.45], faceYaw: 0.0 }, // on the rug mid-floor, facing north down the room to the door walk — the nearest stand-and-watch cell; measured: the mirrored yaw was 95° off, this faces the approach head-on
   { id: 'd-balcony', room: 'balcony', pos: [1.4, 'floor', -3.35], faceYaw: 2.82, pose: 'side' },
 ];
@@ -480,8 +512,9 @@ export const SPAWNS = [
   { room: 'kitchen', pos: [2.93, -0.27], yaw: 1.2 },
   { room: 'hall', pos: [-0.37, 4.43], yaw: 0.1 },
   { room: 'hall', pos: [0.33, 3.03], yaw: 3.0 },
-  { room: 'entry', pos: [1.53, 3.73], yaw: 1.5 },
-  { room: 'bathroom', pos: [-1.27, 2.83], yaw: -2.2 }, // the east band (issue #49: the tub took the old corner)
+  { room: 'entry', pos: [1.85, 3.73], yaw: 1.5 }, // issue #81: rode the entry's 0.32 m east shift
+  { room: 'bathroom', pos: [-1.57, 2.83], yaw: -2.2 }, // the east band (issue #49: the tub took the old corner; #81 gave the band's 0.30 back to the hall)
+  { room: 'dining', pos: [5.1, 1.1], yaw: 2.4 }, // issue #81: the wide arm's north-east corner, looking west-north-west across the table and its chairs
   { room: 'bedroom', pos: [-1.37, 6.63], yaw: 1.6 },
   { room: 'bedroom', pos: [-1.5, 9.1], yaw: -1.2 }, // issue #48: the bed's head is west now and reaches z 8.66 here; the south band is the walk to it (z 9.1 keeps the body clear of the bed pad at 8.96)
 ];
@@ -553,7 +586,14 @@ export const VIEWS = {
   // issue #67: the front door, from the hall opening — leaf, mat, the console
   // beside it and the wall it sits in, all in one frame (yaw 3.379 faces
   // south-south-east down the vestibule; pitch -0.17 drops the floor in).
-  entry: { pos: [1.45, 1.62, 2.6], yaw: 3.379, pitch: -0.17, fov: 76, hand: false },
+  // issue #81: the whole frame rode the entry's 0.32 m east shift — pos 1.77,
+  // and the yaw re-aimed on the moved door's centre (x 1.83) from the new
+  // standing point.
+  entry: { pos: [1.77, 1.62, 2.6], yaw: 3.188, pitch: -0.17, fov: 76, hand: false },
+  // issue #81: the new room's frame — from the grown room's south-west
+  // corner, looking north-east down the side of the table: chairs, pendant
+  // over the top, and the sideboard's wall all in one shot.
+  dining: { pos: [3.15, 1.62, 3.6], yaw: -0.604, pitch: -0.31, fov: 55, hand: false },
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
   // The three doorways, from standing height, aimed through the hole at a
@@ -600,8 +640,9 @@ export const SCALE_RANGES = {
   'sofa-back': { top: [0.8, 0.9], note: 'row 34 again: backrest top 0.85, the `sofaBackTop` support' },
   'coffee-table': { w: [1.0, 1.3], d: [0.5, 0.7], h: [0.38, 0.52], note: 'row 36: 1.10 × 0.60 × 0.45' },
   'side-table': { w: [0.38, 0.52], h: [0.48, 0.62], note: 'row 37: 0.45 dia × 0.55 high' },
-  'dining-table': { w: [1.5, 1.7], d: [0.8, 0.9], h: [0.72, 0.78], note: 'breakfast table 1.60 × 0.80 × 0.75' },
-  'dining-chair': { w: [0.4, 0.5], d: [0.4, 0.55], h: [0.85, 1.0], note: 'chair 0.48 × 0.47 × 0.90' },
+  'dining-table': { w: [0.98, 1.12], d: [0.98, 1.12], h: [0.71, 0.8], note: 'issue #81: round table dia 1.05, top 0.75 (w = d is the roundness)' },
+  'dining-chair': { w: [0.4, 0.5], d: [0.4, 0.55], h: [0.85, 1.0], note: 'issue #81: 0.44 × 0.45, seat 0.45, back 0.86 — measured on each of the four' },
+  'sideboard': { w: [1.1, 1.5], d: [0.36, 0.5], h: [0.75, 0.9], note: 'issue #81: 1.28 × 0.40 × 0.86 on the dining room\u2019s north plaster' },
   'tv-stand': { w: [1.45, 1.72], d: [0.32, 0.46], h: [0.38, 0.55], note: 'row 40: 1.60 × 0.40 × 0.45' },
   'tv-screen': { w: [1.0, 1.35], h: [0.62, 0.8], bottom: [0.79, 0.9], note: 'row 39: 1.22 × 0.71, centre y 1.20' },
   bookshelf: { w: [0.8, 1.0], d: [0.28, 0.4], h: [1.7, 2.1], note: 'row 41: 0.90 × 0.32 × 1.90 high' },
@@ -674,6 +715,7 @@ export const ROOM_LABELS = {
   hall: 'hallway',
   entry: 'entry',
   bathroom: 'bathroom',
+  dining: 'dining room', // issue #81
   bedroom: 'bedroom',
   balcony: 'balcony',
 };
