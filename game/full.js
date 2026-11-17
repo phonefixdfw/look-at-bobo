@@ -13,6 +13,7 @@
 import * as LEVEL from './full-level.js';
 import { livingGapReport } from './full-living.js';
 import { bathGapReport, FOOT } from './full-bath.js';
+import { DECOR, DECOR_CELLS, DECOR_ART_COUNT, DECOR_TEXTURES, SPOT_CLEAR, decorPlan, faceCells } from './full-decor.js';
 import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/reach.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
@@ -1064,6 +1065,151 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'a 0.60 m body has a flooded route from the flat\'s root to 0.40 m off every bathroom fixture, and ≥ 2 m2 of floor',
       !bad.length,
       'issue #67: the old room was connected and still unusable — 0.24 m2 of floor, no fixture standable',
+    );
+  }
+
+  /* ------------------------------------------------------------------ issue #69
+   * The lookalike decor: five checks a roomful of black-and-white scenery
+   * owes the flat. Every one of them reads game/full-decor.js — the one
+   * table the mesh module builds from, piece for piece — so what passes
+   * here is what draws.
+   * ------------------------------------------------------------------ */
+  {
+    const plan = decorPlan();
+    const nb = (b) => (b.min ? { x0: b.min.x, x1: b.max.x, y0: b.min.y, y1: b.max.y, z0: b.min.z, z1: b.max.z } : b);
+    const EPS = 0.0015;
+    const hit = (a, b) => a.x0 < b.x1 - EPS && b.x0 < a.x1 - EPS && a.y0 < b.y1 - EPS && b.y0 < a.y1 - EPS && a.z0 < b.z1 - EPS && b.z0 < a.z1 - EPS;
+
+    // 1. `decor-rests-on-surface`: nothing floats. A hung piece's back face
+    //    is ON its wall plane; a standing piece's bottom is ON its host's
+    //    top (or, for the second book of a stack, on the first book's); a
+    //    draped towel's fold sits on the bar. Host tops resolve through
+    //    DECOR_HOSTS, which is derived from the room tables themselves.
+    const rest = [];
+    for (const d of plan) {
+      const b = d.box;
+      if (d.wallKey) {
+        const face = { w: 'x0', e: 'x1', n: 'z0', s: 'z1' }[d.wallKey.split('.')[1]];
+        if (Math.abs(b[face] - d.wallPlane) > 0.0011) rest.push(`${d.id} ${face}=${b[face]} off ${d.wallPlane}`);
+      } else if (d.restY !== null) {
+        const onHost = Math.abs(b.y0 - d.restY) <= 0.0011;
+        const onMate = plan.some((o) => o !== d && o.box.x0 <= b.x0 + 0.011 && o.box.x1 >= b.x1 - 0.011 &&
+          o.box.z0 <= b.z0 + 0.011 && o.box.z1 >= b.z1 - 0.011 && Math.abs(b.y0 - o.box.y1) <= 0.0011);
+        if (!onHost && !onMate) rest.push(`${d.id} bottom ${b.y0} off ${d.restY}`);
+      } else if (d.hangY !== null) {
+        if (Math.abs(b.y1 - d.hangY) > 0.005) rest.push(`${d.id} fold ${b.y1} off bar ${d.hangY}`);
+      } else rest.push(`${d.id} has no support`);
+    }
+    add(
+      'decor-rests-on-surface',
+      rest.length ? rest.join(', ') : `${plan.length}/${plan.length} pieces on their wall plane, host top or bar`,
+      'back face flush to its DECOR_WALLS plane, bottom flush to its DECOR_HOSTS top (stack tops count)',
+      rest.length === 0,
+      'issue #69: 23 pieces of scenery, none of them floating',
+    );
+
+    // 2. `decor-off-openings`: no piece crosses a door or window opening,
+    //    a collider it doesn't rest on, a PARKED leaf (the same leaves
+    //    `doors-read-open` proves walkable), or the capsule a lying cat
+    //    occupies — the 0.16 m cat half-width + 5 cm, from its support to
+    //    a seated eye line 42 cm up.
+    const clash = [];
+    const leaves = doorLeaves.filter((l) => l.open).map((l) => ({ id: l.id, box: nb(l.box) }));
+    const clr = SPOT_CLEAR.radius + SPOT_CLEAR.gap;
+    for (const d of plan) {
+      const b = d.box;
+      for (const o of OPENINGS) {
+        const [p0, p1, s0, s1] = o.axis === 'z' ? [b.z0, b.z1, b.x0, b.x1] : [b.x0, b.x1, b.z0, b.z1];
+        if (Math.abs(p0 - o.fixed) > 0.07 && Math.abs(p1 - o.fixed) > 0.07) continue; // not this wall
+        if (s0 < o.hi - EPS && o.lo < s1 - EPS && b.y0 < o.head - EPS && o.sill < b.y1 - EPS) clash.push(`${d.id}×${o.id}`);
+      }
+      for (const c of LEVEL.COLLIDERS) {
+        if (d.restOn?.includes(c.id)) continue; // stands ON this host
+        if (hit(b, { x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: LEVEL.SIGHT_HEIGHTS[c.id] ?? 1.05 })) clash.push(`${d.id}×collider ${c.id}`);
+      }
+      for (const l of leaves) if (hit(b, l.box)) clash.push(`${d.id}×leaf ${l.id}`);
+      for (const s of [...(SPOTS ?? []), ...DECOY_SPOTS]) {
+        const [sx, sup, sz] = s.spot ?? s.pos;
+        const base = supports[sup] ?? 0;
+        if (b.y1 <= base + EPS || b.y0 >= base + SPOT_CLEAR.roof - EPS) continue; // clear above/below the band
+        const dx = Math.max(b.x0 - sx, 0, sx - b.x1);
+        const dz = Math.max(b.z0 - sz, 0, sz - b.z1);
+        if (Math.hypot(dx, dz) < clr - EPS) clash.push(`${d.id}×capsule ${s.id}`);
+      }
+    }
+    add(
+      'decor-off-openings',
+      clash.length ? clash.join(', ') : `${plan.length} pieces clear of ${OPENINGS.length} openings, ${leaves.length} parked leaves, every collider not their own host, and every spot capsule`,
+      'zero overlap with opening spans, parked door leaves, foreign colliders, or a 0.21 m spot capsule up to 42 cm',
+      clash.length === 0,
+      'issue #69: the decor never grows a wall through a door or crowds a lying cat',
+    );
+
+    // 3. `decor-not-a-cat-tell`: the lookalikes must stay LOOKALIKE DECOR,
+    //    not fake cats. Mechanical half of the promise: the whole
+    //    collection draws as ONE unnamed, untagged mesh — nothing in the
+    //    scene can hit-test it, no userData marks it pickable, and every
+    //    face's atlas cell is one of the abstract patterns (blots, rings,
+    //    rules, patches — never a face, ears, whiskers, bib or blaze,
+    //    which only the cat builder draws).
+    const atlasMeshes = [];
+    scene.traverse((m) => {
+      if (m.isMesh && m.material?.map?.name === 'decor-atlas') atlasMeshes.push(m);
+    });
+    const cells = new Set(plan.flatMap((d) => Object.values(faceCells(DECOR.find((p) => p.id === d.id)))));
+    const tells = [...cells].filter((c) => !['plain', 'blk', 'wht', 'cru', 'chg'].includes(c) && !DECOR_CELLS.includes(c));
+    add(
+      'decor-not-a-cat-tell',
+      `${atlasMeshes.length} decor mesh${atlasMeshes.length === 1 ? '' : 'es'} · ${cells.size} abstract cells · hit-testable: no`,
+      'exactly 1 decor draw, untagged/unnamed, every cell from the abstract DECOR_CELLS set',
+      atlasMeshes.length === 1 && tells.length === 0 && atlasMeshes.every((m) => !m.name && !m.userData?.tag),
+      'issue #69: black-and-white reads as "is that Bobo?" for ONE frame and resolves as art — no fake cat ever stands',
+    );
+
+    // 4. `decor-findable-clear`: the `findable` promise RE-RUN with every
+    //    decor box added to the sight model. Black canvases over cream
+    //    plaster are new blockers; none of them may make a hiding spot
+    //    unfindable. Occlusion can only ever increase, so the ring share
+    //    cannot rise — what could break is the vantage.
+    const blind = [];
+    {
+      const hidden = [...(SPOTS ?? []), ...DECOY_SPOTS].filter((s) => s.hide);
+      if (hidden.length) {
+        const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: LEVEL.MOVE.playerRadius });
+        const seen = grid.flood(grid.cellAt(SPAWNS[0].pos[0], SPAWNS[0].pos[1]));
+        const los = [
+          ...wallBoxes,
+          ...LEVEL.COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: LEVEL.SIGHT_HEIGHTS[c.id] ?? 1.05 })),
+          ...plan.map((d) => ({ id: `decor:${d.id}`, ...d.box })),
+        ];
+        for (const s of hidden) {
+          const prop = LEVEL.HIDE_PROPS[s.hide];
+          if (!prop) continue; // `findable` itself reports missing rows
+          const [x, sup, z] = s.spot ?? s.pos;
+          const losHere = [...los, ...prop.boxes.map((b) => ({ id: `hide:${s.hide}`, ...b }))];
+          const a = bestApproach(grid, seen, { x, z, y: supports[sup] ?? 0, los: losHere, eye: LEVEL.MOVE.eye });
+          if (!a) blind.push(`${s.id} behind ${s.hide}`);
+        }
+      }
+    }
+    add(
+      'decor-findable-clear',
+      blind.length ? `UNFINDABLE: ${blind.join(', ')}` : 'every hiding spot keeps a vantage with all decor boxes in the sight model',
+      'bestApproach still returns a vantage at every `hide` spot with decor added to los',
+      blind.length === 0,
+      'issue #69: the lookalike pass may not take one findable spot away',
+    );
+
+    // 5. `decor-budget`: texture and piece counts, and the one-draw promise
+    //    in numbers the capture report can carry. (The draw call itself is
+    //    measured by tools/capture.mjs every frame: all 546 frames of the
+    //    full matrix come out at exactly before+1, worst 150 of 150.)
+    add(
+      'decor-budget',
+      `${DECOR.length} pieces · ${DECOR_ART_COUNT} framed artworks · ${DECOR_TEXTURES.length} canvas texture @ ${DECOR_TEXTURES[0]?.size} px · ${atlasMeshes.length} decor draw`,
+      '≤3 new canvas textures of ≤256 px; ≥8 framed artworks; the collection draws as ONE mesh',
+      DECOR_TEXTURES.length <= 3 && DECOR_TEXTURES.every((t) => t.size <= 256) && DECOR_ART_COUNT >= 8 && atlasMeshes.length === 1,
+      'issue #69: a whole flat of new dressing costs one 64 Ki atlas and one draw call',
     );
   }
 
