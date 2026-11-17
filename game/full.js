@@ -1009,6 +1009,49 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     );
   }
 
+  /* Issue #88 — spread: no spot the desk, no bedroom takeover. The check
+   * above is the floor (every spot in ≥8% of RUNS); this is the ceiling, on
+   * the issue's own unit: share of PICKS, ten a run. Same trick, 500
+   * pseudo-random seeds from a second fixed base through pickSpotCycle.
+   * With the pool at 49 spots the uniform share is 2.04%; pickSpotCycle
+   * caps every type that has ≥2 spots at 5% of picks, and the coverage
+   * floor below 50 spots/type pushes 5+ spot types down to 1…1.6%. Rooms
+   * are bounded by their types: bedroom holds desk-pen, keyboard-sit,
+   * bed-stretch, blanket-biscuits and laundry-nap seats — about a quarter
+   * of the picks is its arithmetic share, not a concentration, so the room
+   * cap sits at 27% with the honest measured number next to it. */
+  {
+    const N = 500;
+    const dice = mulberry32(0x5f88ab1e); // a second fixed base: this check never flaps either
+    const seeds = Array.from({ length: N }, () => 1 + Math.floor(dice() * (2 ** 31 - 1)));
+    const roomOf = new Map((SPOTS ?? []).map((s) => [s.id, s.room]));
+    const spotPicks = new Map((SPOT_IDS ?? []).map((id) => [id, 0]));
+    const roomPicks = new Map();
+    let picks = 0;
+    for (const s of seeds) {
+      for (const id of pickSpotCycle(mulberry32(s))) {
+        spotPicks.set(id, (spotPicks.get(id) ?? 0) + 1);
+        const r = roomOf.get(id) ?? '?';
+        roomPicks.set(r, (roomPicks.get(r) ?? 0) + 1);
+        picks++;
+      }
+    }
+    let worstSpot = null;
+    for (const [id, n] of spotPicks) if (!worstSpot || n > worstSpot.n) worstSpot = { id, n };
+    let worstRoom = null;
+    for (const [r, n] of roomPicks) if (!worstRoom || n > worstRoom.n) worstRoom = { r, n };
+    const spotShare = worstSpot ? worstSpot.n / picks : 0;
+    const roomShare = worstRoom ? worstRoom.n / picks : 0;
+    const ok = spotShare <= 0.08 && roomShare <= 0.27 && picks === N * 10;
+    add(
+      'spot-pool-spread',
+      `${(SPOT_IDS ?? []).length} spots; worst spot ${worstSpot?.id} ${(spotShare * 100).toFixed(2)}% of picks; worst room ${worstRoom?.r} ${(roomShare * 100).toFixed(1)}%`,
+      'no spot over 8% of picks, no room over 27% (issue #88 measured 10.00% / 47.4% before)',
+      ok,
+      `issue #88: ${N} random seeds through pickSpotCycle, shares of picks. The ≥8%-of-RUNS coverage floor means a type with k spots cannot give any spot more than 100/k% of its type's picks, so singletons (box, keyboard) top the table at ~5%; the fix for the 10% ceiling rows was adding sibling spots, not weighting.`,
+    );
+  }
+
   /* Issue #65 — three checks for "every door looks closed and the wood has
    * black dots on it". Doors are PERMANENTLY OPEN on purpose in this flat
    * (there is no door control and there never will be); what was broken is

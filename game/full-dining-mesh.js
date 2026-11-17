@@ -24,6 +24,7 @@
  * spent on the sun, and these pieces all receive it.
  */
 import * as THREE from 'three';
+import { TOKENS } from '../src/tokens.js';
 import { SURFACES, surface } from '../src/polish.js';
 import { mergedMesh } from './full-apartment.js';
 import { PIECES, DETAILS, PENDANT } from './full-dining.js';
@@ -49,6 +50,9 @@ function diningMaterials() {
   return {
     wood: SURFACES.wood(), // the table and the sideboard: the flat's walnut
     woodPale: SURFACES.woodPale(), // the four chairs
+    // issue #88: the parcel box's kraft, the living room hero box's own
+    // surface recipe — same token, same roughness, second instance.
+    cardboard: surface(TOKENS.cardboard, { uvTile: 0.5, roughness: 0.94 }),
     handle: surface(0x3b4046, { uvTile: 0.12, roughness: 0.35, metalness: 0.45 }), // pulls, apron boss
     // the pendant: the kitchen pendants' exact shade/bulb pair (same emissive
     // intensities — one lamp language in the flat)

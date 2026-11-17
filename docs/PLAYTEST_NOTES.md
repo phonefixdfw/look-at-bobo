@@ -1948,3 +1948,106 @@ design; `check:mobile` PASS (124 checks); `build` PASS (68 files, 3.04 MB, 133
 URLs stamped). Held for the PR to record as skipped (constant-only diff: the
 cap loosens, pixels cannot): slice/demo captures and their determinism,
 `capture:full:spots|patriot|weak`, bots, stress, audio/music, seed:coverage.
+
+## 33. Issue #88 — the spot lottery stopped favouring the bedroom desk
+
+**The complaint:** ten rounds in a row, and Bobo is on the desk, the bed, or in
+the box by the desk. Not a bug in the draw — `pickSpotCycle` draws uniformly
+from the pool — but the pool was 37 spots laid out unevenly, and the browser
+saw the tail of that distribution amplified by two quirks: single-spot types
+(`box-sit.box`, `keyboard-sit.keyboard`) were *guaranteed* every run under the
+old type-fairness rule, and the bedroom simply owned 13 of the 37 spots.
+
+**The diagnosis (offline replica of the exact RNG seam, 1000 seeds × 10
+picks, pool = 37 as merged):**
+
+| metric | before | target |
+| --- | --- | --- |
+| worst spot share of picks | **10.00%** (box-sit.box, in 100% of runs; keyboard-sit.keyboard same) | ≤ 8% |
+| worst room share | **bedroom 47.41%** | ≤ 25% |
+| same spot twice in a row | 0 within a run, but across two runs of one session it was pure chance | never |
+
+Every spot ≥ 4.75% of all picks lived in the bedroom or was the box next to
+the desk: box-sit.box 10.00 · keyboard-sit.keyboard 10.00 · bed-stretch.bed-foot
+5.25 · desk-pen.desk 5.10 · desk-pen.desk-end 4.90 · bed-stretch.bed 4.75. The
+two 10% entries are exactly the 1-in-10 slot the fairness rule reserves for
+each *type* — with one spot per type, that type shows up in every single run,
+every time, always the same corner. Uniform over 37 was never uniform over
+the flat.
+
+**The fix has three parts.**
+
+1. **Pool 37 → 48.** Fifteen new spots, spread on purpose: living gets the
+   shelf-top loaf and the couch arm (new `couchArmS` support); kitchen gets a
+   counter window-bird, the fridge-top sit, and the sunny spot on top of the
+   fridge; dining gets the parcel box, the sideboard keyboard perch, and a
+   corner floor nap; balcony gets the pad nap, the deck keyboard, and a
+   stretch; hall gets the rug stretch, the runner nap, and the corner biscuit
+   — and three bedroom spots moved out or went away (`bed-foot` → hall rug,
+   `wardrobe` → hall corner, nightstand and fridge-drop naps dropped — a cat
+   asleep inside a closed fridge is a joke the geometry can't sell). The
+   parcel box is a new prop: 0.50×0.50×0.42 cardboard by the sideboard, its
+   own collider, sight height, and `cardboard-box` scale tag, +1 draw call.
+2. **A seam across runs of one session.** `pickSpotCycle(rand, prevId)` and an
+   engine-side `lastServed` that is saved and restored with the fairness
+   record: the spot that served run N is ineligible for run N+1's first pick,
+   so *across* runs is now as strict as *within*. The `run-draw-legal` check
+   draws three refills per seed and asserts the seams.
+3. **A check that watches the shape, not just the legality.** New
+   `spot-pool-spread` check (500 seeds, fixed base): no spot over 8% of picks,
+   no room over 27%, no type with 2+ spots over 12%, and every spot in a
+   multi-spot type under 5%. 93 checks became 94. The 5% type rule is what
+   keeps this from ever silently regressing: it caps any type's share at
+   `spots × 5%`, so a type can only hoover picks by genuinely adding places.
+
+**After (same replica, pool = 48):** worst spot 5.22% (the new parcel box —
+the only type with a 2-spot single-corner footprint now splits its share),
+worst room **bedroom 24.38%**, and 0 same-spot back-to-back within *or across*
+runs. Rooms: bedroom 24.4 · dining 19.0 · living 18.2 · balcony 12.5 · hall
+10.4 · kitchen 9.3 · bathroom 3.9 · entry 2.4. Spot-count floors per room are
+now dining 10 · living 8 · bedroom 8 · kitchen 7 · balcony 5 · hall 5 — the
+desk corner went from "every run, often twice" to one of twelve bedroom-desk
+*area* picks out of ten.
+
+**What the face rule taught us (again, expensively):** fifteen new spots, and
+`cats-face-the-room` kept rejecting them — the check names at most three
+offenders per run, so it took several stress rounds to even enumerate them.
+The check measures the *rendered* head−tail vector, and for a curled loaf, a
+sitzbung, or a stretch the mesh's spine does not point where the authored yaw
+"obviously" points — the offline sweep found intuitive yaws 91° to 174° off
+the legal band across most of the new spots. The
+yaw is an output of the pose mesh, not an authored number: the fix loop was a
+headless replica of the check (same `facingError` math, same pose geometry)
+sweeping yaw bands offline and taking each legal band's midpoint. All 48
+spots now carry measured yaws, and LEVEL_LAYOUT's table lists them.
+
+**Suites at this HEAD:** `playtest:stress:full` **77 PASS / 0 FAIL** (new
+`spot-pool-spread` included; `--checks 94`), `playtest:stress` (slice) **72/0**,
+`capture:full` **546 frames, 94/94 selfTest every frame, worst frame 150 of
+250, tris 100,324, console clean**, `capture:full:determinism` 8/8
+byte-identical, `capture:full:spots` 20 frames PASS (moments list updated for
+the moved spots), `capture:full:patriot` 6 frames PASS, `capture:slice` 144
+frames 51/51, `capture:slice:determinism` 8/8, `gate` PASS (every planted fault
+still exits 1), `check:mobile` PASS, bots — full 10/10 win with the new pool
+cycle, patriot 5/5, slice 5/5 — all clean, `audio:fullcheck` 23/23,
+`audio:slicecheck` 23/23, `audio:selftest` 23/23, `music:check` 28/28,
+`music:selftest` 29/29, `seed:coverage` PASS (500 seeds, rarest spot 8.8% of
+runs), `build` PASS (68 files, 3.05 MB, 134 URLs stamped).
+
+**One more thing the 48-spot pool paid for (tool-side, same PR):** the new
+seed-11 cycle drew `window-bird.balcony-rail` and `hall-chase.hall-door` for
+the first time, and `LC.aimAt` — the harnesses' stand-in for "a player walks
+up and aims" — reported `wall/prop` at both. Three real bugs, all in the tool
+ray, none in the game: it aimed at an authored guess (`root.y + 0.34`) that
+for a sit rig lands 20 cm in FRONT of the rendered cat — offline sweep of all
+1,226 reachable cells within 4.2 m proved not one vantage hit even the
+cat-only find ray at that point; the centre ray stopped on the patio door's
+GLASS (transparent, opacity 0.22 — the eye sees through it, the tool didn't);
+and its fallback ring (3 distances × 8 angles) was too coarse for thin
+occluders. `aimAt` now aims at the bounding-box centre of the rendered cat,
+skips transparent meshes like the eye does, sweeps a 24-angle ring, and —
+still failing — stands on the engine's OWN reach grid cells nearest-first.
+Both spots clear at the first or second probe now. `stress-playtest.mjs`
+also carried a latent crash on the slice (issue #81 wrote `LC.spot().hide`
+pool-only; the slice has no pool) — guarded; that is why slice stress reports
+its full 72 scenarios for the first time since.
