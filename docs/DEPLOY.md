@@ -41,6 +41,7 @@ curl -s -o /dev/null -w 'slice     %{http_code} %{content_type}\n' https://looka
 curl -s -o /dev/null -w 'module    %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/src/cat.js
 curl -s -o /dev/null -w 'three     %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/vendor/three/three.module.js
 curl -s -o /dev/null -w 'audio     %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/assets/audio/yell-look-at-bobo.take1.mp3
+curl -s -o /dev/null -w 'manifest  %{http_code} %{content_type}\n' https://lookatbobo.getluckysocial.com/manifest.webmanifest
 curl -s https://lookatbobo.getluckysocial.com/build.json          # which build is live
 ```
 
@@ -56,9 +57,10 @@ Then open `https://lookatbobo.getluckysocial.com/` — it should land on the
 answers with a `content-type` other than `text/javascript`, the game will not
 boot** (browsers refuse ES modules with the wrong MIME and the console says so)
 — fix the server's MIME config for `.js`/`.mjs` first; that is the usual
-suspect when a static-deploy game is a black screen. Any `404` on these six
+suspect when a static-deploy game is a black screen. Any `404` on these
 lines means the build didn't ship that file — run `npm run build` locally and
-compare against the printed manifest.
+compare against the printed manifest. (The `manifest` line's `content-type`
+is the one type that is safe to see differ — see the web-app note below.)
 
 `build.json` answers "what is live right now?" without a browser:
 
@@ -178,6 +180,7 @@ Useful parameters while phone-testing (append to the URL with `?`/`&`):
 | `?touch=off` | force keyboard/mouse on a phone (QA) — **sticky: it survives every link shared from that page** |
 | `?stamp=on` | the build stamp in the tab title and at the top of the screen, where a boot error cannot hide it |
 | `?label=on` | the tool's moment chip, if you want it while testing |
+| `?safe=notch` | tests only: swaps the real safe-area insets for a simulated iPhone-landscape notch (59/44/21 px) so the notch layout can be seen without an iPhone; players never set it and no capture uses it |
 
 **Read the stamp line first.** The start card says `build … · mode … · quality …`
 (above); it answers which build, which controls and which look in one glance,
@@ -198,6 +201,84 @@ If it still misbehaves, two screenshots settle it: the **start card with
 panel** open in game. `npm run check:mobile` replays the whole phone path
 headlessly — touch events, rotate, auto-low, win at ten, the mis-detected-phone
 rescue and the stamp — and `?touch=on` at a desk reproduces most layouts.
+
+## Full screen on iPhone: install it (issue #77)
+
+**From the browser, fullscreen on iPhone is impossible — for every browser.**
+All of them (Safari, Chrome, Firefox) are WebKit on iPhone, and WebKit gives a
+web page no Fullscreen API outside `<video>`: `requestFullscreen()` does
+nothing, and the address bar and tab bar stay. That is the platform, not a bug
+we can fix. The one supported way to a bar-free, whole-screen game is to run
+the site as a **home-screen web app**, and the site is now built for exactly
+that: `manifest.webmanifest` at the site root (`display: fullscreen`,
+landscape, dark theme, icons rendered in code from the logo —
+`npm run icons:make`), the iOS home-screen meta tags on the game page, and
+safe-area-aware layout so nothing hides under the notch or the home bar when
+the page runs edge to edge (`viewport-fit=cover`; the game picture always
+fills the screen, HUD/stick/shout/gear/title card stay inside the insets).
+
+**Install on iPhone (Safari):**
+
+1. Open `https://lookatbobo.getluckysocial.com/` in **Safari**.
+2. Tap the **Share** button (the square with the up arrow, above the keyboard area).
+3. Tap **Add to Home Screen** (may be under the list) → **Add**.
+4. Open the new **Look at Bobo** icon. The game starts straight in landscape,
+   no Safari bars, whole screen, sound and music from the first tap like always.
+
+A one-time line appears under START on iPhones/iPads that are still in the
+browser — "For full screen: tap Share, then Add to Home Screen" — with the
+same share glyph; tapping it dismisses it for good. It never shows on
+desktop, on Android, once the game is installed, or under `?gate=off`.
+
+**Install on Android (Chrome):** open the site, tap the **⋮ menu → Add app to
+home screen / Install app** — or just tap START: Android Chrome has granted
+fullscreen + landscape lock on the start tap since issue #25 and still does,
+unchanged. The manifest just adds the home-screen icon and the bar-free
+display to that.
+
+**MIME note:** `.webmanifest` is ideally served as `application/manifest+json`
+(the dev server does). xCloud/nginx may answer `application/octet-stream` or
+`application/json` — **that still installs fine in Chrome and Safari today**,
+so do not block a deploy on it; if headers are easy to set, though:
+
+```nginx
+# nginx
+types { application/manifest+json webmanifest; }
+```
+
+`tools/serve.mjs` already answers `.webmanifest` as `application/manifest+json`,
+so `npm run serve` matches the ideal config.
+
+### What to test on a real iPhone (nobody here has one)
+
+The automated suite (`npm run check:mobile`, issue #77 scenarios) proves all of
+this only in **emulation** (iPhone UA, landscape sizes 844×390 / 932×430 /
+667×375, simulated notch insets). On a real iPhone, after deploying:
+
+1. Safari → Share → **Add to Home Screen** is offered for this site, and the
+   new icon shows **Bobo's head** (the 180×180 apple-touch-icon), not a
+   screenshot.
+2. Open the icon: it launches with **no Safari bars**, the game fills the
+   **whole screen**, landscape from the start.
+3. Turn the phone to the notch side up: **no black band** at the notch; the
+   score pill, gear, stick and shout button are all reachable and none sits
+   under the notch or the home-indicator bar.
+4. Tap START: **sound and the bardcore tune unlock** on that tap (standalone
+   follows the same autoplay rules — the first tap is the unlock).
+5. Portrait: the **"turn your phone sideways"** card appears; rotate back and
+   play resumes (iOS cannot lock orientation for a web app, so this overlay —
+   not the manifest — carries it).
+6. Swipe the app away, relaunch from the icon: it comes back to the title
+   screen, still fullscreen.
+7. Still in the **browser** (not installed): the one-time hint line sits under
+   START; tap it — it dismisses and does **not** come back after a reload;
+   tapping it never starts the game.
+8. Chrome on iPhone shows the same hint (it is WebKit there too); after
+   installing via Safari, the installed app shows no hint and never asks for
+   fullscreen.
+
+Anything on that list that fails is a real-device bug to file, not evidence
+the emulation checks are wrong — they pass headlessly on every commit.
 
 ## Checking the build locally before pushing
 
