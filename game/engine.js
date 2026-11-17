@@ -2867,15 +2867,64 @@ export function bootGame(cfg) {
       if (pointerSeq === menuSeq) return;
       unlockGate();
     });
+    // Issue #99 (desktop mouse): one door back into play, used by the card
+    // background, the canvas, the Resume button and Esc/P. If there is nothing
+    // to grab (headless ?gate=off, touch, or a browser with no
+    // requestPointerLock at all) we resume with a normal cursor — Resume is
+    // never a dead end. When the pointer IS grabbable, resuming is the grab,
+    // and the lock-change event clears the pause; a DENIED grab (Chrome
+    // refuses an instant re-lock after Esc) leaves the card up, which is the
+    // honest state and invites another click.
+    function tryResumeLock() {
+      if (game.phase === 'win') return;
+      if (GATE_OFF || input.isLocked() || TOUCH || !input.canLock()) resumePlay();
+      else input.lock();
+    }
+    /** Pause without a lock to drop (issue #99): the game runs, the cursor is
+     *  already free (lock was denied or unavailable), and P/Esc/O says wait.
+     *  `game.paused` stays THE flag — the run clock only ever steps through
+     *  stepGame, which returns early while it is set, so paused time is never
+     *  game time (the later leaderboard can distrust a run by reading it). */
+    function pauseHere() {
+      if (!started || game.phase === 'win') return;
+      game.paused = true;
+      el.pause.classList.add('show');
+    }
+    /** P / Esc (mouse only): release the pointer and open the pause card, or
+     *  take the pointer back if the card is already up. */
+    function desktopPauseToggle() {
+      if (GATE_OFF || !gateOpen || !started || game.phase === 'win') return;
+      if (input.isLocked()) input.unlock(); // the lock-change event pauses
+      else if (game.paused) tryResumeLock();
+      else pauseHere();
+    }
+    // Issue #99: the comfort panel is reachable with a mouse, so opening it
+    // from the gear or O must never leave the world ticking behind it: a
+    // mouse run releases the pointer (or pauses directly when there is
+    // nothing to release) first. The panel sits ABOVE the pause card, and
+    // closing it (X, Esc, O again) lands back on the card — never a dead state.
+    const sBtn = document.getElementById('settings-btn');
+    const sPanel = document.getElementById('settings-panel');
+    const syncOpen = () => {
+      window.__lcSettingsOpen = !!(sPanel && sPanel.classList.contains('show'));
+    };
+    function openSettingsFlow() {
+      if (!sPanel) return;
+      if (!TOUCH && !GATE_OFF && started && game.phase !== 'win' && !game.paused) {
+        if (input.isLocked()) input.unlock(); // the lock-change event pauses
+        else pauseHere(); // cursor was already free: pause directly
+      }
+      sPanel.classList.add('show');
+      syncOpen();
+    }
+    function closeSettings() {
+      if (!sPanel) return;
+      sPanel.classList.remove('show');
+      syncOpen();
+    }
     el.pause.addEventListener('click', () => {
       if (game.phase === 'win') return;
-      // Resume paths by situation: still holding the pointer (a blur paused
-      // us — Alt-Tab keeps the lock) or no lock semantics at all (headless
-      // ?gate=off, or touch — issue #25: nothing to grab, tapping IS asking)
-      // → resume directly; otherwise resuming IS re-grabbing the pointer,
-      // and the lock-change event clears the pause.
-      if (GATE_OFF || input.isLocked() || TOUCH) resumePlay();
-      else input.lock();
+      tryResumeLock();
     });
     // Step 8 (full game): the pause card also carries a restart button.
     if (el.pauseRestart) {
@@ -2886,10 +2935,21 @@ export function bootGame(cfg) {
         else input.lock(); // the lock-change event clears the pause
       });
     }
+    // Issue #99: the card grows a Resume and a Settings button (mouse pages
+    // only — .only-desktop retires them on phones, where the always-visible
+    // gear and tap-anywhere card already do this job). Absent on the slice.
+    const pauseResume = document.getElementById('pause-resume');
+    if (pauseResume) {
+      pauseResume.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        tryResumeLock();
+      });
+    }
     // Issue #57: and a "back to menu" — the title screen again, Play from
     // there starts a fresh run. Guarded like the restart button (the slice
-    // has neither). The M key is the same door; Esc while the card is UP
-    // means "I want out" (Esc while playing just pauses, via src/input.js).
+    // has neither). The M key is that door. Issue #99 took Esc off it: while
+    // the card is UP Esc now RESUMES (Esc while playing pauses, via
+    // src/input.js), because the same key must not mean "leave the run".
     if (SPLASH_CFG && el.pauseMenu) {
       el.pauseMenu.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -2897,7 +2957,7 @@ export function bootGame(cfg) {
       });
       window.addEventListener('keydown', (ev) => {
         if (window.__lcSettingsOpen) return;
-        if ((ev.code === 'KeyM' || ev.code === 'Escape') && gateOpen && started && game.paused && game.phase !== 'win') {
+        if (ev.code === 'KeyM' && gateOpen && started && game.paused && game.phase !== 'win') {
           ev.preventDefault();
           backToMenu();
         }
@@ -2925,7 +2985,8 @@ export function bootGame(cfg) {
         return;
       }
       if (input.isLocked()) input.queueAction('point');
-      else input.lock();
+      else tryResumeLock(); // issue #99: click-on-the-view while the card is
+      // up is "give me the pointer back" — with the no-lock-API fallback.
     });
     window.addEventListener('keydown', (ev) => {
       // Comfort panel is open: keys belong to the panel, never to the game.
@@ -2936,21 +2997,54 @@ export function bootGame(cfg) {
         else input.queueAction('point');
       }
     });
+    // Issue #99 (desktop, mouse pages only — every path checks TOUCH live, so
+    // a device that switched to thumbs mid-page, #29, is left alone):
+    //   Esc while playing → the browser drops the lock (no keydown arrives)
+    //     and the lock-change event pauses; Esc again → back into play.
+    //   P → the same toggle, for the browsers/pages where no lock was ever
+    //     granted (denied, no API) and Esc produced no keydown to react to.
+    //   O → open the settings panel directly, releasing the mouse first; Esc
+    //     (or O again) closes it back onto the pause card, never a dead state.
+    window.addEventListener('keydown', (ev) => {
+      if (TOUCH || ev.repeat) return;
+      if (window.__lcSettingsOpen) {
+        if (ev.code === 'Escape' || ev.code === 'KeyO') {
+          ev.preventDefault();
+          closeSettings(); // back onto whatever is under it (the pause card)
+        }
+        return;
+      }
+      if (ev.code === 'KeyO' && gateOpen && sBtn && sPanel) {
+        ev.preventDefault();
+        openSettingsFlow();
+        return;
+      }
+      if ((ev.code === 'KeyP' || ev.code === 'Escape') && !GATE_OFF) {
+        ev.preventDefault();
+        desktopPauseToggle();
+      }
+    });
     // Step 9 comfort panel: the settings live in the URL, so a choice persists
     // across refresh, shares as a link, and re-applies in one obvious way.
     // Guarded: only pages that ship the panel (game/full.html) get wired.
-    const sBtn = document.getElementById('settings-btn');
-    const sPanel = document.getElementById('settings-panel');
+    // (sBtn/sPanel/syncOpen were taken above — issue #99 uses them from the
+    // gear, the pause card and the O/Esc keys alike.)
     if (sBtn && sPanel) {
       sBtn.classList.add('show');
-      const syncOpen = () => {
-        window.__lcSettingsOpen = sPanel.classList.contains('show');
-      };
       sBtn.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        sPanel.classList.toggle('show');
-        syncOpen();
+        if (sPanel.classList.contains('show')) closeSettings();
+        else openSettingsFlow();
       });
+      // Issue #99: the pause card's Settings button opens the same panel on
+      // top of the card. Absent on the slice, like the card's other extras.
+      const pauseSettings = document.getElementById('pause-settings');
+      if (pauseSettings) {
+        pauseSettings.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          openSettingsFlow();
+        });
+      }
       sPanel.addEventListener('click', (ev) => ev.stopPropagation());
       const q = (id) => sPanel.querySelector(id);
       q('#set-sens').value = String(SETTINGS.sens);
@@ -2982,11 +3076,7 @@ export function bootGame(cfg) {
       };
       for (const c of sPanel.querySelectorAll('input')) c.addEventListener('change', apply);
       const sClose = q('#settings-close');
-      if (sClose)
-        sClose.addEventListener('click', () => {
-          sPanel.classList.remove('show');
-          syncOpen();
-        });
+      if (sClose) sClose.addEventListener('click', closeSettings);
     }
   }
 

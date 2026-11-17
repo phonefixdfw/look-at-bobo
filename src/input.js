@@ -125,6 +125,13 @@ export function createInput({ dom = document, canvas = null } = {}) {
     lock() {
       if (!locked) target?.requestPointerLock?.();
     },
+    /** Issue #99: is pointer lock even on the menu in this browser? (Some
+     *  iframes and hardened browsers ship no requestPointerLock at all — the
+     *  caller then resumes with a normal cursor instead of asking a door that
+     *  does not exist, so Resume can never be a dead end.) */
+    canLock() {
+      return typeof target?.requestPointerLock === 'function';
+    },
     unlock() {
       if (locked) dom.exitPointerLock?.();
     },
