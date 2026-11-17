@@ -5,12 +5,10 @@
 // painted, which is what keeps this at one draw call and zero CPU per frame.
 //
 // The atlas rows are depth bands of one street: sky, far skyline, midrise,
-// storefronts, roadway, near rooftops (see full-street.js for the card math).
-// Each backdrop card tiles quads sampling those rows, so far towers vanish
-// behind the midrise, storefront bases meet the sidewalk, and the roadway's
-// far sidewalk meets the storefronts — band seams read as occlusion. The same
-// rows serve the west/east cards running down the street: the roadway's
-// cross-section bands line up with the direction of travel there too.
+// storefronts, roadway, near rooftops, side-street block (see full-street.js
+// for the card math). Each backdrop card tiles quads sampling those rows, so
+// far towers vanish behind the midrise, storefront bases meet the sidewalk,
+// and the ground card's swapped roadway cross-section meets the canyon walls.
 //
 // `?quality=low` stacks two rows (sky + one compressed city/road row painted
 // from the SAME skyline silhouette) on the same planes: a simpler scene, the
@@ -34,6 +32,7 @@ const ATLAS_FULL = {
     front: { x: 256, y: 160, w: 256, h: 128 },
     road: { x: 0, y: 288, w: 256, h: 112 },
     roof: { x: 256, y: 288, w: 256, h: 112 },
+    side: { x: 0, y: 400, w: 256, h: 112 }, // block running down the street
   },
 };
 const ATLAS_LOW = {
@@ -275,6 +274,37 @@ function paintRoad(P) {
   }
 }
 
+// the block running down the street (west/east cards): brick rows with
+// cornices + window grids, storefront glazing and awnings at the foot, and a
+// sidewalk strip that meets the ground card's side edge. One cell stretches
+// the ~33 m the card spans; the stretch reads as wide 1920s warehouse bays.
+function paintSide(P, rand) {
+  const { w, h } = P.cell;
+  P.hgrad(0, h, [[0, CITY.sky.haze], [0.3, '#efe7d6'], [1, '#e6dbc6']]);
+  let x = 0;
+  while (x < w - 6) {
+    const bw = Math.round(between(rand, 22, 52));
+    const bh = Math.round(between(rand, h * 0.4, h * 0.92));
+    const top = h - bh;
+    const style = pick(rand, CITY.mid.bricks.concat(CITY.front.painted));
+    P.rect(x, top, bw, bh, style);
+    P.rect(x, top, bw, 3, rand() < 0.5 ? '#e0d5c0' : '#6f4a41'); // cornice
+    const pane = CITY.midWindows[pick(rand, [0, 1, 2]) % CITY.midWindows.length];
+    for (let wy = top + 8; wy < h - 27; wy += 7) {
+      for (let wx = x + 3; wx < x + bw - 4; wx += 6) {
+        P.rect(wx, wy, 3, 4, rand() < 0.85 ? pane : '#c9c1b2');
+      }
+    }
+    P.rect(x + 2, h - 22, bw - 4, 14, CITY.front.door); // storefront glazing
+    P.rect(x + 3, h - 21, bw - 6, 11, CITY.front.glass);
+    for (let sx = x + 2; sx < x + bw - 3; sx += 6) {
+      P.rect(sx, h - 25, 3, 3, CITY.front.awnings[((sx - x) / 3) % 2 ? 1 : 0]);
+    }
+    x += bw + 1;
+  }
+  P.rect(0, h - 7, w, 7, '#d8d2c6'); // sidewalk foot — meets the ground card
+}
+
 function paintRoof(P, rand) {
   const { w, h } = P.cell;
   P.rect(0, 0, w, h, '#3a3d42'); // the slot you fall into between rooftops
@@ -365,6 +395,7 @@ function paintAtlas(THREE, tier) {
     paintFront(at('front'), rand);
     paintRoad(at('road'));
     paintRoof(at('roof'), rand);
+    paintSide(at('side'), rand);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -384,10 +415,11 @@ function paintAtlas(THREE, tier) {
 function emitQuad(parts, plane, spec, quad, atlas) {
   const cell = atlas.cells[quad.cell];
   const [vb0, vb1] = quad.vBand ?? [0, 1];
+  const [ub0, ub1] = quad.uBand ?? [0, 1];
   const tint = quad.tint ?? 1;
   const pad = 1; // px: keep filtering off neighbouring cells
-  const u0 = (cell.x + pad) / atlas.w;
-  const u1 = (cell.x + cell.w - pad) / atlas.w;
+  const u0 = (cell.x + ub0 * cell.w + (ub0 === 0 ? pad : 0)) / atlas.w;
+  const u1 = (cell.x + ub1 * cell.w - (ub1 === 1 ? pad : 0)) / atlas.w;
   const vTop = 1 - (cell.y + vb0 * cell.h + (vb0 === 0 ? pad : 0)) / atlas.h;
   const vBot = 1 - (cell.y + vb1 * cell.h - (vb1 === 1 ? pad : 0)) / atlas.h;
   const [yTop, yBot] = quad.y ?? [0, 0];
@@ -409,7 +441,14 @@ function emitQuad(parts, plane, spec, quad, atlas) {
   }
   const idx = parts.pos.length / 3;
   parts.pos.push(bl[0], bl[1], bl[2], br[0], br[1], br[2], tr[0], tr[1], tr[2], tl[0], tl[1], tl[2]);
-  parts.uv.push(u0, vBot, u1, vBot, u1, vTop, u0, vTop);
+  if (quad.swapUV) {
+    // ground cards only: cell-u runs down-street (world z, near edge first),
+    // cell-v across the canyon (world x, west first) — the painted roadway
+    // cross-section spans the canyon and its cars/dashes run with the street
+    parts.uv.push(u0, vBot, u0, vTop, u1, vTop, u1, vBot);
+  } else {
+    parts.uv.push(u0, vBot, u1, vBot, u1, vTop, u0, vTop);
+  }
   for (let i = 0; i < 4; i += 1) parts.col.push(tint, tint, tint);
   parts.idx.push(idx, idx + 1, idx + 2, idx, idx + 2, idx + 3);
 }

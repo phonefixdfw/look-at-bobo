@@ -745,3 +745,76 @@ headroom-left-to-cap. Max draw per camera room over all 546 capture frames:
 `cat-props-clear-the-plan` (no prop rect covers a spawn, a floor moment
 spot or a decoy) — full check count 91 → **93**, and `playtest:stress:full`
 passes `--checks 93` to match.
+
+## Issue #83 — the street outside (replaces the flat blue)
+
+The north (window) wall of the living room has ONE real window — the 1.8m
+apartment window at x −2.1..−0.3 (sill .9, head 2.1). The old 4.5m-wide flat
+sky sheet behind it and the balcony's three decorative sky sheets are gone;
+in their place is the procedural street (`game/full-street.js` layout data +
+`game/full-street-mesh.js` atlas paint and merged mesh): ONE
+`MeshBasicMaterial` mesh (vertex colours, unlit, no shadows — same no-real-
+light rule as the blinds) fed by ONE runtime-painted 512px canvas atlas,
+painted deterministically (seed 20261117). Parked cars are painted into the
+atlas instead of being separate animated objects — static traffic costs
+zero draw calls, which is the trade this card explicitly allows.
+
+**Cards** (world metres, `?quality=low` in brackets):
+
+| card | rect | atlas row |
+|---|---|---|
+| apartment window | x −2.8..0.4, y .45..2.55, z −3.24 (exact old sheet rect) | storefronts [low: far skyline] |
+| far skyline | x −140..150, y 26.4..1.2, z −60 | skyline (horizon y 1.62, `vBand` roots the towers) |
+| mid-rise row | x −60..70, y 12..0.2, z −36 | midrises [low: city band 16..−9.28] |
+| storefront row (street's north wall) | x −24..32, y 5.9..−9.28, z −20.5 | storefront band (low: sky + city rows) |
+| near rooftops | x −16..22, y −2.2..−9.28, z −8 | near roofs (low: none) |
+| west / east facades | x −8 / +9.5, y 16..−9.28, z −36..−3.15 | side streetscape [low: far + city] |
+| street ground | x −8..9.5, z −4.6..−20.5, y −9.3 | roadway cross-section, UV swapped [low: city] |
+
+The rows are depth-sorted top-to-bottom on the atlas, so the far skyline
+hazes behind the midrises behind the storefronts behind the near rooftops.
+The street sits 9.3m BELOW the balcony (the stage-set trick: from the
+window and the balcony the sightline always enters through glass or over
+the railing, which hides the joint); the balcony slab and railing hide the
+steep-down angles from the ground quad's near edge. Ground quad is 17.5m
+wide — the canyon width between the side facades — and its UVs are swapped
+so the painted roadway cross-section runs east-west while the parked cars
+and lane dashes run north-south down the street.
+
+**It is a stage set, not a place.** No collision, not walkable, no
+findable tags: `WALK_RECTS` already keeps the player inside the apartment
+and the backdrop sits far outside every room rect, so no walk clamp or
+findable test can touch it. Guard check `street-clear-of-the-walk` fails
+the page if that ever stops being true.
+
+**Culling — per-room invite lists.** `createRoomCull` grew a second rule
+besides the exclusion one: a card (or group) tagged `userData.cullRooms =
+['living','balcony']` is visible ONLY from those rooms, and `?cull=off`
+still shows everything. The street is the only member today; blinds and
+curtains keep their `cullGroups` exclusions. On low quality this is how
+the two-row street stays inside `LOW_QUALITY_DRAW_CALL_CAP`: only the
+street-seeing frames pay for it.
+
+**New capture view `street`** (15th): eye `[1.5, 1.62, −3.6]` = standing at
+the window, yaw 0, pitch −0.34 (the issue's "look slightly down the
+street"), fov 55, handheld off (a still, so the paint-comparison checks
+have a stable frame). 0.604m from the balcony view, which keeps
+`views-distinct` honest. The capture matrix grows 546 → **585 frames**,
+and the balcony/street frames re-baseline deliberately: the blue sky they
+used to match is the thing this card removed.
+
+**Draw budget.** Worst frame moves from 150/250 to **151/250** (dining
+view — the street adds +1 draw to every street-seeing frame, and the
+diorama pays it too on full quality because it sees the window). Max draw
+per camera room over all 585 frames:
+
+| room | living | dining | kitchen | bedroom | balcony | entry | hall |
+|---|---|---|---|---|---|---|---|
+| max draws | **151** | **151** | 129 | 125 | 116 | 103 | 96 |
+
+**Checks.** Four new selfTests — `street-backdrop-built` (built, one draw,
+atlas ≤512), `street-culled-to-views` (culled in diorama/bedroom/kitchen,
+`?cull=off` brings it back), `street-view-not-flat-blue` (old-sky palette
+share of the street/balcony frames < 35 %, near-black < 25 %),
+`street-clear-of-the-walk` (no `findable` tag, no card inside a walk rect)
+— full check count 95 → **99**, `playtest:stress:full` runs `--checks 99`.

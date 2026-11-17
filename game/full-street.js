@@ -56,8 +56,11 @@ export const CITY = {
 // One flat card = a plane + a stack of quads tiling it top-down. `quads` are
 // world y spans [top, bottom]; each samples one atlas row (cell), `tint` is a
 // flat brightness, `vBand` optionally slices the row (fractions from its top)
-// for haze/base strips. North planes face +z (long axis x); west/east planes
-// run down the street (long axis z) and face the street.
+// and `uBand` slices it sideways (fractions from its left) for haze/base
+// strips; `swapUV` (ground cards only) rotates the cell 90° so the cell's u
+// runs down-street and its v across the canyon. North planes face +z (long
+// axis x); west/east planes run down the street (long axis z) and face the
+// street.
 export const CARDS_FULL = [
   {
     id: 'window',
@@ -102,8 +105,9 @@ export const CARDS_FULL = [
     x0: -16,
     x1: 14,
     quads: [
-      { cell: 'front', y: [5.9, 0.15], tint: 1.03 },
-      { cell: 'road', y: [0.15, -9.28], tint: 1.08 },
+      // the block across the street, storefronts to sidewalk foot; the road
+      // below it is the ground quad's, so this card is pure facade
+      { cell: 'front', y: [5.9, -9.28], tint: 1.03 },
     ],
   },
   {
@@ -117,19 +121,22 @@ export const CARDS_FULL = [
     ],
   },
   {
-    // the street FLOOR itself at y −9.28: catches every steep sight-line that
-    // passes under the vertical cards' bottom edges (leaning on the railing
-    // and looking down must be asphalt, not the empty scene background). Its
-    // far edge tucks under the storefront card, which occludes everything
-    // behind it from any eye above street level.
+    // the street FLOOR itself at y −9.28: the canyon between the side cards,
+    // catching every steep sight-line that passes under the vertical cards'
+    // bottom edges (leaning on the railing and looking down must be asphalt,
+    // not the empty scene background). Its far edge tucks under the
+    // storefront card, which occludes everything behind it from any eye above
+    // street level. UVs are swapped: the roadway cell's cross-section runs
+    // east-west across the canyon and its parked cars/lane dashes run
+    // north-south down the street, at ~4 m per car.
     id: 'ground',
     plane: 'ground',
     y: STREET_GROUND_Y,
-    x0: -43,
-    x1: 49,
+    x0: -8,
+    x1: 9.5,
     z0: -20.5,
     z1: -4.6,
-    quads: [{ cell: 'road', tint: 1.04 }],
+    quads: [{ cell: 'road', tint: 1.04, uBand: [0.08, 0.55], swapUV: true }],
   },
   {
     id: 'west',
@@ -138,9 +145,10 @@ export const CARDS_FULL = [
     z0: -36,
     z1: -3.15,
     quads: [
-      { cell: 'sky', y: [46, 26] },
-      { cell: 'far', y: [26, 1.2], tint: 0.94 },
-      { cell: 'road', y: [1.2, -9.28], tint: 1.02 },
+      { cell: 'sky', y: [46, 16] },
+      // one painted block running down the street (due-east/west sightlines
+      // from the balcony land here, not on the far card)
+      { cell: 'side', y: [16, -9.28], tint: 1.02 },
     ],
   },
   {
@@ -150,9 +158,8 @@ export const CARDS_FULL = [
     z0: -36,
     z1: -3.15,
     quads: [
-      { cell: 'sky', y: [46, 26] },
-      { cell: 'far', y: [26, 1.2], tint: 0.94 },
-      { cell: 'road', y: [1.2, -9.28], tint: 1.02 },
+      { cell: 'sky', y: [46, 16] },
+      { cell: 'side', y: [16, -9.28], tint: 1.02 },
     ],
   },
 ];
@@ -185,14 +192,17 @@ export const CARDS_LOW = [
     ],
   },
   {
+    // same canyon floor as the full tier, painted from the compressed city
+    // row's lower band (storefront feet + roadway + cars), UVs swapped so the
+    // cars run down the street like they do at full quality
     id: 'ground',
     plane: 'ground',
     y: STREET_GROUND_Y,
-    x0: -43,
-    x1: 49,
+    x0: -8,
+    x1: 9.5,
     z0: -20.5,
     z1: -4.6,
-    quads: [{ cell: 'city', tint: 1.04 }],
+    quads: [{ cell: 'city', tint: 1.04, uBand: [0.1, 0.6], vBand: [0.6, 1], swapUV: true }],
   },
   {
     id: 'west',
