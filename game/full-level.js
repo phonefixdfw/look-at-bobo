@@ -647,7 +647,7 @@ export const SCALE_RANGES = {
   'side-table': { w: [0.38, 0.52], h: [0.48, 0.62], note: 'row 37: 0.45 dia × 0.55 high' },
   'dining-table': { w: [0.98, 1.12], d: [0.98, 1.12], h: [0.71, 0.8], note: 'issue #81: round table dia 1.05, top 0.75 (w = d is the roundness)' },
   'dining-chair': { w: [0.4, 0.5], d: [0.4, 0.55], h: [0.85, 1.0], note: 'issue #81: 0.44 × 0.45, seat 0.45, back 0.86 — measured on each of the four' },
-  'sideboard': { w: [1.1, 1.5], d: [0.36, 0.5], h: [0.75, 0.9], note: 'issue #81: 1.28 × 0.40 × 0.86 on the dining room\u2019s north plaster' },
+  'sideboard': { w: [1.1, 1.5], d: [0.36, 0.5], h: [0.75, 0.9], note: 'issue #81: 1.28 × 0.40 × 0.86 on the dining room\u2019s south wall, under the window' },
   'tv-stand': { w: [1.45, 1.72], d: [0.32, 0.46], h: [0.38, 0.55], note: 'row 40: 1.60 × 0.40 × 0.45' },
   'tv-screen': { w: [1.0, 1.35], h: [0.62, 0.8], bottom: [0.79, 0.9], note: 'row 39: 1.22 × 0.71, centre y 1.20' },
   bookshelf: { w: [0.8, 1.0], d: [0.28, 0.4], h: [1.7, 2.1], note: 'row 41: 0.90 × 0.32 × 1.90 high' },
