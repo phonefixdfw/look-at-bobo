@@ -156,6 +156,14 @@ export const FOOT = {
   // small bin in the corner at the tub's east end (was the doorway field's
   // south corner, which the old tub occupied)
   bin: F(-1.58, 4.90, -1.34, 5.14),
+  // issue #82: the litter box, 0.46 × 0.32, in the one pocket of the room
+  // no body ever stands in: between the mat's east end and the bin, flush
+  // east on the plaster and 4 cm off the tub's flank. Every cell around it
+  // is already the tub pad's or the wall's shadow, so the tray costs the
+  // bath-clear-path flood nothing, keeps the tub cat's findable sightline
+  // (which runs from floor north of z 4.15), and never crosses the mat,
+  // the bin or the door's field — not even under its own body pad.
+  litter: F(-1.66, 4.44, -1.34, 4.90),
   // balcony chair: the placeholder's footprint, kept verbatim so the
   // `chairSeat` support (1.93 … 2.42, −3.87 … −3.33) still lands on it
   chair: F(1.90, -3.90, 2.45, -3.30),
@@ -174,6 +182,7 @@ export const BATH_COLLIDERS = [
   { id: 'toilet', ...FOOT.toilet },
   { id: 'tub', ...FOOT.tub },
   { id: 'bath-bin', ...FOOT.bin },
+  { id: 'litter-box', ...FOOT.litter }, // issue #82
 ];
 
 export const BALCONY_COLLIDERS = [
@@ -202,6 +211,7 @@ const piece = (id, mat, parts, scale = null, note = '', cyls = []) => ({
 const V = FOOT.vanity; // 0.86 = SUPPORT_DEFS.vanityTop: the counter's top IS the support
 const T = FOOT.toilet;
 const U = FOOT.tub;
+const L = FOOT.litter; // issue #82: the litter box footprint
 const WC = (V.x0 + V.x1) / 2; // −2.85: the basin's centre line
 const TX = (T.x0 + T.x1) / 2; // −2.135: the toilet's centre line
 
@@ -268,6 +278,24 @@ export const PIECES = [
     ],
     'tub',
     'row 56: 1.60 × 0.75, rim 0.55 inside 0.5…0.62 — the well floor sits inside the measured box',
+  ),
+
+  /* ── the litter box (issue #82): 0.46 × 0.32, wall of it 0.15 high, in the
+   *  pocket between the mat's east end and the bin's north face. Plain
+   *  white plastic, the scoop left at home — a low tray a loaf can see over.
+   *  Tagged so the ruler measures it like every other piece. ─────────────── */
+  piece(
+    'litter-box',
+    'porcelain',
+    [
+      bx(L.x0, 0, L.z0, L.x1, 0.04, L.z1), // base slab
+      bx(L.x0, 0.04, L.z0, L.x1, 0.15, L.z0 + 0.06), // rim wall, north
+      bx(L.x0, 0.04, L.z1 - 0.06, L.x1, 0.15, L.z1), // rim wall, south
+      bx(L.x0, 0.04, L.z0, L.x0 + 0.06, 0.15, L.z1), // rim wall, room side
+      bx(L.x1 - 0.06, 0.04, L.z0, L.x1, 0.15, L.z1), // rim wall, plaster side
+    ],
+    'litter-box',
+    'issue #82: 0.46 × 0.32 × 0.15, low-sided tray, in the tub-to-bin pocket',
   ),
 
   /* ── bath mirror (row 54): 0.70 × 0.90, bottom y 1.10, over the vanity,

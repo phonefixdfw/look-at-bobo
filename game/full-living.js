@@ -68,6 +68,13 @@ export const LIV = {
   plinthH: 0.24,
   deckH: 0.3, // the seat deck the cushions sit on
 
+  // row 34's cat upgrade (issue #82): a 40 × 55 cm yellow heat pad, 3 cm
+  // thick, on the SOUTH cushion — top 0.48, three centimetres of warming
+  // over the 0.45 seat. Not a collider: a pad you walk on, like the rug.
+  padX: [-2.93, -2.53],
+  padZ: [0.08, 0.63],
+  padTop: 0.48,
+
   // row 36: coffee table 1.10 × 0.60 × 0.45 high (allows 0.38…0.52); the top
   // slab is row 13's 4 cm by the same logic as the kitchen worktop.
   coffeeLen: 1.1,
@@ -225,6 +232,18 @@ export const PIECES = [
     CUSHION_Z.map(([z0, z1]) => bx(S.x0 + LIV.backT, 0.42, z0, S.x0 + LIV.backT + 0.22, LIV.sofaH, z1)),
     'sofa-back',
     'the back cushions, top at the `sofaBackTop` support (0.85)',
+  ),
+  /* ── the heat pad (issue #82) ──────────────────────────────────────────────
+   * The one yellow thing in the flat's warmest spot: a 40 × 55 cm corded
+   * heat pad on the south cushion, top 0.48 — the `heatPad` support's own
+   * number. Its own mesh and its own row: a cat loafing on it is measured
+   * standing on the pad, not sinking into the cushion under it. */
+  piece(
+    'heat-pad',
+    'heatpad',
+    [bx(LIV.padX[0], LIV.seatH, LIV.padZ[0], LIV.padX[1], LIV.padTop, LIV.padZ[1])],
+    'heat-pad',
+    'issue #82: 40 × 55 × 3 cm, top 0.48 on the south cushion',
   ),
 
   /* ── coffee table (row 36): 1.10 × 0.60 × 0.45, 0.46 m off the seat face ──
@@ -492,6 +511,15 @@ export const DETAILS = {
   tvBase: [
     bx(2.13, LIV.standH, -1.9, 2.21, LIV.standH + 0.018, -1.5), // plate on the stand
     bx(2.155, LIV.standH + 0.018, -1.78, 2.195, LIV.tvCentreY - LIV.tvH / 2, -1.62), // stem to the panel
+  ],
+
+  // the heat pad's cord (issue #82): out the pad's east face, across the
+  // cushion, down the sofa's front and into a small adapter behind it — dark
+  // dressing merged with the TV's base, a pad with no cord is a cushion.
+  padCord: [
+    bx(-2.53, 0.455, 0.34, -2.38, 0.468, 0.362), // across the cushion to the seat's edge
+    bx(-2.402, 0.02, 0.34, -2.378, 0.46, 0.362), // down the sofa's front face
+    bx(-2.402, 0.02, 0.30, -2.35, 0.058, 0.366), // the adapter, at the sofa's foot on the rug
   ],
 
   // one framed print, colour-blocked (the brief: not another black-and-white

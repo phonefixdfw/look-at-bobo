@@ -56,6 +56,7 @@ function livingMaterials() {
     tvBody: surface(0x14171a, { uvTile: 0.3, roughness: 0.45, metalness: 0.3 }),
     dark: surface(0x25282d, { uvTile: 0.25, roughness: 0.55, metalness: 0.25 }), // kicks, pegs, the pedestal
     cardboard: surface(TOKENS.cardboard, { uvTile: 0.5, roughness: 0.94 }), // the hero prop
+    heatpad: fabric(0xf2b63f), // issue #82: the yellow heat pad — the flat's second warm accent
     rug: SURFACES.rug(), // the 3.3 × 2.3 pile under the seat group
     pillow: fabric(TOKENS.pillow), // the two cushions, the flat's one gold accent
     throw: fabric(0x8a5c46), // over the arm: terracotta, folded
@@ -124,7 +125,7 @@ function buildDetails(living, mats) {
     { cast: false },
   );
   mergedMesh(living, D.bookSpines.map((b) => ({ geo: boxGeo(b), mat: mats.spines })), { cast: false });
-  mergedMesh(living, D.tvBase.map((b) => ({ geo: boxGeo(b), mat: mats.dark })), { cast: false });
+  mergedMesh(living, [...D.tvBase, ...D.padCord].map((b) => ({ geo: boxGeo(b), mat: mats.dark })), { cast: false });
 
   // pots and the vase: turned, one draw for all three
   const potParts = [

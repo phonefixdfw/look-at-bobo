@@ -18,7 +18,7 @@ import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/rea
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
-import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W } from './full-shell.js';
+import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W, SUPPORT_DEFS } from './full-shell.js';
 import { diningGapReport } from './full-dining.js';
 import { woodTextureAudit } from '../src/polish.js';
 import { SPLASH } from './splash.js';
@@ -425,6 +425,12 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'dining-table',
       'dining-chair',
       'sideboard',
+      // issue #82: the cat-care props. The pad on the sofa's south cushion,
+      // the two bowls measured as one pair, and the low tray on the bath
+      // strip — all tagged by their own builders, so all three are measured.
+      'heat-pad',
+      'food-bowl',
+      'litter-box',
     ];
     const boxes = new Map(); // row -> [[label, Box3]]
     const groups = new Map(); // group -> [label, Box3] to union
@@ -488,6 +494,68 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       `every tagged box inside docs/ISSUE_33_REBUILD.md §1 (+${REQUIRED.length} rows required)`,
       bad.length === 0,
       'issues #41/#46: kitchen and living room measure what the ruler says, not what they were handed',
+    );
+  }
+
+  /* Issue #82 — the heat pad's own claim: the `heatPad` support is not a
+   * number floated over the sofa, it IS the drawn pad. Measured off the
+   * built mesh: the pad's bottom rests on the cushion's top (0.45) and its
+   * top is the support a cat stands on (0.48). `every-moment-contact` proves
+   * the loaf touches 0.48; this proves 0.48 is real furniture. */
+  {
+    const sup = SUPPORT_DEFS.heatPad;
+    const cush = SUPPORT_DEFS.cushion;
+    let box = null;
+    scene.traverse((o) => {
+      const t = o.userData?.scale;
+      if (!o.isMesh || (t !== 'heat-pad' && !(Array.isArray(t) && t.includes('heat-pad')))) return;
+      o.updateWorldMatrix(true, false);
+      const b = new THREE.Box3().setFromObject(o);
+      box = box ? box.union(b) : b;
+    });
+    const ok = !!box && Math.abs(box.max.y - sup.top) < 0.001 && Math.abs(box.min.y - cush.top) < 0.001;
+    add(
+      'heat-pad-rests-on-cushion',
+      box ? `pad ${box.min.y.toFixed(3)}…${box.max.y.toFixed(3)} m` : 'no heat-pad mesh carries the row',
+      `pad bottom = cushion top ${cush.top}, pad top = heatPad support ${sup.top} (±0.001)`,
+      ok,
+      'issue #82: three cm of warmth is the support itself: neither floating nor sunken',
+    );
+  }
+
+  /* Issue #82 — the three cat-care footprints (the tray, the bowls and the
+   * bigger bin) leave the flat's plan open: no spawn's stand cell inside a
+   * body pad, no floor spot inside a body pad, no decoy standing inside a
+   * raw box. The walk-graph checks re-run against these colliders anyway;
+   * this prints the tightest spawn gap so the clearances are a number. */
+  {
+    const pad = 0.3; // MOVE.playerRadius: how far a collider's pad reaches
+    const props = ['litter-box', 'pet-bowls', 'kitchen-bin'];
+    const rects = LEVEL.COLLIDERS.filter((c) => props.includes(c.id));
+    const bad = [];
+    let minSpawn = Infinity;
+    let tight = '';
+    const outside = (r, x, z, m) => x < r.x0 - m || x > r.x1 + m || z < r.z0 - m || z > r.z1 + m;
+    for (const s of LEVEL.SPAWNS) {
+      for (const r of rects) {
+        if (!outside(r, s.pos[0], s.pos[1], pad)) bad.push(`spawn at ${s.room} inside ${r.id}'s body pad`);
+        const d = Math.max(r.x0 - s.pos[0], s.pos[0] - r.x1, r.z0 - s.pos[1], s.pos[1] - r.z1);
+        if (d < minSpawn) { minSpawn = d; tight = `${s.room} spawn ↔ ${r.id}`; }
+      }
+    }
+    for (const sp of LEVEL.SPOTS) {
+      if (sp.spot[1] !== 'floor') continue; // furniture-top spots ride their own support
+      for (const r of rects) if (!outside(r, sp.spot[0], sp.spot[2], pad)) bad.push(`${sp.id} inside ${r.id}'s body pad`);
+    }
+    for (const d of LEVEL.DECOY_SPOTS) {
+      for (const r of rects) if (!outside(r, d.pos[0], d.pos[2], 0)) bad.push(`${d.id} stands inside ${r.id}`);
+    }
+    add(
+      'cat-props-clear-the-plan',
+      bad.length ? bad.join(', ') : `tightest spawn gap ${minSpawn.toFixed(2)} m (${tight}); every floor spot and decoy clear`,
+      'the three issue #82 footprints cover no spawn cell, no floor spot, no decoy',
+      bad.length === 0 && rects.length === 3,
+      'issue #82: the litter tray, the bowls and the bigger bin leave every route, spot and spawn open',
     );
   }
 

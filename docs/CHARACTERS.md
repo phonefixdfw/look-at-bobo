@@ -51,6 +51,30 @@
 ## Other characters
 - **The decoy cat (above)**, added by Brandon's design change, is the only other character in scope. No other humans or animals (aligns with "not goals": no multiplayer; vision describes a solo apartment search). If Brandon later wants another presence (e.g. offscreen owner voice), that remains an optional future change.
 
+## Owner-supplied facts about the real cats (Brandon, 2026-11-16, issue #82)
+
+Verbatim from Brandon's playtest notes, recorded here as owner facts —
+nothing beyond these lines is invented:
+
+> the flat has a litter box and food bowls; BOTH Bobo and the decoy like
+> lying on the yellow heat pad on the couch; Bobo likes to sit in chairs;
+> the decoy likes the patio (the balcony)
+
+And, on the kitchen: **"There can be a trash can near the kitchen."** — with
+the presentation rule that came with it: *"Plain, clean, cute: no mess or
+gross detail."*
+
+What the game now encodes, and nothing more: the litter box and the food/
+water bowls on their mat are built props (docs/LEVEL_LAYOUT.md, "Issue #82");
+the yellow heat pad on the couch is a spot **both** cats can hold — Bobo as
+`couch-loaf.heatpad`, the decoy as `d-heatpad` — and one run's draw picks at
+most one of them, so they never share the pad; Bobo sits upright in chairs
+(the four dining chairs and the desk chair, `sink-sit`/`laundry-nap` spots);
+the balcony got decoy lazy-spots (deck chair, deck floor, beside the rail —
+the pre-existing `d-balcony` was already Brandon's "likes the patio" beat).
+Habits beyond these four sentences remain unknown: no preference, routine
+or backstory has been invented for either cat.
+
 ## Lookalike decor — scenery that borrows the joke, never steals it (issue #69)
 The flat now wears black-and-white dressing (docs/LEVEL_LAYOUT.md, "Lookalike
 decor"): framed abstract ink art, a cow-patch duvet, patchwork cushions, a

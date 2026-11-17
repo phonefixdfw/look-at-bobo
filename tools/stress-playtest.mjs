@@ -61,6 +61,8 @@ const PAGE = arg('page', 'game/slice.html');
 // issue #66: the engine's run-seed checks (seed-matches-url-env, capture-seed-stays-fixed, seed-is-a-plain-integer,
 //            restart-reseeds-in-live-play, seed-shown-to-the-player) land on both pages (46 → 51); full adds
 //            seed-reproduces-the-run + pool-coverage-over-random-seeds (70 → 77).
+// issue #81: full gained hall-width-in-band + dining-walkways + the three dining real-scale rows and a doorway case (+4: 87 → 91).
+// issue #82: full gained heat-pad-rests-on-cushion + cat-props-clear-the-plan (91 → 93); slice stays 46.
 const CHECKS = Number(arg("checks", 51));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
