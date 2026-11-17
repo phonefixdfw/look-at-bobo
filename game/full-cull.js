@@ -155,7 +155,8 @@ export function createRoomCull(root, { hops = 2, enabled = true } = {}) {
     state.shown = 0;
     for (const list of byRoom.values()) for (const g of list) g.visible = true;
     for (const g of shared) g.visible = true;
-    for (const g of named) g.visible = true;
+    // #86: even with the cull standing down, a gated group answers to its gate.
+    for (const g of named) g.visible = g.userData.cullGate ? g.userData.cullGate() : true;
   }
 
   return {
@@ -192,7 +193,11 @@ export function createRoomCull(root, { hops = 2, enabled = true } = {}) {
       }
       for (const g of named) {
         const near = g.userData.cullRooms.includes(room.id);
-        if (g.visible !== near) g.visible = near;
+        // #86: an opted-in group can also carry a `cullGate` predicate —
+        // roomNear AND gate, so a scene group (the owner on the sofa) is only
+        // ever visible while its scene actually runs.
+        const vis = near && (!g.userData.cullGate || g.userData.cullGate());
+        if (g.visible !== vis) g.visible = vis;
       }
       state.shown = ROOMS.length - state.hidden.length;
       return state;

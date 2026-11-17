@@ -26,6 +26,7 @@ import { KITCHEN_DETAILS_COLLIDERS } from './full-kitchen-details.js';
 import { LIVING_COLLIDERS } from './full-living.js';
 import { BATH_COLLIDERS, BALCONY_COLLIDERS, CURTAIN } from './full-bath.js';
 import { BEDROOM_COLLIDERS } from './full-bedroom.js';
+import { LAP } from './full-human-scene.js';
 import { DINING_COLLIDERS } from './full-dining.js';
 
 /** Angle convention shared by camera and cats: a yaw a faces (−sin a, −cos a),
@@ -332,6 +333,11 @@ export const SPOTS = [
   //    the chair's footprint clear of his own 0.35 m minimum spacing. ──
   spot('window-bird', 'balcony-rail', 'balcony', 'sit', [1.35, 'floor', -3.85], -2.9),
   spot('couch-loaf', 'balcony-chair', 'balcony', 'loaf', [2.15, 'chairSeat', -3.6], 1.77, { open: true }),
+  // issue #86: a couch-loaf spot on the owner's lap, live only while the lap
+  // scene runs (`sceneOnly` = never in a seeded spot cycle; the engine swaps
+  // into it from a living-room couch-loaf find). Yaw matches the couch spot's
+  // measured one — Bobo faces the way he always does from the sofa, higher up.
+  spot('couch-loaf', 'lap', 'living', 'loaf', [LAP.x, 'lap', LAP.z], -0.73, { open: true, sceneOnly: true }),
   spot('laundry-nap', 'balcony-pad', 'balcony', 'side', [1.0, 'floor', -4.05], -2.31, { open: true }),
   spot('keyboard-sit', 'balcony-deck', 'balcony', 'side', [0.95, 'floor', -3.45], 2.31, { open: true }),
   spot('bed-stretch', 'balcony-stretch', 'balcony', 'back', [1.7, 'floor', -4.15], 1.99, { open: true }),
@@ -518,7 +524,9 @@ export function pickSpotCycle(rand, prevId = null) {
   // predates #88, and seed 11's first cycle — keeps the old stream position
   // for position: same seed, same ten ids.
   const chosen = MOMENT_IDS.map((t) => {
-    const list = SPOTS.filter((s) => s.type === t);
+    // #86: `sceneOnly` spots (the owner's lap) are never drawn into a cycle —
+    // every seeded stream, seed 11's baselines included, stays identical.
+    const list = SPOTS.filter((s) => s.type === t && !s.sceneOnly);
     return list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
   });
   const groups = new Map();

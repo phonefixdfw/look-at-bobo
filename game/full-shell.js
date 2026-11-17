@@ -383,6 +383,11 @@ export const CEILINGS = FLOORS.filter((f) => f.room !== 'balcony').map((f) => ({
 export const SUPPORT_DEFS = {
   // living room
   cushion: { x0: -3.0, z0: -0.93, x1: -2.46, z1: 0.73, top: 0.45 },
+  // issue #86: the owner's lap while the lap scene runs — the padded band of
+  // his thighs (game/full-human-scene.js derives it from the seated build),
+  // 16.5 cm of thigh above the cushion top. Pure data like every other
+  // support, so `spots-on-supports` holds with the man hidden, too.
+  lap: { x0: -2.66, z0: -0.75, x1: -2.3, z1: -0.33, top: 0.615 },
   // issue #82: the yellow heat pad on the south cushion — its own patch at the
   // pad's own top (0.48, the pad is 3 cm of warming), fully inside `cushion`,
   // so the pad cat stands on furniture twice over and the pad never floats.
