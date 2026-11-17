@@ -309,8 +309,8 @@ export const SPOTS = [
   //    its south end. Both are `open`: the room is young and the ring maths
   //    of `findable` is not asked to survive its four chair-height islands
   //    yet; a run still never visits the room twice back to back. ──
-  spot('sink-sit', 'table', 'dining', 'sit', [4.3, 'diningTop', 2.28], 1.57, { open: true }), // issue #81: rode the table's 6 cm south-shift to (4.06, 2.28)
-  spot('hall-chase', 'dining', 'dining', 'loaf', [4.9, 'floor', 1.15], 0.1, { open: true }), // issue #81: into the wide arm's north-east corner — clear of the ring's pads, looking back along the table
+  spot('sink-sit', 'table', 'dining', 'sit', [4.3, 'diningTop', 2.28], -1.57, { open: true }), // issue #81: rode the table's 6 cm south-shift to (4.06, 2.28). He faces east along the table — the nearest place a body can stand and see him (cats-face-the-room's own bestApproach) is the dining gap off the table's east end, at x 5.2
+  spot('hall-chase', 'dining', 'dining', 'loaf', [4.9, 'floor', 1.15], 1.57, { open: true }), // issue #81: into the wide arm's north-east corner — clear of the ring's pads. He faces west along the table's north side, at the doorway-side lane his chase would have come from (bestApproach's vantage sits at x 4.0, z 1.15)
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
   // ── hall + entry + bathroom (7) — the entry gained the dash spot that used
   //    to sit in the living room (issue #53: `spot-pool-covers-rooms` needs ≥ 2

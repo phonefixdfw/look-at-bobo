@@ -30,6 +30,7 @@
 import { PIECES as LIVING_PIECES, FOOT as LIV_FOOT, LIV } from './full-living.js';
 import { PIECES as BATH_PIECES, FOOT as BATH_FOOT, CURTAIN } from './full-bath.js';
 import { PIECES as BED_PIECES, SUPPORTS as BED_SUPPORTS, BEDROOM_DIMS, FACES as BR_FACES } from './full-bedroom.js';
+import { PIECES as DINING_PIECES } from './full-dining.js';
 import { SUPPORT_DEFS } from './full-shell.js';
 
 /** A box in the flat's own convention (world x/z, y from the floor). */
@@ -41,6 +42,7 @@ const bx = (x0, y0, z0, x1, y1, z1) => ({ x0, x1, y0, y1, z0, z1 });
  *  -------------------------------------------------------------------------- */
 const livingTop = (group) => Math.max(...LIVING_PIECES.filter((p) => p.group === group || p.scale === group).flatMap((p) => p.parts.map((b) => b.y1)));
 const bathTop = (id) => Math.max(...BATH_PIECES.filter((p) => p.id === id).flatMap((p) => p.parts.map((b) => b.y1)));
+const diningTop = (id) => Math.max(...DINING_PIECES.filter((p) => p.id === id).flatMap((p) => p.parts.map((b) => b.y1)));
 
 /** Named support planes a decor piece may rest on: { y } for a top surface,
  *  { hang } for a bar to drape over, and `restOn` naming the COLLIDERS whose
@@ -55,6 +57,9 @@ export const DECOR_HOSTS = {
   wardrobe: { y: BEDROOM_DIMS.wardrobe.h, restOn: ['wardrobe'] }, // 2.10
   'vanity-rim': { y: bathTop('vanity'), restOn: ['vanity'] }, // 0.87 — the bowl rim's lip, the flat tile the folded stack sits on
   'towel-bar': { hang: bathTop('towel-bar'), restOn: [] }, // 1.165 — the bar's top, where the duck-egg towel drapes too
+  // issue #81: the dining room's two surfaces, read back from the built room
+  'dining-table': { y: diningTop('dining-table'), restOn: ['dining-table'] }, // 0.75 — the table's own top
+  sideboard: { y: diningTop('sideboard'), restOn: ['sideboard'] }, // 0.86 — the sideboard under the window
 };
 
 /** The wall planes the pieces hang ON, from the same faces every other
@@ -63,9 +68,10 @@ export const DECOR_HOSTS = {
 export const DECOR_WALLS = {
   'living.w': -3.28, 'living.e': 2.4, 'living.n': -2.9, 'living.s': 2.1,
   'kitchen.e': 5.52,
-  'hall.w': -0.9,
-  'entry.e': 2.4,
-  'bathroom.e': -1.02,
+  'hall.w': -1.2, // issue #81: the 2.40 m hall's west face
+  'entry.e': 2.72, // issue #81: the entry's new east plaster (E-ent-1)
+  'dining.s': 4.4, // issue #81: the dining room's new south wall, under the window
+  'bathroom.e': -1.32, // issue #81: the hall took 0.30 m of this face
   'bedroom.w': BR_FACES.w, // −2.60, flush like the headboard
   'bedroom.n': BR_FACES.n, // 5.32, flush like the desk's back
 };
@@ -146,26 +152,45 @@ export const DECOR = [
   // ── hall ─────────────────────────────────────────────────────────────────
   // the west plaster between the bathroom opening (z ≤ 3.45) and the
   // console end of the room — the runner's wall, opposite the console print
-  P('art-hall-w', 'hall', 'art', 'art-a6', bx(-0.90, 1.26, 3.72, -0.867, 1.82, 4.28), { wall: 'hall.w' }),
+  P('art-hall-w', 'hall', 'art', 'art-a6', bx(-1.2, 1.26, 3.72, -1.167, 1.82, 4.28), { wall: 'hall.w' }), // issue #81: rode the hall's new west face
 
   // ── entry ────────────────────────────────────────────────────────────────
-  // over the coat bench (seat 0.45, back 2.38), below the hat shelf's sight
-  // line and clear of the pendant at (1.78, 3.5)
-  P('art-entry-e', 'entry', 'art', 'art-a7', bx(2.367, 1.32, 2.68, 2.40, 1.92, 3.22), { wall: 'entry.e' }),
+  // over the coat bench (seat 0.45, back 2.70), below the hat shelf's sight
+  // line and clear of the pendant at (1.85, 3.5) — issue #81 carried it 0.32
+  // east with the room
+  P('art-entry-e', 'entry', 'art', 'art-a7', bx(2.687, 1.32, 2.68, 2.72, 1.92, 3.22), { wall: 'entry.e' }),
+
+  // ── dining (issue #81) ───────────────────────────────────────────────────
+  // the pier east of the window (x ≥ 4.35), over the sideboard's east end —
+  // the first framed piece this room has ever had. 0.50 × 0.56, in the
+  // issue's 0.4 … 1.0 band, bottom 1.28 clear of the top's 0.86.
+  P('art-dining-s', 'dining', 'art', 'art-a3', bx(4.55, 1.28, 4.367, 5.05, 1.84, 4.4), { wall: 'dining.s' }),
+  // a low bowl on the sideboard's clear east half and a folded book flat on
+  // its west end — both west of the art, clear of every chair pad and of
+  // both dining spots' capsules
+  P('bowl-sideboard', 'dining', 'object', 'pot', bx(4.18, 0.86, 4.1, 4.38, 1.02, 4.3), { host: 'sideboard' }, { shape: 'cyl', r: 0.1 }),
+  P('book-sideboard', 'dining', 'object', 'book', bx(3.66, 0.86, 4.06, 3.9, 0.882, 4.3), { host: 'sideboard' }),
+  // a small ring-and-dot vase dead on the table's centre, west of the
+  // `sink-sit.table` spot at (4.3, 2.28) — 0.26 m of clearance off its
+  // capsule, and under every sight line the room's aisles carry
+  P('vase-dining-table', 'dining', 'object', 'pot', bx(3.86, 0.75, 2.19, 4.04, 0.87, 2.37), { host: 'dining-table' }, { shape: 'cyl', r: 0.09 }),
 
   // ── bathroom ─────────────────────────────────────────────────────────────
   // the east plaster south of the doorway, hung ABOVE the tile band
   // (tileTop 1.2): bottom edge 1.36, clear of the rod bracket at x −1.72
-  P('art-bath-e', 'bathroom', 'art', 'art-a8', bx(-1.053, 1.36, 4.22, -1.02, 1.92, 4.62), { wall: 'bathroom.e' }),
+  P('art-bath-e', 'bathroom', 'art', 'art-a8', bx(-1.353, 1.36, 4.22, -1.32, 1.92, 4.62), { wall: 'bathroom.e' }), // issue #81: rode the face 0.30 west
   // a striped hand towel on the SAME bar as the duck-egg one, east of it —
-  // the bar runs to x −1.45 and the toilet's footprint ends at −1.65
+  // the bar runs to x −1.45 and the toilet's footprint ends at −1.95 (issue
+  // #81 moved it west, which only widened this gap)
   P('towel-bath-hang', 'bathroom', 'towel', 'towel', bx(-1.640, 0.905, 2.218, -1.465, 1.168, 2.272), { bar: 'towel-bar' }),
   // a folded stack on the vanity's south band: rim top 0.87, west of the
   // bowl's rim, clear of the `vanity` spot's capsule at (−2.65, 2.46)
   P('towel-bath-stack', 'bathroom', 'towel', 'towel', bx(-3.275, 0.87, 2.595, -2.990, 0.945, 2.695), { host: 'vanity-rim' }),
   // the patchy mat the enlargement left room for: east of the seafoam one
-  // (x −2.65 … −1.75) and west of the east plaster, clear of the bin (z ≥ 4.9)
-  P('mat-bath', 'bathroom', 'rug', 'duvet', bx(-1.60, 0.0, 3.92, -1.12, 0.022, 4.48), { host: 'floor' }),
+  // (x −2.65 … −1.75) and west of the east plaster. Issue #81's narrower
+  // room trimmed it to 0.36 (the gap is 0.43 wide now), and its north-south
+  // run stops at z 4.44 so the corner never grazes the tub's pad.
+  P('mat-bath', 'bathroom', 'rug', 'duvet', bx(-1.73, 0.0, 3.92, -1.37, 0.022, 4.44), { host: 'floor' }),
 
   // ── bedroom ──────────────────────────────────────────────────────────────
   // over the headboard (top 1.20): bottom edge 1.40, centred z

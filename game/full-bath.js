@@ -5,8 +5,10 @@
  * bath mirror, towel bar, tub, bath mat) and row 59 (balcony 1.90 × 1.30
  * decking, railing 1.00 high) plus rows 58 and 61/62, and the bathroom and
  * balcony rows of the room table and the openings table in section 2 (bathroom
- * x [−3.30, −1.02], z [2.22, 5.20] — issue #67 grew it south into the void at
- * the bedroom's north band, from the [2.22, 3.90] the table still prints),
+ * x [−3.30, −1.32], z [2.22, 5.20] — issue #67 grew it south into the void at
+ * the bedroom's north band, from the [2.22, 3.90] the table still prints, and
+ * issue #81 gave its east 30 cm back to the widened hall — 1.98 × 2.98 =
+ * 5.9 m2, above that issue's own 5 m2 minimum),
  * door-less on its east side (the cased
  * opening z 2.42 … 3.48) with the frosted window (z 2.60 … 3.30, sill 1.50) on
  * the west — plus the balcony row: x [0.55, 2.45], z [−4.40, −3.10], decking
@@ -52,9 +54,13 @@
  *          its top at (−2.65, 2.46) and SUPPORT_DEFS.vanityTop pins the counter
  *          at 0.86 — with the mirror over it and the towel bar to its east, on
  *          the one clean stretch of north plaster left (x −2.05 … −1.45);
- *   north-east the toilet, back to the north wall facing south, clear of the
- *          vanity (0.38 m between them — a real bathroom leaves 0.20+) and
- *          well west of the doorway; its paper holder on the wall to its east;
+ *   north-east the toilet, back to the north wall facing south. Issue #81
+ *          moved it 0.30 m west when the hall took the east plaster: the
+ *          doorway field (0.63 m) and the bathroom SPAWN's 0.30 m furniture
+ *          clearance both live on the flank distance, and the narrowed room
+ *          leaves the move no alternative. The vanity gap tightens to 0.08 m
+ *          — no ruler row measures that pairing, and it is the honest price
+ *          of the 2.40 m hall; the paper holder rode west with it;
  *   south  the tub along the SOUTH wall, drain end west, where the old
  *          partition used to be — issue #67 moved it 1.30 m down into the floor
  *          it gained, so the whole window wall (sill 1.50 over a 0.55 rim) and
@@ -64,11 +70,16 @@
  *          0.60, which a 0.30 m body fits but the 0.10 m standability grid
  *          does not. At 1.60 the band is 0.68 (the ruler's own 0.60, tolerated
  *          only in front of the tub, with 0.08 of grid play) and the cased
- *          opening stays fully clear. The bathroom SPAWN stays east in that
- *          band — the old point sat on the tub's own floor, which no wall-hung
- *          tub layout can free (see the PR); every cat spot stayed exactly
- *          where it was except the mat's, which rode the tub south, and the
- *          hall dash's, which faces the bathroom door (see the PR).
+ *          opening stays fully clear. Issue #81's hall widening ate 0.30 of
+ *          that band — it is 0.38 now, furniture-side rather than route: a
+ *          body no longer passes east of the tub, and the flood proves
+ *          nothing on the floor needs it to (the tub's own cat spot is read
+ *          from the open tile north of its rim). The bathroom SPAWN stays
+ *          east in the doorway field — the old point sat on the tub's own
+ *          floor, which no wall-hung tub layout can free (see the PR); every
+ *          cat spot stayed exactly where it was except the mat's, which rode
+ *          the tub south, and the hall dash's, which faces the bathroom door
+ *          (see the PR).
  *   middle the 1.73 m strip of open floor the enlargement bought, with the mat
  *          0.90 × 0.55 (row 57's allowed width, the brief's own number) at the
  *          tub's north face, where feet land coming out. That is where the
@@ -93,7 +104,7 @@ export const BATH = {
   // Issue #67: z1 was 3.90 (a 2.28 × 1.68 = 3.8 m2 room). The sealed service
   // void behind the old south partition is the room now, to the bedroom's own
   // north band at z 5.20: 2.28 × 2.98 = 6.8 m2.
-  x0: -3.30, x1: -1.02, z0: 2.22, z1: 5.20,
+  x0: -3.30, x1: -1.32, z0: 2.22, z1: 5.20, // #81: x1 rode 0.30 west with the 2.40 m hall
   // the cased doorway on the east wall (§2 openings table)
   doorLo: 2.42, doorHi: 3.48,
   // the west window (§2 windows: sill 1.50, head 2.05)
@@ -129,8 +140,10 @@ export const BALCONY = {
 export const FOOT = {
   // vanity: flush west, 0.90 along the north wall, 0.48 deep (row 53)
   vanity: F(-3.30, 2.22, -2.40, 2.70),
-  // toilet: 0.37 × 0.68, back to the north wall (row 52)
-  toilet: F(-2.02, 2.22, -1.65, 2.90),
+  // toilet: 0.37 × 0.68, back to the north wall (row 52) — issue #81 moved
+  // it 0.30 west with the room's new east face: the doorway field and the
+  // spawn's furniture clearance both need the flank where it is
+  toilet: F(-2.32, 2.22, -1.95, 2.90),
   // tub: 1.60 × 0.75, drain end west, along the SOUTH plaster — issue #67
   // moved it off the old partition (z 3.90) down to the room's new south face,
   // which is what frees the 1.73 m strip of open floor in the middle (rim 0.55,
@@ -190,7 +203,7 @@ const V = FOOT.vanity; // 0.86 = SUPPORT_DEFS.vanityTop: the counter's top IS th
 const T = FOOT.toilet;
 const U = FOOT.tub;
 const WC = (V.x0 + V.x1) / 2; // −2.85: the basin's centre line
-const TX = (T.x0 + T.x1) / 2; // −1.835: the toilet's centre line
+const TX = (T.x0 + T.x1) / 2; // −2.135: the toilet's centre line
 
 export const PIECES = [
   /* ── vanity + sink (row 53): one stone piece, 0.90 × 0.48, counter top
@@ -275,7 +288,10 @@ export const PIECES = [
   /* ── towel bar (row 55): 0.60 long at y 1.15 on the north plaster east of
    * the mirror. The bar is wrapped and the towel is doubled over it — one
    * fabric piece, and row 55 measures what it always measured: the bar's
-   * length and its top. The towel hangs below the measured top by design. */
+   * length and its top. The towel hangs below the measured top by design.
+   * Issue #81 moved the toilet 0.30 west, so the bar's west 10 cm now runs
+   * OVER the tank — 36 cm above the lid, the over-the-toilet bar a small
+   * bathroom actually ships; nothing else on that plaster is left. */
   piece(
     'towel-bar',
     'towel',
@@ -427,9 +443,9 @@ export function bathGapReport() {
     },
     {
       name: 'bath: tub face → east band (body centre)',
-      m: T.x1 + 0.35 - U.x1 - BODY, // the centre-line play past the tub's east end
-      min: 0,
-      note: "the standable band north of the bin; the tub end and the east plaster are 0.68 apart",
+      m: BATH.x1 - 0.08 - U.x1, // the walk-rect band east of the tub end: 0.30 since #81 (0.38 to the plaster)
+      min: null,
+      note: 'furniture-side, not a route, since issue #81 took 0.30 m of it for the hall: a body no longer passes east of the tub and the flood proves nothing needs it to — the doorway field above is the room\u2019s tightest walkway',
     },
     {
       name: 'bath: open floor (vanity face → tub face)',

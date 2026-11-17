@@ -1296,10 +1296,15 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
           if (Math.abs(w - LEAF_W) > 0.005) problems.door.push(`leaf is ${w.toFixed(2)} m wide, not the flat's ${LEAF_W} m leaf`);
           if (hole && w < 0.8 * (hole.hi - hole.lo)) problems.door.push(`leaf covers only ${(100 * w / (hole.hi - hole.lo)).toFixed(0)}% of the ${((hole.hi - hole.lo) * 100).toFixed(0)} cm case`);
           if (bb.z0 < 3.8 || bb.z1 > 4.1) problems.door.push(`leaf at z ${bb.z0.toFixed(2)}…${bb.z1.toFixed(2)}, not in the south band`);
-          const outside = LEVEL.WALK_RECTS.some((r) => 1.76 >= r.x0 && 1.76 <= r.x1 && 4.1 >= r.z0 && 4.1 <= r.z1);
+          const mid = hole ? (hole.lo + hole.hi) / 2 : 1.83;
+          const outside = LEVEL.WALK_RECTS.some((r) => mid >= r.x0 && mid <= r.x1 && 4.1 >= r.z0 && 4.1 <= r.z1);
           if (outside) problems.door.push('a walk rect crosses the front door');
         }
-        const centre = new THREE.Vector3(1.76, 1.2, 3.9);
+        // the leaf's face centre, derived from the shell's own case (issue #81
+        // slid the door to x 1.32 … 2.34; the old literal 1.76 followed it to
+        // 1.83 without being retyped)
+        const frontHole = OPENINGS.find((o) => o.id === 'door-front');
+        const centre = new THREE.Vector3(frontHole ? (frontHole.lo + frontHole.hi) / 2 : 1.83, 1.2, 3.9);
         const pc = centre.clone().project(camera);
         const px = readPatch(pc);
         if (pc.z > 1 || !px) problems.door.push('the leaf centre is off-screen from the entry view');
