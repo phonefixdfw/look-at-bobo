@@ -13,6 +13,8 @@
 //     "assets/..." paths), so dev-only or secret files in assets/ never ship;
 //   - index.html — a real page (title "Look at Bobo", a start link) that
 //     immediately redirects to ENTRY;
+//   - manifest.webmanifest + the icons it names (assets/icons/) — the
+//     installable-web-app files (issue #77);
 //   - build.json — this build's stamp, for a deploy log or a curl to read.
 //
 // Every URL inside dist/ is stamped (issue #29): each relative module, asset and
@@ -45,6 +47,10 @@ const ENTRY = 'game/full.html';
 /** Directories the game loads from at runtime. Copied wholesale (never
  *  filtered per-file) so new files in them ship automatically. */
 const COPY_DIRS = ['game', 'src', 'vendor/three'];
+
+/** The PWA manifest (issue #77), at the site root so its relative start_url,
+ *  scope and icon paths work at any deploy path. */
+const MANIFEST = 'manifest.webmanifest';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(REPO, 'dist');
@@ -220,7 +226,37 @@ for (const [ref, by] of assetRefs) {
   cpSync(src, dst);
 }
 
-// ------------------------------ 3b. stamp every URL inside dist/ (issue #29)
+// --------------------------- 3b. PWA manifest + the icons it names (issue #77)
+
+// The manifest is the only fullscreen path on iPhone (Add to Home Screen), so
+// it sits at the site root in dist/, exactly as in the repo. Its own URLs —
+// start_url, scope, icons — are relative to itself and stay PLAIN (no stamp):
+// start_url is a navigation, not a cached fetch, and a stamped one would
+// break the "works at any path" contract the file is written for. But a
+// manifest is not html/js, so the scan above never sees its icon paths — the
+// icons are followed and verified here instead, same rule: a missing one
+// fails the build loudly, never as a 404 on a phone's home screen.
+if (!statSync(join(REPO, MANIFEST), { throwIfNoEntry: false })?.isFile()) {
+  fail(`site-root manifest "${MANIFEST}" is missing.`);
+}
+cpSync(join(REPO, MANIFEST), join(DIST, MANIFEST));
+let manifestJson;
+try {
+  manifestJson = JSON.parse(readFileSync(join(REPO, MANIFEST), 'utf8'));
+} catch (e) {
+  fail(`${MANIFEST} is not valid JSON: ${e.message}`);
+}
+for (const icon of manifestJson.icons || []) {
+  const src = join(REPO, icon.src);
+  if (!statSync(src, { throwIfNoEntry: false })?.isFile()) {
+    fail(`${MANIFEST} names icon "${icon.src}", which does not exist in the repo.`);
+  }
+  const dst = join(DIST, icon.src);
+  mkdirSync(dirname(dst), { recursive: true });
+  cpSync(src, dst);
+}
+
+// ------------------------------ 3c. stamp every URL inside dist/ (issue #29)
 
 // The bug this exists for: Brandon's phone kept the NEW HTML and the OLD
 // JavaScript. A `?v=2` he typed on the page address says nothing about the ~30
@@ -344,6 +380,10 @@ while (queue.length) {
 // is published as the root (xCloud) and under a subpath. The target carries this
 // build's stamp like every other URL here (issue #29).
 const href = `${ENTRY.split('/').map(encodeURIComponent).join('/')}?${VPARAM}`;
+// The links below the redirect are written with this script's own stamped()
+// helper — index.html is generated after the stamping pass, like the href.
+const manifestHref = stamped('./manifest.webmanifest');
+const touchIconHref = stamped('./assets/icons/apple-touch-icon.png');
 writeFileSync(
   join(DIST, 'index.html'),
   `<!doctype html>
@@ -351,8 +391,17 @@ writeFileSync(
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Look at Bobo</title>
+    <!-- Issue #77: the same installable-web-app tags as the game page, so an
+         "Add to Home Screen" made from THIS url behaves the same way. -->
+    <link rel="manifest" href="${manifestHref}" />
+    <meta name="theme-color" content="#14181f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Look at Bobo" />
+    <link rel="apple-touch-icon" href="${touchIconHref}" />
     <meta http-equiv="refresh" content="0;url=${href}" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1e26'/%3E%3Crect x='14' y='7' width='4' height='9' rx='2' fill='%23f1ece1'/%3E%3Ccircle cx='16' cy='21' r='6' fill='%23f1ece1'/%3E%3C/svg%3E" />
     <style>

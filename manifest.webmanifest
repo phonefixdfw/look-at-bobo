@@ -1,0 +1,17 @@
+{
+  "name": "Look at Bobo",
+  "short_name": "Look at Bobo",
+  "description": "A cat is doing cute things somewhere in the flat. Find him, put the dot on him, and shout LOOK AT BOBO!",
+  "start_url": "game/full.html",
+  "scope": ".",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#14181f",
+  "theme_color": "#14181f",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

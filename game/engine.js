@@ -192,6 +192,13 @@ export function bootGame(cfg) {
   // flips it over — see `enableTouchMode` / `watchForTouch` in section 13.
   const TOUCH_OVERRIDE = touchOverride(location.search);
   let TOUCH = TOUCH_OVERRIDE ?? isTouchDevice();
+  /* Issue #77: running as an installed web app ("Add to Home Screen", the
+     manifest's display:fullscreen) — the page ALREADY has no browser chrome,
+     so the start tap skips the fullscreen request that does nothing here. */
+  const IS_STANDALONE =
+    navigator.standalone === true ||
+    matchMedia('(display-mode: standalone)').matches ||
+    matchMedia('(display-mode: fullscreen)').matches;
   const AUTO_LOW = autoLowQuality();
   const qualityParam = params.get('quality');
   const SETTINGS = {
@@ -2558,6 +2565,9 @@ export function bootGame(cfg) {
    *  video-only), so there the game plays perfectly well inside the browser
    *  chrome (docs/DEPLOY.md "Testing on a phone"). */
   function requestTouchFullscreen() {
+    /* Issue #77: in the installed web app there is nothing to un-fullscreen —
+       the manifest already gave us the whole screen; asking again is noise. */
+    if (IS_STANDALONE) return;
     try {
       const root = document.documentElement;
       if (typeof root.requestFullscreen === 'function') {
