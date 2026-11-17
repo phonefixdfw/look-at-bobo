@@ -165,9 +165,9 @@ export const HUMAN_PARTS = [
   // chest and a trapezius slab ties neck, shoulders and chest into ONE
   // continuous torso-to-chin column.
   { id: 'neck', mat: 'skin', kind: 'cyl', p0: [0, 0.86, 0.025], p1: [0, 1.165, 0.025], r0: 0.066, r1: 0.05 },
-  { id: 'traps', mat: 'shirt', kind: 'box', box: { cx: 0, cy: 0.955, cz: -0.005, w: 0.4, h: 0.12, d: 0.17 } },
+  { id: 'traps', mat: 'shirt', kind: 'box', box: { cx: 0, cy: 0.955, cz: -0.03, w: 0.5, h: 0.12, d: 0.24 } },
   { id: 'head', mat: 'skin', kind: 'sph', p: [0, 1.215, 0.015], r: 0.112, scale: [0.92, 1, 0.96] },
-  { id: 'hair-nape', mat: 'hair', kind: 'box', box: { cx: 0, cy: 1.15, cz: 0.108, w: 0.13, h: 0.09, d: 0.05 } },
+  { id: 'hair-nape', mat: 'hair', kind: 'sph', p: [0, 1.17, 0.1], r: 0.095, scale: [0.72, 0.52, 0.5] },
   // the backwards cap: dome + button up top, brim facing the +z BACK.
   // #86 fix: the brim used to be a 20 cm-wide plate reaching 8 cm past the
   // dome into open air — a second dark shard beside the head. It now hugs
