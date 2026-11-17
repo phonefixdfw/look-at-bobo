@@ -1769,6 +1769,22 @@ If a future leaf ever stands in front of same-palette oak again, the honest
 lever is the leaf's face colour or a per-door threshold with a written
 reason — not the mapping.
 
+**Where the harnesses learned #70's rule.** With the pool at 31, the stress
+run's seed-11 round 3 now draws `laundry-nap.bath-tub` — and the stress aim
+rule, written before #70, demands a props-visible centre ray the drawn curtain
+legitimately never grants from any vantage within 3.4 m (dense sweep: zero).
+#70's own contract is that cover hides the EYE, never the SHOUT: the
+crosshair find-ray (cat meshes only) must land, and `findable` polices it at
+selfTest. Both harnesses now apply each rule to its kind of spot — hidden
+ones proven through `aimProbe()` where `aimAt` parks the player, exactly how a
+real find works — including the hidden DECOY spot (`d-kitchen`) and the audio
+tool's aim lines, which have been a 22/23-or-23/23 coin flip on live random
+seeds since #66 (a hidden draw trips the visual rule on `main` too).
+`LC.spot` grew a `hide` field and decoy-id resolution so the tools read the
+level's row instead of re-typing it. And the shout-at-nothing check waits for
+the pulse to paint (it rides the render loop) instead of betting a fixed
+120 ms, which a loaded swiftshader frame can outlast.
+
 **Suites.** `capture:full` 546 frames **91/91 PASS** (four new issue-#81
 checks, three new `furniture-real-scale` rows, 87 → 91); worst frame 149 ≤
 150; `capture:full:determinism` 8/8 byte-identical; planted-fault runs
