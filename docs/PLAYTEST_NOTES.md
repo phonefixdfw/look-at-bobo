@@ -2288,3 +2288,90 @@ Slice suites untouched and green: `capture:slice` 51/51, slice determinism
 console clean. Music 28/28, audio 23/23. Art direction: `docs/ART_STYLE.md`
 §13; the little driver on the screen: `docs/CHARACTERS.md` "The player on
 the couch".
+
+## 37. Issue #85 — a robot vacuum drives the flat, and Bobo sometimes rides it (2026-11-17)
+
+Brandon (2026-11-16): "A Roomba that moves around, Bobo could sometimes
+be on it." What shipped is deliberately never branded — a generic round
+robot vacuum, no trademark name or logo anywhere near it, silent, and a
+soft obstacle: zero new colliders, zero new walk rects. A player walks
+over it; the checks' game of #27 is untouched.
+
+- **The route is pure data, so the position is a pure function of the
+  run seed and simulation time.** `game/full-roomba-route.js` builds a
+  seeded shuffled tour of 6 of 10 stations over the flat's own 0.25 m
+  walk grid — living, hall, kitchen, dining only (the bathroom's
+  door-less void and the balcony are forbidden-door rects, non-walkable;
+  only the four legal passage doors are ever passable) — with a
+  union-based box clearance (0.25 m off furniture, 0.16 m off walls:
+  the per-rect shrink failed at doorway seams where rects overlap), a
+  BFS pathfinder and corner simplification, then `roombaAt(route, s)`
+  answers pose by arc length alone. Loops measure 33.5…56 m — 186…311 s
+  at the owner's 0.18 m/s. The engine drives one odometer
+  (`roombaOdo += speed·dt`); under `?gate=off` metres are
+  `speed × game.time`, so ~43 cm by capture time and a staged ride is
+  arithmetically impossible. `roomba-route-legal` sweeps 40 seeds:
+  served rooms only, margins hold, closed loops.
+- **One draw, paid only where it is seen.** `game/full-roomba-mesh.js`
+  merges the whole appliance — disc body, bumper ring, sensor dome,
+  front LED strip — into one `BufferGeometry` with ONE
+  `MeshLambertMaterial` using vertex colours: 328 tris full tier, 144
+  on `?quality=low`, same route. The status LED is faked as bright
+  `#b8ff5e` vertex colour — an emissive material would be a second
+  material, hence a second draw. The mesh **casts no shadow**: the sun
+  pass draws shadow casters regardless of the view frustum, and with
+  `castShadow` on, served-room frames measured **+2 draws / +656 tris**
+  instead of +1 — the second draw was invisible in the picture but not
+  in the budget. Culled with `userData.cullRooms =
+  ['living','hall','kitchen','dining']` through the #61 culler. Worst
+  frame 151 → **152 of 250** (living `overview`; per-room worst:
+  living 152 · dining 149 · kitchen 129 · bedroom 125 · balcony 116 ·
+  entry 103 · hall 96 · bathroom/fail-open 87) — where the vacuum is
+  off-camera or in an un-served room it costs nothing at all, which is
+  exactly what killing the shadow bought.
+- **The ride is one dice roll per run, riding on top of every rule.**
+  `mulberry32(hashId('roomba-ride ' + SEED))() < 1/6` — measured
+  **18.0 % of 600 seeds** plan a ride (`roomba-ride-plan-rate`, target
+  ≈ 16.7 %). Checked in `startLiveRound` after `rollPatriot()`: never
+  the first find, never before the route has run a whole loop, once per
+  run. The ride never enters `SPOTS`/`POOL`: a synthetic `RIDE_SPOT`
+  (`roomba-ride`, type cat, `sit` pose, lid at 0.105 m) answers
+  `LC.spot()` and the room lookups, the decoy pool can never draw it,
+  Bobo sits balanced facing the direction of travel, and a catch while
+  aboard respawns exactly like any other catch with the render hook
+  ending the ride cleanly (`roomba-ride-after-catch`). His `room` is
+  the room he is in NOW. Moment id stays `box-sit`, so queue, hint and
+  fairness logic never learn a new type. `?roomba=on` forces the plan
+  for tools; `?roomba=off` deletes mesh, route and ride — that page
+  selfTests 111/111 with the five live-only rows standing down
+  honestly.
+- **Eleven new selfTests, 105 → 116** (`--checks 116`):
+  `roomba-route-legal`, `roomba-doorway-dwell` (worst 7 % of a loop
+  inside doorways, longest single stay 0.4 m), `roomba-route-deterministic`,
+  `roomba-ride-plan-rate`, `roomba-ride-rules`,
+  `roomba-ride-rides-the-route`, `roomba-ride-findable` (17 route
+  samples: the aim ray hits him at every one, from walkable vantages,
+  through the live game's own sight maths), `roomba-ride-after-catch`,
+  `roomba-one-draw`, `roomba-gate-off-determinism`,
+  `roomba-soft-obstacle`. The engine stays appliance-agnostic: it holds
+  an `apt.roomba` API (poseAt/ride/roll/reset/place/stats) and one
+  odometer line; nothing vacuum-shaped is hardcoded in `engine.js`.
+- **Re-baseline is the feature, on the record.** Frames from the four
+  served rooms where the vacuum is in frame (living `overview` worst
+  152) and the fail-open views now show a small white disc on the
+  floor — that is the issue. There are no committed PNG baselines;
+  determinism re-proves **8/8 byte-identical** at this HEAD, and the
+  slice and demo pages never load a vacuum and come out byte-identical.
+
+**Suites at this HEAD (all nineteen runs, none skipped).**
+`capture:full` PASS — 585 frames, 116/116 every frame, worst 152 draws
+/ 100 676 triangles / 1 pass, console clean.
+`capture:full:determinism` 8/8 byte-identical. `weak` PASS, worst
+94 ≤ 150. `spots` 20 frames, `patriot` 6 frames PASS. Planted capture
+exits 1 catching exactly `ending-text-exact`. `gate` PASS,
+`check:mobile` PASS. Bots full 10/10 and patriot 5/5, exact ending,
+console clean. `playtest:stress:full` **77 PASS / 0 FAIL** at
+`--checks 116`. Audio 23/23, music 29/29 + 28/28. `seed:coverage` PASS
+(rarest `sink-sit.bar` 8.8 %). `build` PASS — 73 files, 3.17 MB. Docs:
+`docs/LEVEL_LAYOUT.md` (route data), `docs/CHARACTERS.md` (the vacuum),
+`docs/STORY.md` (the ride rule).
