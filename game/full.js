@@ -906,12 +906,12 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const raycaster = new THREE.Raycaster();
     // one clear standing pose per parked leaf, aimed at the leaf's face
     // centre (poses worked against the collider rects in docs/LEVEL_LAYOUT.md:
-    // living-hall from the open floor, living-kitchen from the dining gap —
-    // the ray passes over the 0.75 m table — bedroom from mid-room, over the
-    // desk chair and clear of the dresser).
+    // living-hall from the open floor, bedroom from mid-room, over the
+    // desk chair and clear of the dresser). Issue #81: living-kitchen's leaf
+    // is gone — that opening went cased, and a cased opening has no face to
+    // read.
     const LEAF_CAMS = {
       'door-living-hall': { pos: [-0.2, 1.5, 0.9], yaw: 2.510, pitch: -0.342, fov: 55 },
-      'door-living-kitchen': { pos: [1.35, 1.5, 0.9], yaw: -1.56, pitch: -0.471, fov: 55 },
       'door-hall-bedroom': { pos: [-1.5, 1.45, 6.8], yaw: -1.065, pitch: -0.153, fov: 55 },
     };
     const readPatch = (ndc) => {

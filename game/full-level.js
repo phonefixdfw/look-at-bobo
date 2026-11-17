@@ -61,12 +61,16 @@ export const WALK_RECTS = [
   // north half (the kitchen end — the wide arm of the L) keeps its west edge
   // at the living→dining door's own west jamb (x 2.68), so a body walks
   // through the middle of that opening; the south half starts at the entry's
-  // east band. The two rects TOUCH at z 2.22 — one room, no wall across it,
-  // and the 0.1 m grid straddles the seam cell-to-cell — but do not overlap:
-  // an overlap would hand the flood two standable cells inside the sealed
-  // slot west of the band (the grid knows colliders, not plaster).
-  { id: 'dining-n', room: 'dining', x0: 2.68, z0: 0.88, x1: 5.44, z1: 2.22 },
-  { id: 'dining-s', room: 'dining', x0: 2.92, z0: 2.22, x1: 5.44, z1: 4.32 },
+  // east band. The seam sits at z 2.02, not the room line's 2.22: `M-liv-s3`
+  // (the living→dining door's south jamb, z [2.10, 2.22]) hangs over the
+  // corner, and `wall-camera-clearance` wants 7 cm of daylight between a
+  // walk rect and any plaster — 2.02 leaves exactly that plus a millimetre.
+  // The two rects still TOUCH, so one room floods as one room, but they do
+  // not overlap: an overlap would hand the flood standable cells inside the
+  // sealed slot west of the entry band (the grid knows colliders, not
+  // plaster).
+  { id: 'dining-n', room: 'dining', x0: 2.68, z0: 0.88, x1: 5.44, z1: 2.02 },
+  { id: 'dining-s', room: 'dining', x0: 2.92, z0: 2.02, x1: 5.44, z1: 4.32 },
   { id: 'bedroom', room: 'bedroom', x0: -2.52, z0: 5.4, x1: 1.12, z1: 9.24 },
   // The balcony's walkable strip stops short of the railing by the railing's
   // own push pad: no fall, no pressing the camera against the parapet, and the
@@ -596,14 +600,15 @@ export const VIEWS = {
   dining: { pos: [3.15, 1.62, 3.6], yaw: -0.604, pitch: -0.31, fov: 55, hand: false },
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
-  // The three doorways, from standing height, aimed through the hole at a
+  // The doorways, from standing height, aimed through the hole at a
   // point in the room beyond (issue #65). `doorways-read-open` in game/full.js
   // keys off these ids — one per `kind:'door'` opening — and reads the pixel
   // at the hole's centre from each. The pitch lands the sightline through the
   // opening at y ~1.0 and on floor just past the wall, clear of trim, jambs
   // and furniture (the geometry is worked in the comments of the check).
+  // Issue #81: `door-living-kitchen` left this list with its leaf — the
+  // opening went cased, and cased openings are not doors to read open.
   'door-living-hall': { pos: [-0.3, 1.62, 0.55], yaw: -3.0061, pitch: -0.6303, fov: 55, hand: false }, // standing in the living room, at the hall doorway
-  'door-living-kitchen': { pos: [1.5, 1.62, -0.6], yaw: -1.8717, pitch: -0.8178, fov: 55, hand: false }, // standing by the TV stand, at the kitchen doorway
   'door-hall-bedroom': { pos: [0.28, 1.62, 3.8], yaw: -3.1416, pitch: -0.624, fov: 55, hand: false }, // standing in the hall, at the bedroom doorway
 };
 

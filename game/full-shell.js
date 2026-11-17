@@ -184,12 +184,15 @@ export const WALL_DEFS = [
   // wide opening the issue asks for between the two rooms). The window over
   // the old breakfast table, `win-living-e`, stood on exactly this plaster and
   // came down with it; the dining room's new south window took its place.
+  // The opening's south jamb is `M-liv-s3`'s west end, not a pier of this
+  // line: the M-liv band at z [2.10, 2.22] already covers x [0.53, 2.84],
+  // so plaster here would grow INTO the cased door's clear (its leaf-free
+  // case runs to z 2.02 and the casing to 2.10).
   pier('E-liv-1', 'x', -2.9, -0.68, 2.4, 'wall-int', 'living'),
   pier('E-liv-2', 'x', 0.38, 0.6, 2.4, 'wall-int', 'living'),
   pier('E-liv-3', 'x', -2.9, 0.6, 2.4, 'wall-int', 'living', DOOR_HEAD, WALL_H),
   pier('E-liv-4', 'x', 0.6, 0.72, 2.4, 'wall-ext', 'living'),
   pier('E-din-h', 'x', 0.72, 2.1, 2.4, 'wall-ext', 'dining', DOOR_HEAD, WALL_H),
-  pier('E-liv-5', 'x', 1.95, 2.1, 2.4, 'wall-ext', 'living'),
 
   // ── the flat's west exterior line, x −3.50 … −3.30 ──────────────────────
   // Living room and bathroom, then the piece that seals the unlit service
@@ -217,6 +220,14 @@ export const WALL_DEFS = [
   // `S-ent-1` is now the 12 cm corner post between that band and the case.
   pier('S-ent-1', 'z', 1.2, 1.32, 3.9, 'wall-ext', 'entry'),
   pier('S-ent-h', 'z', 1.32, 2.34, 3.9, 'wall-ext', 'entry', DOOR_HEAD, WALL_H),
+
+  // ── the entry's east wall (issue #81) ────────────────────────────────────
+  // The wall the dining room hangs on: it seals the entry's east side, gives
+  // the dining room's south arm its west face (x 2.84), and closes the slot
+  // between the two rooms. It runs the whole depth, living-wall band to
+  // dining south band, with no opening — the entry is reached from the hall
+  // alone, and an opening here would give the dining room a third neighbour.
+  pier('E-ent-1', 'x', 2.22, 4.4, 2.72, 'wall-int', 'entry'),
 
   // ── the bathroom: the east wall to the hall with a door-less cased opening
   //    (a room you can walk into and never leave is issue #31's bug, so nothing
@@ -283,12 +294,19 @@ export const OPENINGS = [
   // For the `door` kind, `swingHi` names the hinge jamb (true: the leaf lies
   // along the plaster beyond `hi`, false: beyond `lo`) and `swingOut` lies the
   // leaf against toRoom's plaster instead of o.room's. They are chosen so the
-  // leaf has a clear run of wall: living-hall west (open floor), living-kitchen
-  // north (clear to the window), hall-bedroom east AND bedroom-side — the hall
-  // has only 37 cm of plaster either side of that opening, and the bedroom's
-  // north face is clear east to the corner (issue #65, docs/LEVEL_LAYOUT.md).
+  // leaf has a clear run of wall: living-hall west (open floor), hall-bedroom
+  // east AND bedroom-side — the hall has only 37 cm of plaster either side of
+  // that opening, and the bedroom's north face is clear east to the corner
+  // (issue #65, docs/LEVEL_LAYOUT.md).
   { id: 'door-living-hall', kind: 'door', room: 'living', toRoom: 'hall', axis: 'z', fixed: 2.1, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD, swingHi: false },
-  { id: 'door-living-kitchen', kind: 'door', room: 'living', toRoom: 'kitchen', axis: 'x', fixed: 2.4, lo: -0.6, hi: 0.3, sill: 0, head: DOOR_HEAD, swingHi: true },
+  // Issue #81: living-kitchen went `cased` with the dining room. Its only
+  // remaining leaf-park run — north of the opening, z [0.38, 1.24] — is now
+  // the living→dining doorway's own bridge rect, so a leaf there would stand
+  // in a walkable opening (`doors-read-open` rightly fails it), and the flat's
+  // rule is that nothing may ever be shut or stand in a way. A cased opening
+  // keeps the trim and loses the leaf, same as the bathroom's and the dining
+  // room's.
+  { id: 'door-living-kitchen', kind: 'cased', room: 'living', toRoom: 'kitchen', axis: 'x', fixed: 2.4, lo: -0.6, hi: 0.3, sill: 0, head: DOOR_HEAD },
   { id: 'door-hall-bedroom', kind: 'door', room: 'hall', toRoom: 'bedroom', axis: 'z', fixed: 5.2, lo: -0.45, hi: 0.45, sill: 0, head: DOOR_HEAD, swingHi: true, swingOut: true },
   { id: 'open-hall-bath', kind: 'cased', room: 'hall', toRoom: 'bathroom', axis: 'x', fixed: -1.2, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },
   { id: 'open-hall-entry', kind: 'cased', room: 'hall', toRoom: 'entry', axis: 'x', fixed: 1.2, lo: 2.6, hi: 3.45, sill: 0, head: DOOR_HEAD },

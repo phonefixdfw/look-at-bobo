@@ -50,6 +50,7 @@ import { buildFullLiving } from './full-living-mesh.js';
 import { buildFullBath } from './full-bath-mesh.js';
 import { buildFullBedroom } from './full-bedroom-mesh.js';
 import { buildFullEntry } from './full-entry-mesh.js';
+import { buildFullDining } from './full-dining-mesh.js';
 import { buildFullDecor } from './full-decor-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
 import { createRoomCull } from './full-cull.js';
@@ -608,6 +609,12 @@ export function buildFullApartment(scene) {
   // have been in game/full-level.js since the first walk grid, undrawn.
   buildFullEntry(flat);
 
+  // ── the dining room (issue #81) ───────────────────────────────────────────
+  // The round table, the four chairs, the sideboard and the pendant, every
+  // number from game/full-dining.js. It lands before the decor pass because
+  // DECOR_HOSTS files the bowl and the book onto the sideboard's top.
+  buildFullDining(flat);
+
   // ── the lookalike decor (issue #69) ───────────────────────────────────────
   // B/W art, bedding, towels, pot, books: every piece shares one canvas
   // atlas (game/full-decor-mesh.js), so the whole collection lands as ONE
@@ -682,7 +689,7 @@ export function buildFullApartment(scene) {
     // lights, hung one under each.
     { at: [0.72, 2.34, 3.4], color: 0xffe6c4, i: 5.4, d: 7.0 }, // hall + the front door's room
     { at: [-0.7, 2.34, 7.3], color: 0xffdcc0, i: 5.0, d: 7.5 }, // bedroom
-    { at: [-2.16, 2.34, 3.71], color: 0xf0e8f0, i: 3.9, d: 5.8 }, // bathroom (cooler: a different fixture)
+    { at: [-2.31, 2.34, 3.71], color: 0xf0e8f0, i: 3.9, d: 5.8 }, // bathroom (cooler: a different fixture; issue #81: the hall's 0.30 m widened the room east, so the fill rides the new centre)
   ].map((f) => {
     const p = new THREE.PointLight(f.color, f.i, f.d, 2);
     p.position.set(...f.at);
