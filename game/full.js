@@ -1198,8 +1198,12 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const N = 500;
     const dice = mulberry32(0x6c6b6f62); // 'lob' — a fixed base: random-shaped seeds, a check that never flaps
     const seeds = Array.from({ length: N }, () => 1 + Math.floor(dice() * (2 ** 31 - 1)));
+    // #86: `sceneOnly` spots (the owner's lap) are deliberately NEVER drawn
+    // into a seeded cycle — the engine swaps into them live — so they are
+    // exempt from the coverage floor. Every ordinary spot still holds ≥8%.
+    const cycleIds = (SPOTS ?? []).filter((s) => !s.sceneOnly).map((s) => s.id);
     const roomOf = new Map((SPOTS ?? []).map((s) => [s.id, s.room]));
-    const spotRuns = new Map((SPOT_IDS ?? []).map((id) => [id, 0]));
+    const spotRuns = new Map(cycleIds.map((id) => [id, 0]));
     const roomRuns = new Map();
     let patriotRuns = 0;
     let totalFinds = 0;
@@ -1248,7 +1252,10 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const dice = mulberry32(0x5f88ab1e); // a second fixed base: this check never flaps either
     const seeds = Array.from({ length: N }, () => 1 + Math.floor(dice() * (2 ** 31 - 1)));
     const roomOf = new Map((SPOTS ?? []).map((s) => [s.id, s.room]));
-    const spotPicks = new Map((SPOT_IDS ?? []).map((id) => [id, 0]));
+    // #86: same exemption as the coverage row — `sceneOnly` spots never play
+    // in a cycle, so they are neither worst nor never on this table.
+    const cycleIds2 = (SPOTS ?? []).filter((s) => !s.sceneOnly).map((s) => s.id);
+    const spotPicks = new Map(cycleIds2.map((id) => [id, 0]));
     const roomPicks = new Map();
     let picks = 0;
     for (const s of seeds) {
