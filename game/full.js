@@ -18,6 +18,7 @@ import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/rea
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
+import { EYEWITNESS } from './full-street.js';
 import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W, SUPPORT_DEFS } from './full-shell.js';
 import { diningGapReport } from './full-dining.js';
 import { woodTextureAudit } from '../src/polish.js';
@@ -172,8 +173,9 @@ function batThePen(pen, supports, t) {
  * screen #57 → 58), then the seven Patriot Bobo checks issue #58 added, and
  * the three door/wood checks issue #65 added, and the four bathroom/entry
  * checks issue #67 added, and the `findable` hiding guarantee issue #70
- * added, so the full page reports 82, and the `decoy-on-furniture` promise
- * issue #89 appended makes it 95. */
+ * added, so the full page reports 82, the `decoy-on-furniture` promise issue
+ * #89 appended makes it 95, and the four Uptown-backdrop checks issue #83
+ * adds make it 99. */
 /** Door frames are rendered ONCE per page by `doorways-read-open`: they
  *  check static geometry, and selfTest runs per capture frame — re-rendering
  *  six extra frames every time starves the live frame loop under load (the
@@ -184,7 +186,10 @@ const doorFramesDone = { v: false };
  *  renders a pass. `entry` and `luma` are the numbers they measured, kept for
  *  the detail strings once the measuring is done. */
 const roomLightFrames = { v: false, entry: null, luma: null };
-function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
+/** …and the same rule again for issue #83's street pixel check: two renders
+ *  once per page, `blues` keeps what it measured for the detail line. */
+const streetFrames = { v: false, blues: null };
+function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -1697,6 +1702,134 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     add('entry-reads-lit', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
     add('front-door-shut-and-found', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
     add('bath-luma-in-band', 'no renderer handed to extraChecks', 'a renderer to render a frame with', false, 'engine wiring regression');
+  }
+
+  // ── issue #83: the Uptown street outside the living room ──────────────────
+  // Built the way it promised (one draw, one ≤512 atlas, unlit), seen from
+  // exactly the rooms that own its sightlines, not a wall of flat blue any
+  // more, and never inside a walk rect (floating cards). The pixel half runs
+  // ONCE per page like the door and entry frames above.
+  {
+    const problems = { built: [], culled: [], blue: [], walk: [] };
+    const st = aptStreet;
+    if (!st) {
+      problems.built.push('the flat built without a street group');
+      problems.culled.push('nothing to cull');
+      problems.walk.push('nothing to measure');
+    } else {
+      const s = st.stats;
+      if (s.drawCalls !== 1) problems.built.push(`${s.drawCalls} draws — the promise is one`);
+      if (!(s.atlasWidth <= 512 && s.atlasHeight <= 512)) problems.built.push(`atlas ${s.atlasWidth}×${s.atlasHeight}, limit 512`);
+      if (!st.mesh.material.isMeshBasicMaterial) problems.built.push('lit material — must be unlit like the sky it replaces');
+      if (st.tier === 'full' && s.triangles > 200) problems.built.push(`${s.triangles} triangles for a card scene`);
+      // no painted text or brand: the atlas is code-drawn by construction;
+      // the check pins the geometry side — one mesh, one material, no decals.
+      let parts = 0;
+      st.group.traverse((o) => { if (o.isMesh) parts += 1; });
+      if (parts !== 1) problems.built.push(`${parts} meshes in the group — the promise is one merged mesh`);
+      // walk-clear: no card vertex may stand on a floor the camera walks
+      const vpos = st.mesh.geometry.getAttribute('position');
+      const inRect = (x, z, r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
+      for (let i = 0; i < vpos.count; i += 1) {
+        const v = { x: vpos.getX(i), z: vpos.getZ(i) };
+        for (const r of EYEWITNESS.clearRects) {
+          if (inRect(v.x, v.z, r)) { problems.walk.push(`vertex ${i} at ${v.x.toFixed(2)}, ${v.z.toFixed(2)} stands on a walkable floor`); i = vpos.count; break; }
+        }
+      }
+    }
+    // cull invite list: park the camera in every room, one frame each, and
+    // read who gets to see the street. Then put the camera and the cull back
+    // exactly as they were.
+    if (st && aptCull && camera) {
+      const wasOn = aptCull.enabled;
+      const savedPos = camera.position.clone();
+      try {
+        aptCull.setEnabled(true);
+        const seen = {};
+        for (const r of ROOMS) {
+          camera.position.set((r.x0 + r.x1) / 2, 1.62, (r.z0 + r.z1) / 2);
+          aptCull.update(camera);
+          seen[r.id] = st.group.visible;
+        }
+        camera.position.set(9.0, 1.62, 9.0); // beyond every rect: fail open
+        aptCull.update(camera);
+        seen.__outside = st.group.visible;
+        for (const id of ['living', 'balcony', '__outside']) {
+          if (seen[id] !== true) problems.culled.push(`${id === '__outside' ? 'outside the flat' : id}: street hidden`);
+        }
+        for (const r of ROOMS) {
+          if (EYEWITNESS.view && (r.id === 'living' || r.id === 'balcony')) continue;
+          if (seen[r.id] !== false) problems.culled.push(`${r.id}: street visible from a room that never looks at it`);
+        }
+      } finally {
+        camera.position.copy(savedPos);
+        aptCull.setEnabled(wasOn); // showAll runs with it if it was standing down
+        aptCull.update(camera);
+      }
+    } else if (st) {
+      problems.culled.push('no cull/camera handed to extraChecks');
+    }
+    // pixels: the street and balcony frames may not be mostly the old flat
+    // blue any more (< 35% old-sky palette), and may not show the scene's
+    // dark background as a hole (< 25% near-black) — once per page.
+    if (st && renderer && camera && !streetFrames.v) {
+      const canvasEl = renderer.domElement;
+      const gl = renderer.getContext();
+      const savedPos = camera.position.clone();
+      const savedQuat = camera.quaternion.clone();
+      const savedFov = camera.fov;
+      const near1 = (v, t) => Math.abs(v - t) <= 24;
+      const oldSky = (r, g, b) => (near1(r, 142) && near1(g, 196) && near1(b, 234))
+        || (near1(r, 207) && near1(g, 230) && near1(b, 244))
+        || (near1(r, 243) && near1(g, 234) && near1(b, 217));
+      const blues = {};
+      try {
+        for (const name of ['street', 'balcony']) {
+          const vw = LEVEL.VIEWS[name];
+          camera.position.set(vw.pos[0], vw.pos[1], vw.pos[2]);
+          camera.rotation.set(vw.pitch, vw.yaw, 0);
+          camera.fov = vw.fov;
+          camera.updateProjectionMatrix();
+          renderer.render(scene, camera);
+          const w = canvasEl.width;
+          const h = canvasEl.height;
+          const buf = new Uint8Array(4 * w * h);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+          let old = 0;
+          let dark = 0;
+          let sum = 0;
+          const n = w * h;
+          for (let i = 0; i < n; i += 1) {
+            const r = buf[i * 4];
+            const g = buf[i * 4 + 1];
+            const b = buf[i * 4 + 2];
+            const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            sum += luma;
+            if (luma < 24) dark += 1;
+            if (oldSky(r, g, b)) old += 1;
+          }
+          blues[name] = { old: old / n, dark: dark / n, mean: sum / n };
+        }
+        streetFrames.blues = blues;
+        for (const [name, bs] of Object.entries(blues)) {
+          if (bs.old >= 0.35) problems.blue.push(`${name} frame is ${(bs.old * 100).toFixed(0)}% old flat sky palette (limit 35%)`);
+          if (bs.dark >= 0.25) problems.blue.push(`${name} frame is ${(bs.dark * 100).toFixed(0)}% near-black: a hole where the city should be`);
+          if (bs.mean < 60) problems.blue.push(`${name} mean luma ${bs.mean.toFixed(0)}: the street renders dark`);
+        }
+        if (!problems.built.length && !problems.culled.length && !problems.blue.length && !problems.walk.length) streetFrames.v = true;
+      } finally {
+        camera.position.copy(savedPos);
+        camera.quaternion.copy(savedQuat);
+        camera.fov = savedFov;
+        camera.updateProjectionMatrix();
+      }
+    }
+    const bl = streetFrames.blues;
+    const blueText = bl ? Object.entries(bl).map(([k, v]) => `${k} old-sky ${(v.old * 100).toFixed(0)}% dark ${(v.dark * 100).toFixed(0)}%`).join(', ') : 'awaiting first render';
+    add('street-backdrop-built', problems.built.length ? problems.built.join('; ') : `${st ? `${st.tier} tier · 1 draw · ${st.stats.triangles} tris · ${st.stats.atlasWidth}px atlas · basic material` : 'missing'}`, 'one merged mesh, one unlit draw, atlas ≤ 512 px', !problems.built.length, 'issue #83: the balcony looks at Uptown, painted on one atlas into one mesh — no photos, no text, no logos by construction');
+    add('street-culled-to-views', problems.culled.length ? problems.culled.join('; ') : 'living + balcony + fail-open outside see it; every other room does not', 'visible iff the camera stands in living/balcony (or outside every rect)', !problems.culled.length, 'issue #83: per-room culling of the backdrop; ?cull=off and the checks still see it whole');
+    add('street-view-not-flat-blue', problems.blue.length ? problems.blue.join('; ') : blueText, '< 35% of the frame in the old flat-sky palette and < 25% near-black, street + balcony', !problems.blue.length, 'issue #83: "the blue nothing" is gone from the frames that matter, measured on pixels');
+    add('street-clear-of-the-walk', problems.walk.length ? problems.walk.join('; ') : 'no backdrop vertex inside the living-room or balcony walk rects', 'cards stand outside every walkable floor — nothing floats over the camera', !problems.walk.length, 'issue #83: the street is scenery seen through openings, never a room object');
   }
 }
 

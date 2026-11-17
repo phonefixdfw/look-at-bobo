@@ -2078,7 +2078,7 @@ export function bootGame(cfg) {
     // moment's contact band, room coverage). The slice adds none. Issue #58
     // hands the Patriot pieces (rule, reward, costume, pop) down the same way.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
+      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
     }
 
     game.score = savedScore;
