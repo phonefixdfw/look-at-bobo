@@ -54,8 +54,13 @@ export const KIT_D = {
   cofW: 0.2, cofD: 0.26, cofH: 0.36,
   // row 27: dish rack 0.40 × 0.30 × 0.15 (allows high 0.10…0.22)
   rackW: 0.3, rackD: 0.4, rackH: 0.15,
-  // row 28: trash bin 0.30 dia × 0.42 (allows high 0.28…0.50)
-  binDia: 0.3, binH: 0.42,
+  // row 28: trash bin — issue #82 grew it to the kitchen's proper food-waste
+  // bin, 0.35 dia × 0.62 (the ruler row moved with it: 0.33…0.37 across,
+  // 0.58…0.66 high). A 0.30 tin beside the sink could not hold a day of
+  // kitchen scraps, and the owner asked for the bigger one.
+  binDia: 0.35, binH: 0.62,
+  // issue #82: the feeding corner — a 12 mm silicone mat under 7 cm bowls
+  matT: 0.012, bowlH: 0.07,
   // row 31: breakfast bar top 1.05 with a 0.30 overhang (allows 0.98…1.15).
   // The carcass is 0.40 deep against the south wall; the top is 0.70 deep, so
   // the overhang the row names is the 0.30 the stools tuck under.
@@ -114,8 +119,17 @@ export const PIECES = [
   //    at the old return-adjacent footprint its body-pad rotated the costumed
   //    bobo's measured approach at the return loaf past the cats-face-the-room
   //    limit once #56's rig landed on main; here it is clear of the doorway
-  //    walk rect, both kitchen spawns, and every cat approach) ──────────────
-  piece('trash-bin', 'dark', [5.19, 5.49], [0, KIT_D.binH], [0.28, 0.58], ['trash-bin'], 'row 28: 0.30 dia × 0.42 beside the counter', { shape: 'cyl' }),
+  //    walk rect, both kitchen spawns, and every cat approach). Issue #82
+  //    grew it in place to the 0.35 × 0.62 food-waste bin the owner asked
+  //    for: it shares the old corner, its pad still stops short of the
+  //    kitchen→dining doorway lane and of the bar stool's. ──────────────────
+  piece('trash-bin', 'dark', [5.17, 5.52], [0, KIT_D.binH], [0.26, 0.61], ['trash-bin'], 'row 28: 0.35 dia × 0.62 (issue #82), in the bar\'s east corner', { shape: 'cyl' }),
+  // ── the cat's dinner corner (issue #82): two steel bowls on a dark silicone
+  //    mat, on the open floor east of the west counter's return — where a
+  //    feeding station actually lives, out of the aisle (the mat's pad keeps
+  //    x ≥ 3.78 of the galley aisle) and 2 cm under the sight clip. One tagged
+  //    mesh, two bowls: the pair is row 'food-bowl' together. ────────────────
+  piece('food-bowl', 'steel', [3.1, 3.44], [KIT_D.matT, KIT_D.matT + KIT_D.bowlH], [-1.6, -1.05], ['food-bowl'], 'issue #82: two 0.16 dia × 0.07 bowls on the mat, pair measured as one row', { parts: 'bowls' }),
   // ── the breakfast bar (row 31), where game/full-shell.js `barTop` says ──
   // Carcass 0.40 deep on the south wall; top 0.70 deep — the 0.30 overhang
   // runs north over the stools. Measured: the top's 1.05.
@@ -163,9 +177,13 @@ export const DETAILS = [
   { id: 'rack-plate-a', mat: 'steel', x0: 3.64, y0: KIT_D.WT + 0.024, z0: -2.66, x1: 3.665, y1: KIT_D.WT + 0.17, z1: -2.44 },
   { id: 'rack-plate-b', mat: 'steel', x0: 3.71, y0: KIT_D.WT + 0.024, z0: -2.66, x1: 3.735, y1: KIT_D.WT + 0.17, z1: -2.44 },
   { id: 'rack-plate-c', mat: 'steel', x0: 3.78, y0: KIT_D.WT + 0.024, z0: -2.66, x1: 3.805, y1: KIT_D.WT + 0.17, z1: -2.44 },
-  // bin: the rim and a pedal — a lid you step on is another playset tell gone
-  { id: 'bin-rim', mat: 'steel', x0: 2.71, y0: KIT_D.binH, z0: -1.09, x1: 2.99, y1: KIT_D.binH + 0.025, z1: -0.81 },
-  { id: 'bin-pedal', mat: 'steel', x0: 2.78, y0: 0.012, z0: -0.79, x1: 2.92, y1: 0.04, z1: -0.755 },
+  // bin: the lid and a pedal — a lid you step on is another playset tell gone
+  // (issue #82 moved them onto the bigger bin's mouth and south face)
+  { id: 'bin-rim', mat: 'steel', x0: 5.18, y0: KIT_D.binH, z0: 0.27, x1: 5.51, y1: KIT_D.binH + 0.025, z1: 0.6 },
+  { id: 'bin-pedal', mat: 'steel', x0: 5.275, y0: 0.012, z0: 0.61, x1: 5.415, y1: 0.04, z1: 0.637 },
+  // issue #82: the silicone mat under the cat's two bowls — dressing, no
+  // ruler row of its own (the bowls carry it) and no collider (the pair does)
+  { id: 'pet-mat', mat: 'dark', x0: 3.1, y0: 0, z0: -1.6, x1: 3.44, y1: KIT_D.matT, z1: -1.05 },
   // the bar: recessed toe and a drawer line across the carcass front (z 0.2)
   { id: 'bar-toe', mat: 'dark', x0: 3.78, y0: 0, z0: 0.2, x1: 5.10, y1: 0.1, z1: 0.26 },
   { id: 'bar-drawer', mat: 'handle', x0: 3.82, y0: 0.86, z0: 0.185, x1: 5.06, y1: 0.875, z1: 0.2 },
@@ -197,5 +215,6 @@ export const KITCHEN_DETAILS_COLLIDERS = [
   { id: 'kitchen-bar', x0: 3.74, z0: 0.2, x1: 5.14, z1: 0.6 },
   { id: 'bar-stool-a', x0: 3.99, z0: -0.15, x1: 4.35, z1: 0.21 },
   { id: 'bar-stool-b', x0: 4.73, z0: -0.15, x1: 5.09, z1: 0.21 },
-  { id: 'kitchen-bin', x0: 5.19, z0: 0.28, x1: 5.49, z1: 0.58 }, // issue #59: east run's south end corner (was x 2.7-3.0, z -1.1--0.8)
+  { id: 'kitchen-bin', x0: 5.17, z0: 0.26, x1: 5.52, z1: 0.61 }, // issue #59: east run's south end corner (was x 2.7-3.0, z -1.1--0.8); issue #82: the wider body grew 2 cm each way in place
+  { id: 'pet-bowls', x0: 3.1, z0: -1.6, x1: 3.44, z1: -1.05 }, // issue #82: the bowls AND their mat, one push box (the mat itself never collides); the east face leaves the d-kitchen decoy's shoulder room
 ];

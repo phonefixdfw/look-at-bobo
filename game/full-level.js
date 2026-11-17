@@ -168,9 +168,12 @@ export const SIGHT_HEIGHTS = {
   'dining-table': 0.75, 'dining-chair-n': 0.86, 'dining-chair-e': 0.86,
   'dining-chair-s': 0.86, 'dining-chair-w': 0.86, 'sideboard': 0.86,
   'counter-n': 0.9, 'counter-w': 0.9, 'counter-e': 0.9, 'fridge': 1.8,
-  'kitchen-bar': 1.05, 'bar-stool-a': 0.62, 'bar-stool-b': 0.62, 'kitchen-bin': 0.5,
+  'kitchen-bar': 1.05, 'bar-stool-a': 0.62, 'bar-stool-b': 0.62,
+  'kitchen-bin': 0.645, // issue #82: the 0.62 food-waste bin plus its lid rim
+  'pet-bowls': 0.082, // issue #82: 12 mm mat + 7 cm bowls, two cm under the sight clip
   'hall-console': 0.78, 'coat-bench': 0.62,
   'vanity': 0.86, 'toilet': 0.8, 'tub': 0.55, 'bath-bin': 0.45,
+  'litter-box': 0.15, // issue #82: the litter tray's rim: too low to hide or to be hidden by
   'bed': 0.58, 'nightstand': 0.55, 'nightstand-south': 0.55, 'dresser': 0.78,
   'wardrobe': 2.1, 'desk': 0.75, 'desk-chair': 0.41, 'laundry-basket': 0.37,
   'bedroom-plant': 0.9,
@@ -254,7 +257,7 @@ export const CANONICAL_EVENT_MOMENT = 'box-sit';
  *  The spot pool (issue #33: "a couple of times I didn't see him, or the places
  *  he was hiding wasn't enough").
  *
- *  Twenty-eight places across all seven rooms. A run draws ten of them — ONE
+ *  Thirty-seven places across all eight rooms. A run draws ten of them — ONE
  *  spot per moment type (all ten types, exactly once), random order, no spot
  *  twice, never two in the same room twice in a row (`pickSpotCycle` below).
  *  Every record:
@@ -290,6 +293,10 @@ export const SPOTS = [
   // ── living room (6) ──────────────────────────────────────────────────────
   spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
+  // issue #82: the yellow heat pad on the south cushion — a loaf of cat on
+  // 40 × 55 cm of warmth, facing east into the room (the open floor east of
+  // the sofa is `cats-face-the-room`'s own approach from this spot).
+  spot('couch-loaf', 'heatpad', 'living', 'loaf', [-2.73, 'heatPad', 0.355], -1.57, { open: true }),
   spot('window-bird', 'n-window', 'living', 'sit', [-1.35, 'floor', -2.5], 1.71, { hide: 'big-plant' }), // issue #70: bedded at the foot of its grown houseplant — 42% of the ring around him can see him at all, and `findable` proves he is never invisible
   // issue #81: the `e-window` spot went with the window — its plaster is the
   // living→dining doorway now, and a cat cannot sit in a door pier. The
@@ -304,12 +311,21 @@ export const SPOTS = [
   spot('sink-sit', 'counter-return', 'kitchen', 'loaf', [2.82, 'counterTopW', -1.5], 3.02, { open: true, hide: 'counter-w' }), // issue #70: loafed on the return's own counter, body half behind the run's west flank — 26% of the ring sees him, `findable` holds the guarantee
   spot('sink-sit', 'fridge', 'kitchen', 'sit', [5.2, 'floor', -1.75], 1.4),
   spot('sink-sit', 'bar', 'kitchen', 'side', [4.55, 'barTop', 0.4], -0.14, { open: true }), // issue #81: rode the bar's 0.44 m east shift (the kitchen→dining doorway took the bar's old west end)
-  // ── dining (2, issue #81) — the new room joins the pool with the two
+  // ── dining (6, issues #81 + #82) — the new room joins the pool with the two
   //    moments the room reads for: a cat on the table, and a zoomie loaf at
   //    its south end. Both are `open`: the room is young and the ring maths
   //    of `findable` is not asked to survive its four chair-height islands
   //    yet; a run still never visits the room twice back to back. ──
   spot('sink-sit', 'table', 'dining', 'sit', [4.3, 'diningTop', 2.28], -1.57, { open: true }), // issue #81: rode the table's 6 cm south-shift to (4.06, 2.28). He faces east along the table — the nearest place a body can stand and see him (cats-face-the-room's own bestApproach) is the dining gap off the table's east end, at x 5.2
+  // Issue #82: the four chairs themselves, one extra seat for the same
+  // "sit up on a thing" moment. Each cat faces away from the roast and toward
+  // the lane a player reaches it from (`cats-face-the-room` re-derives every
+  // yaw; the south chair reads the room over its shoulder rather than the
+  // sideboard wall, same reasoning as the couch).
+  spot('sink-sit', 'chair-n', 'dining', 'sit', [4.06, 'diningSeatN', 1.73], 0, { open: true }),
+  spot('sink-sit', 'chair-e', 'dining', 'sit', [4.61, 'diningSeatE', 2.28], -1.57, { open: true }),
+  spot('sink-sit', 'chair-s', 'dining', 'sit', [4.06, 'diningSeatS', 2.83], 1.57, { open: true }),
+  spot('sink-sit', 'chair-w', 'dining', 'sit', [3.51, 'diningSeatW', 2.28], 0, { open: true }),
   spot('hall-chase', 'dining', 'dining', 'loaf', [4.9, 'floor', 1.15], 1.57, { open: true }), // issue #81: into the wide arm's north-east corner — clear of the ring's pads. He faces west along the table's north side, at the doorway-side lane his chase would have come from (bestApproach's vantage sits at x 4.0, z 1.15)
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
   // ── hall + entry + bathroom (7) — the entry gained the dash spot that used
@@ -330,7 +346,7 @@ export const SPOTS = [
   // around him can see him at all; the gap at the curtain's east end is where
   // he's found, and `findable` fails the build if that gap ever closes up.
   spot('laundry-nap', 'bath-tub', 'bathroom', 'side', [-2.55, 'tubWell', 4.85], -0.44, { hide: 'shower-curtain' }),
-  // ── bedroom (10) — issue #48 turned the bed head-west. The five spots on
+  // ── bedroom (11) — issue #48 turned the bed head-west. The five spots on
   //    the moved pieces came with it (mirrored across the room's middle and
   //    nudged 0.20 m south for the longer head clearance); the desk, desk-end,
   //    keyboard and laundry ones are where they were — those pieces stayed.
@@ -352,6 +368,12 @@ export const SPOTS = [
   // (the `run-draw-legal` alternation — see the pickSpotCycle note).
   spot('blanket-biscuits', 'dresser-gap', 'bedroom', 'loaf', [0.95, 'floor', 6.85], 2.62, { hide: 'dresser' }),
   spot('laundry-nap', 'nightstand', 'bedroom', 'side', [-2.35, 'nightstandTop', 6.8], -0.28, { open: true }),
+  // Issue #82: the desk chair. Deliberately a `laundry-nap` spot, not another
+  // `sink-sit`: the type already belongs to this room, so `run-draw-legal`'s
+  // bound (bedroom holds at most five of the ten draws, locked at exactly
+  // five today) still holds; a sixth bedroom type would leave no legal order.
+  // Facing south into the room with its back to the desk, checking the door.
+  spot('laundry-nap', 'desk-chair', 'bedroom', 'side', [-1.98, 'deskChair', 6.29], 3.14, { open: true }),
 ];
 
 export const SPOT_IDS = SPOTS.map((s) => s.id);
@@ -470,7 +492,7 @@ export function spotRoom(id) {
 }
 
 /** The decoy: 22 lb of scenery, mostly black, white on his feet only, no dash
- *  (docs/DECOY_CAT.md). Issue #33 grew the lazy-spot pool to ten — one or two
+ *  (docs/DECOY_CAT.md). Issue #33 grew the lazy-spot pool to ten, and issue #82 to thirteen — one or two
  *  per room, so "is that…?" can happen anywhere, balcony included. Still never
  *  Bobo's spot and never closer than DECOY_MIN_DIST, which the engine enforces
  *  per round by filtering this list, not by hoping. */
@@ -485,6 +507,14 @@ export const DECOY_SPOTS = [
   { id: 'd-bath', room: 'bathroom', pos: [-1.65, 'floor', 3.2], faceYaw: 1.57, pose: 'side' }, // issue #67: moved into the new open floor (the old point came within 1.2 m of the moved mat spot) and turned to the room; issue #81: gave the widened hall its 0.30 back
   { id: 'd-bedroom', room: 'bedroom', pos: [-0.55, 'floor', 6.45], faceYaw: 0.0 }, // on the rug mid-floor, facing north down the room to the door walk — the nearest stand-and-watch cell; measured: the mirrored yaw was 95° off, this faces the approach head-on
   { id: 'd-balcony', room: 'balcony', pos: [1.4, 'floor', -3.35], faceYaw: 2.82, pose: 'side' },
+  // Issue #82: the balcony's third lazy spot and the heat pad's first. The
+  // chair decoy stands on Bobo's own balcony-chair spot and the pad decoy on
+  // couch-loaf.heatpad — legal by construction: `pickDecoySpot` filters
+  // this list by DECOY_MIN_DIST every round, so a decoy on the spot Bobo
+  // actually drew simply never gets picked that round.
+  { id: 'd-balcony-chair', room: 'balcony', pos: [2.18, 'chairSeat', -3.58], faceYaw: 1.77, pose: 'sit' }, // the same yaw its Bobo twin measures: west down the deck
+  { id: 'd-balcony-deck', room: 'balcony', pos: [1.1, 'floor', -3.98], faceYaw: 2.82, pose: 'sprawl' }, // full length on the deck boards, turned to the door (the yaw d-balcony's sweep proved)
+  { id: 'd-heatpad', room: 'living', pos: [-2.73, 'heatPad', 0.355], faceYaw: -1.57, pose: 'side' }, // curled on the pad facing east into the room, like the real spot's loaf
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
 export const DECOY_MIN_DIST = 1.2;
@@ -642,6 +672,7 @@ export const SCALE_RANGES = {
   // furniture has been drawn since then (game/full-living.js).
   sofa: { w: [1.8, 2.4], d: [0.82, 1.05], h: [0.75, 0.95], note: 'row 34: 2.10 × 0.92 × 0.85' },
   'seat-height': { top: [0.38, 0.5], note: 'row 35: seat 0.45, the `cushion` support' },
+  'heat-pad': { w: [0.52, 0.6], d: [0.38, 0.44], h: [0.02, 0.06], top: [0.46, 0.5], note: 'issue #82: 40 × 55 cm pad, 3 cm of warming, top 0.48 on the south cushion' },
   'sofa-back': { top: [0.8, 0.9], note: 'row 34 again: backrest top 0.85, the `sofaBackTop` support' },
   'coffee-table': { w: [1.0, 1.3], d: [0.5, 0.7], h: [0.38, 0.52], note: 'row 36: 1.10 × 0.60 × 0.45' },
   'side-table': { w: [0.38, 0.52], h: [0.48, 0.62], note: 'row 37: 0.45 dia × 0.55 high' },
@@ -679,7 +710,8 @@ export const SCALE_RANGES = {
   toaster: { h: [0.15, 0.24], note: 'row 25: 0.26 × 0.18 × 0.19' },
   'coffee-maker': { h: [0.28, 0.45], note: 'row 26: 0.36 tall against the east tile' },
   'dish-rack': { h: [0.1, 0.22], note: 'row 27: 0.40 × 0.30 × 0.15 over the drainer' },
-  'trash-bin': { h: [0.28, 0.5], note: 'row 28: 0.30 dia × 0.42 beside the counter' },
+  'trash-bin': { w: [0.33, 0.37], h: [0.58, 0.66], note: 'row 28 (issue #82): the kitchen food-waste bin, 0.35 dia × 0.62, in the bar corner' },
+  'food-bowl': { w: [0.33, 0.36], d: [0.15, 0.17], h: [0.06, 0.08], note: 'issue #82: the pair measures as one row — w spans both rims, d is one 0.16 bowl' },
   'rug-runner': { d: [0.6, 0.85], note: 'row 33: the runner is 0.70 wide (w is its 2.00 length)' },
   'bar-height': { top: [1.0, 1.1], note: 'breakfast bar top 1.05' },
   'bar-stool': { w: [0.3, 0.4], d: [0.3, 0.4], h: [0.6, 0.7], note: 'stool 0.36 × 0.36 × 0.65' },
@@ -705,6 +737,7 @@ export const SCALE_RANGES = {
   // rows 54-57 (issue #49): the tub, the mirror, the bar and the mat, drawn
   // by game/full-bath-mesh.js and measured back off the built boxes
   tub: { w: [1.5, 1.8], d: [0.7, 0.8], h: [0.5, 0.62], note: 'row 56: 1.60 × 0.75, rim 0.55' },
+  'litter-box': { w: [0.46, 0.54], d: [0.3, 0.34], h: [0.13, 0.18], note: 'issue #82: 0.46 × 0.32 × 0.15 low-sided tray, tub-to-bin pocket' },
   'bath-mirror': { w: [0.6, 0.8], h: [0.8, 1.0], note: 'row 54: 0.70 × 0.90, bottom 1.10' },
   'towel-bar': { w: [0.5, 0.7], top: [1.12, 1.2], note: 'row 55: 0.60 long, bar top 1.165 — the draped towel hangs below the measured top by design' },
   'bath-mat': { w: [0.8, 1.0], d: [0.45, 0.7], h: [0.005, 0.05], note: 'row 57: 0.90 × 0.55 pile (the brief\'s own mat, mid-range)' },

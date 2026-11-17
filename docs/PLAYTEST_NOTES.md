@@ -1792,3 +1792,87 @@ still fail by name; `gate` PASS; slice + demo byte-identical;
 `check:mobile` PASS; bots 10/10 with the ending text exact;
 `playtest:stress:full` at `--checks 91`; audio/music PASS;
 `capture:full:weak` clean under swiftshader; `build` stamps every URL.
+
+## 31. Issue #82 — cat care: litter box, bowls, a bigger bin, and the yellow heat pad
+
+**What the pass changed.** Brandon's 2026-11-16 playtest facts shipped as
+data and geometry, recorded verbatim in docs/CHARACTERS.md: *"the flat has
+a litter box and food bowls; BOTH Bobo and the decoy like lying on the
+yellow heat pad on the couch; Bobo likes to sit in chairs; the decoy likes
+the patio (the balcony)"*, plus *"There can be a trash can near the
+kitchen."* — and the rule that nothing gets gross: *"Plain, clean, cute:
+no mess or gross detail."* Built: the little kitchen bin replaced by the
+issue's bigger one (0.35 dia × 0.62, lid + pedal, east run's south corner —
+old lid/pedal details moved, not duplicated); two porcelain bowls (Ø 0.16)
+on a 0.34 × 0.55 feeding mat at the pass wall south of the counter return;
+an open litter tray (0.46 × 0.32 × 0.15) in the bathroom; a folded yellow
+heat pad (0.55 × 0.40 × 0.03, fabric 0xf2b63f, cord behind the sofa) on the
+couch's south cushion; six new Bobo spots (`couch-loaf.heatpad`, four
+`sink-sit.chair-*`, `laundry-nap.desk-chair`) and three new decoy lazy
+spots (balcony chair, balcony deck, the pad itself — `d-heatpad`). Pool
+31 → **37**, decoys 10 → **13**, colliders 41 → 43 (`pet-bowls`,
+`litter-box`).
+
+**How it plays.** Seed 11 — the run everybody used to get — now lands
+`sink-sit.chair-n` and `couch-loaf.heatpad` inside its first ten finds, and
+the bot's spot cycle still reads 10/10 distinct with every catch changing
+rooms. The pad loaf is a real beat: a yellow rectangle on the couch with a
+cat curled on it reads at a glance, and the decoy can own that same pad on
+a run that does not put Bobo there. The chairs face the aisles, not the
+table — a sitter aimed at a round table shows nobody a face.
+
+**The litter box found its spot by failing three checks.** The first
+placement — the open floor between tub and bath bin — failed
+`bath-clear-path` (clear bath floor dropped to 1.99 m² against the 2 m²
+floor), `findable` (it pinched the tub cat's ring) and `decor-off-openings`
+(it clipped `mat-bath`) before any pixel was cut. The tray now stands in
+the pocket between the tub's flank and the east wall (x −1.66 … −1.34,
+z 4.44 … 4.90): cells the tub already shadowed, so the walk flood, the
+line-of-sight model and the decor rules all shrug. Bowls learned the same
+lesson quietly — the mat envelope started at x 3.48 and the raw mat box ate
+the `d-kitchen` decoy's shoulder room; it ships at 3.44.
+
+**The chair that faced the wrong way.** `chair-s` at an intuitive 3.93 was
+135° off its approach the first time `cats-face-the-room` swept the pool:
+the south chair now sits its sitter facing west across the room (1.57).
+And the desk-chair nap is deliberately a `laundry-nap`, not a `sink-sit`:
+the run draw locks the bedroom to exactly five of the ten types, and
+laundry-nap is one of the five — a sixth bedroom sink-sit spot would break
+`run-draw-legal`'s alternation bound where a fourth laundry-nap spot is
+free.
+
+**What it cost.** The pad's yellow fabric is the one prop that buys its own
+draw (atlas materials can't wear a second colour); its cord folds into the
+living room's dark-detail merge, and the kitchen's carcass merge gives a
+slot back the same way (untagged pieces fold nameless). Worst frame lands
+on **150 of 150** — the budget exactly, no more and no less; per-room max
+over all 546 frames: living 150 · dining 149 · kitchen 129 · bedroom 125 ·
+balcony 115 · entry 103 · hall 96. Zero new lights, zero new textures,
+slice and demo byte-identical.
+
+**Bugs the checks caught before any pixels did.** Two new selfTests came
+out of the issue's own asks: `heat-pad-rests-on-cushion` pins pad bottom to
+cushion top (0.45) and support to mesh top (0.48 ± 1 mm), and
+`cat-props-clear-the-plan` fails the build if any cat prop's rect covers a
+spawn, a floor moment spot or a decoy. Full check count 91 → **93**.
+
+**Where the harness learned #70's rule again.** With 37 spots, seed 11's
+DAG! round is now `laundry-nap.bath-tub` — the curtain spot — and the
+re-look shout after the DAG! reported the bot's own invariant as a failure
+(`ray wall/prop`) even though the catch landed: the bot was still reading
+the props-visible centre ray, the exact rule #81 corrected in the stress
+harness. The bot now applies #70's rule per kind of spot — hidden rounds
+report the engine's crosshair find-ray (`cat-bobo through shower-curtain`),
+open rounds keep the strict visual ray.
+
+**Suites.** `capture:full` 546 frames **93/93 PASS**, worst frame **150 ≤
+150**; `capture:full:determinism` 8/8 byte-identical; `capture:full:spots`
+PASS (three new spot moments added, the stale #81-era `window-bird.e-window`
+moment dropped); `capture:full:weak` clean under swiftshader;
+`capture:full:planted` caught by name; `gate` PASS; `check:mobile` PASS;
+`playtest:stress:full` at `--checks 93` — 77 PASS / 0 FAIL; bots PASS on
+slice, full and forced-Patriot (10/10, spot cycle 10/10, ending text
+exact); `seed:coverage` PASS over 500 seeds — every spot drawn, rarest
+`sink-sit.fridge` **8.8 %**, the nine-way chairs land 9.4 … 13.2 %, pad loaf
+24.0 %, desk-chair nap 27.8 %; `audio:fullcheck` at the documented live-seed
+coin flip (22/23, exit 0, same footnote as #81); `build` stamps every URL.

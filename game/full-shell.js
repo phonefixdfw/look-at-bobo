@@ -383,6 +383,10 @@ export const CEILINGS = FLOORS.filter((f) => f.room !== 'balcony').map((f) => ({
 export const SUPPORT_DEFS = {
   // living room
   cushion: { x0: -3.0, z0: -0.93, x1: -2.46, z1: 0.73, top: 0.45 },
+  // issue #82: the yellow heat pad on the south cushion — its own patch at the
+  // pad's own top (0.48, the pad is 3 cm of warming), fully inside `cushion`,
+  // so the pad cat stands on furniture twice over and the pad never floats.
+  heatPad: { x0: -2.93, z0: 0.08, x1: -2.53, z1: 0.63, top: 0.48 },
   sofaBackTop: { x0: -3.28, z0: -1.1, x1: -3.04, z1: 0.9, top: 0.85 },
   coffeeTop: { x0: -1.87, z0: -0.97, x1: -1.33, z1: 0.17, top: 0.45 },
   boxFloor: { x0: -2.3, z0: 1.4, x1: -1.85, z1: 1.75, top: 0.001 },
@@ -393,6 +397,14 @@ export const SUPPORT_DEFS = {
   // breakfast-table support in the living room that no spot ever used; the
   // name moved with the room.
   diningTop: { x0: 3.56, z0: 1.78, x1: 4.56, z1: 2.78, top: 0.75 },
+  // issue #82: the four dining chairs' own seats — game/full-dining.js's
+  // CHAIRS cardinals (centres 0.55 m off the table, 0.44 × 0.45 footprint),
+  // seat top 0.45. Each patch is exactly one drawn chair's seat slab, so a
+  // cat drawn to a chair stands on that chair.
+  diningSeatN: { x0: 3.84, z0: 1.505, x1: 4.28, z1: 1.955, top: 0.45 },
+  diningSeatE: { x0: 4.39, z0: 2.055, x1: 4.83, z1: 2.505, top: 0.45 },
+  diningSeatS: { x0: 3.84, z0: 2.605, x1: 4.28, z1: 3.055, top: 0.45 },
+  diningSeatW: { x0: 3.29, z0: 2.055, x1: 3.73, z1: 2.505, top: 0.45 },
   // kitchen
   counterTop: { x0: 2.52, z0: -2.88, x1: 4.93, z1: -2.32, top: 0.9 },
   counterTopW: { x0: 2.54, z0: -2.28, x1: 3.1, z1: -1.07, top: 0.9 },
@@ -419,6 +431,10 @@ export const SUPPORT_DEFS = {
   blanketTop: { x0: -0.89, z0: 7.16, x1: -0.63, z1: 8.57, top: 0.58 },
   nightstandTop: { x0: -2.58, z0: 6.57, x1: -2.17, z1: 7.03, top: 0.55 },
   deskTop: { x0: -2.53, z0: 5.34, x1: -1.17, z1: 6.0, top: 0.75 },
+  // issue #82: the desk chair's own cushion (game/full-bedroom.js's
+  // chair-seat + chair-cushion, 0.40 × 0.38 at top 0.47) — the rolled-up
+  // chair by the desk is where a cat naps in a human's seat.
+  deskChair: { x0: -2.18, z0: 6.1, x1: -1.78, z1: 6.48, top: 0.47 },
   kbTop: { x0: -2.13, z0: 5.74, x1: -1.57, z1: 5.9, top: 0.79 },
   laundryTop: { x0: 0.64, z0: 8.82, x1: 1.0, z1: 9.18, top: 0.55 },
 };

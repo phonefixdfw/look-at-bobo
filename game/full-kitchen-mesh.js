@@ -104,7 +104,12 @@ export function buildFullKitchen(parent) {
     const geo = pieceGeometry(p);
     worldUV(geo, mat.userData?.uvTile ?? 0.6);
     const m = new THREE.Mesh(geo, mat);
-    m.name = p.id;
+    // Issue #82: only the MEASURED pieces keep a name. `name` is a merge lock
+    // (game/full-merge.js), and every ruler handle here is userData, never
+    // the name — so the untagged fillers (the sink-base panel, the end
+    // filler) can now fold into their same-material siblings and the frame
+    // that gained the cat's bowls and the bigger bin gives a draw back.
+    if (p.scale?.length || p.group) m.name = p.id;
     m.castShadow = false;
     m.receiveShadow = true;
     // The ruler's handle: rows this box is measured against, verbatim from the

@@ -51,7 +51,7 @@ deliberately toy-sized prop fails the run).
 | 25 | Toaster | 0.26 × 0.18 × 0.19 | 0.15 … 0.24 high |
 | 26 | Coffee maker | 0.20 × 0.26 × 0.36 | 0.28 … 0.45 high |
 | 27 | Dish rack | 0.40 × 0.30 × 0.15 | 0.10 … 0.22 high |
-| 28 | Trash bin | 0.30 dia × 0.42 | 0.28 … 0.50 high |
+| 28 | Trash bin | 0.35 dia × 0.62, lid + pedal (issue #82: Brandon's *bigger* bin; was 0.30 dia × 0.42) | w 0.33 … 0.37, h 0.58 … 0.66 (row lifted with the piece) |
 | 29 | Dining table | 0.75 high top, 4 legs, top 0.04 | 0.71 … 0.80 |
 | 30 | Chair seat / back | 0.45 / 0.86 | seat 0.40 … 0.50, back 0.78 … 0.95 |
 | 31 | Breakfast bar top | 1.05 with a 0.30 overhang | 0.98 … 1.15 |
@@ -86,6 +86,9 @@ deliberately toy-sized prop fails the run).
 | 60 | Cardboard box (the game's hero prop) | 0.60 × 0.44 × 0.42, floor y 0.02 (`boxFloor`) | 0.4 … 0.7 |
 | 61 | Player eye height | 1.62 (`MOVE.eye`, unchanged) | — |
 | 62 | Player collision radius | 0.30 (`MOVE.playerRadius`, unchanged) | — |
+| 63 | Heat pad (issue #82) | 0.55 × 0.40 × 0.03 folded fabric, top y 0.48 on the south cushion (`heatPad`) | w 0.52 … 0.6, d 0.38 … 0.44, h 0.02 … 0.06, top 0.46 … 0.5 |
+| 64 | Food/water bowls (issue #82, pair = one row) | two porcelain bowls 0.16 dia × 0.08 on a 0.34 × 0.55 × 0.012 mat | w 0.33 … 0.36 across both rims, d 0.15 … 0.17 (one bowl), h 0.06 … 0.08 |
+| 65 | Litter box (issue #82) | open tray 0.46 × 0.32 × 0.15, bath tub-to-bin pocket | w 0.46 … 0.54, d 0.30 … 0.34, h 0.13 … 0.18 |
 
 ## 2. The floor plan (real scale)
 
@@ -174,7 +177,7 @@ Room rectangles (interior faces, x0 z0 → x1 z1):
 | dining | [2.60, 5.52] | [0.80, 4.40] | 9.99 m² usable (10.51 rect − 0.52 sealed band) | issue #81's new room: round table Ø 1.05 top 0.75, four chairs (seat 0.45, back 0.86), emissive pendant, sideboard on the S wall under the new S window, art on the S pier. Doors: kitchen (N, 0.90, cased), living (W, 1.22, cased) |
 | hall | [−1.20, 1.20] | [2.22, 5.20] | 7.15 m² | the spine: living, bathroom, entry, bedroom; **2.40 m wide since issue #81** (was 1.80); east band built all the way to 5.20 since issue #67 |
 | entry (vestibule) | [1.32, 2.72] | [2.22, 3.90] | 2.35 m² | front door (S band, z 3.90, sealed; the case rode 0.07 east with the widened hall: x 1.32 … 2.34, leaf 1.40 … 2.26) + the bench, hooks and console issue #67 drew, all walked 0.30–0.32 m east by issue #81 |
-| bathroom | [−3.30, −1.32] | [2.22, 5.20] | 5.90 m² | was [2.22, 3.90] / 3.8 m² pre-#67, 6.8 m² [−1.02] post-#67; issue #81 gave the hall's widening 0.30 m off this face. The #67 clear-path rows all still pass (aisle 0.90, tub/toilet fronts 0.60); the toilet moved 0.30 m west to hold them, which made the towel bar run over the tank — the over-the-toilet bar a small bathroom really ships. Door-less on purpose (issue #31 rule): the player can never be trapped |
+| bathroom | [−3.30, −1.32] | [2.22, 5.20] | 5.90 m² | was [2.22, 3.90] / 3.8 m² pre-#67, 6.8 m² [−1.02] post-#67; issue #81 gave the hall's widening 0.30 m off this face. The #67 clear-path rows all still pass (aisle 0.90, tub/toilet fronts 0.60); the toilet moved 0.30 m west to hold them, which made the towel bar run over the tank — the over-the-toilet bar a small bathroom really ships. Door-less on purpose (issue #31 rule): the player can never be trapped. Issue #82's litter tray (0.46 × 0.32 × 0.15) stands in the tub-flank pocket x −1.66 … −1.34 z 4.44 … 4.90 — cells the tub already shadowed, so every clear-path row still passes |
 | bedroom | [−2.60, 1.20] | [5.32, 9.32] | 15.2 m² | S window, closet, desk. Its N band (z 5.20 … 5.32) runs wider than the room, x −3.30 → 1.40: it is the bathroom's south face and the hall's end (issue #67) |
 | balcony | [0.55, 2.45] | [−4.40, −3.10] | 2.5 m² | outdoor decking, railing 1.00 m, glass door off the living room |
 

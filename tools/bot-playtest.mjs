@@ -77,9 +77,16 @@ try {
   const shout = (which) =>
     page.evaluate((w) => {
       const a = window.LC.aimAt(w);
+      // Issue #70's rule, carried from the stress harness (#81): at a `hide`
+      // spot the drawn cover can legitimately eat the props-visible centre
+      // ray forever — the shout's find-ray (cat meshes only, cover never
+      // between) is the contract, read where aimAt just parked the player.
+      const probe = window.LC.aimProbe();
+      const hide = w === 'bobo' && window.LC.spot ? (window.LC.spot() || {}).hide : null;
       window.LC.trigger(w === 'bobo' ? 'catch' : 'wrong'); // what aimShout() does after its raycast
-      return a.hits;
+      return { hits: a.hits, probe, hide };
     }, which);
+  const rayTag = (r) => (r.hide ? `${r.probe} through ${r.hide}` : r.hits);
   // Where the round stands BEFORE the bot moves: the real spawn→Bobo walk,
   // not aimAt's teleport next to the cat (issue #53's "does a run tour the
   // flat" measure).
@@ -103,7 +110,8 @@ try {
     if (s.spotId) spotSeen.push({ spot: s.spotId, room: s.room, d: await spawnToBobo() }); // pool pages only (issue #53)
     if (!dagged && scores.length === 2) {
       dagged = true;
-      events.push(`DAG! at "${s.momentId}" (ray ${await shout('decoy')})`);
+      const rD = await shout('decoy');
+      events.push(`DAG! at "${s.momentId}" (ray ${rayTag(rD)})`);
       await waitPhase('wrong');
       flags.push(null);
       scores.push((await st()).score);
@@ -114,7 +122,8 @@ try {
       find: s.findNum,
       costume: await page.evaluate(() => (window.LC.patriot ? window.LC.patriot().costumeAttached : false)),
     };
-    events.push(`shout#${catchN + 1} at "${s.momentId}" (ray ${await shout('bobo')})${pf.p ? ' [+3 PATRIOT!]' : ''}`);
+    const rB = await shout('bobo');
+    events.push(`shout#${catchN + 1} at "${s.momentId}" (ray ${rayTag(rB)})${pf.p ? ' [+3 PATRIOT!]' : ''}`);
     await waitCatchOrWin();
     flags.push(pf);
     scores.push((await st()).score);

@@ -179,7 +179,10 @@ room's north-east arm (counter run x∈[0.6,2.4] z≈2.24, marble laminate,
 fridge + kettle), and a **bathroom** off the hall's west side (tub, vanity,
 toilet, round mirror, bath mat, tiled walls); since issue #81 also a
 **dining room** in the flat's east arm (round table, four chairs, a pendant,
-a sideboard under a new south window), and the hall at the issue's own 2.40 m.
+a sideboard under a new south window), and the hall at the issue's own 2.40 m; since issue #82 also the cat
+furniture — a litter box in the bathroom, food and water bowls on a mat at
+the kitchen pass wall, a bigger bin on the east run, and a heat pad on the
+couch.
 The bedroom gains a desk +
 keyboard against the west wall, a laundry basket, and a window with
 curtains. `game/full.html` boots `bootGame()` from `game/engine.js` against
@@ -244,9 +247,9 @@ no same-spot respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance),
 `winAt: 10`. The full flat draws each run from the spot pool instead —
 see "The spot pool" below (issue #53).
 
-## The spot pool (`SPOTS`, 31 — wired up by issue #53, dining added by #81)
+## The spot pool (`SPOTS`, 37 — wired up by issue #53, dining added by #81, cat furniture by #82)
 
-`full-level.js` exports `SPOTS`: 30 authored places Bobo can actually be,
+`full-level.js` exports `SPOTS`: 37 authored places Bobo can actually be,
 each with the moment `type` it belongs to, its `room`, `pose`, `spot`
 [x, y, z] and `faceYaw`. Every moment's canonical capture spot is one of
 them, named by `MOMENTS[i].canonical` (★ below); the rest are alternates
@@ -258,8 +261,8 @@ below the table).
 |---|---|---|---|---|
 | `couch-loaf.couch` ★ | living | side | (−2.75, cushion, −0.1) | −0.73 |
 | `couch-loaf.sofa-back` | living | loaf | (−3.16, sofaBackTop, 0.35) | −1.6 |
+| `couch-loaf.heatpad` § | living | loaf | (−2.73, heatPad, 0.355) | −1.57 |
 | `window-bird.n-window` ★ ‡ | living | sit | (−1.35, floor, −2.5) | 1.71 |
-| `window-bird.e-window` | living | sit | (1.72, floor, 0.55) | 1.51 |
 | `window-bird.balcony-door` | living | sit | (1.5, floor, −2.45) | 3.04 |
 | `box-sit.box` ★ | living | sit | (−2.075, boxFloor, 1.575) | −1.57 |
 | `window-bird.balcony-rail` | balcony | sit | (1.35, floor, −3.85) | −2.9 |
@@ -269,6 +272,10 @@ below the table).
 | `sink-sit.fridge` | kitchen | sit | (5.2, floor, −1.75) | 1.4 |
 | `sink-sit.bar` | kitchen | side | (4.55, barTop, 0.4) | −0.14 |
 | `sink-sit.table` † | dining | sit | (4.3, diningTop, 2.28) | −1.57 |
+| `sink-sit.chair-n` § | dining | sit | (4.06, diningSeatN, 1.73) | 0 |
+| `sink-sit.chair-e` § | dining | sit | (4.61, diningSeatE, 2.28) | −1.57 |
+| `sink-sit.chair-s` § | dining | sit | (4.06, diningSeatS, 2.83) | 1.57 |
+| `sink-sit.chair-w` § | dining | sit | (3.51, diningSeatW, 2.28) | 0 |
 | `hall-chase.dining` † | dining | loaf | (4.9, floor, 1.15) | 1.57 |
 | `hall-chase.kitchen` | kitchen | loaf | (4.3, floor, −1.3) | 1.58 |
 | `hall-chase.hall` ★ | hall | loaf | (−0.35, floor, 3.3) | −0.19 |
@@ -283,6 +290,7 @@ below the table).
 | `keyboard-sit.keyboard` ★ | bedroom | sit | (−1.85, kbTop, 5.82) | 3.13 |
 | `laundry-nap.basket` ★ | bedroom | side | (0.82, laundryTop, 9) | 1.46 |
 | `laundry-nap.nightstand` | bedroom | side | (0.95, nightstandTop, 6.6) | 0.28 |
+| `laundry-nap.desk-chair` § | bedroom | side | (−1.98, deskChair, 6.29) | 3.14 |
 | `bed-stretch.bed` ★ | bedroom | back | (0.2, bedTop, 7.35) | 0.08 |
 | `bed-stretch.bed-foot` | bedroom | side | (−0.4, bedTop, 8.25) | 1.43 |
 | `blanket-biscuits.blanket` ★ | bedroom | sit | (0.2, blanketTop, 7.15) | 0 |
@@ -296,8 +304,25 @@ table's north side at the lane a chase would come from. Both rode the table's
 final pin to (4.06, 2.28) — the spot x is the capsule centre, 0.24 east of
 the table's.
 
-Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 10 · living 5 ·
-kitchen 5 · dining 2 (issue #81) · bathroom 3 · hall 2 · entry 2 · balcony 2. Two data moves got
+§ — issue #82's six cat-furniture spots. The pad loaf faces east into the
+living room like the couch loaf it shares the sofa with; the desk chair
+nap faces north down the bedroom's length, toward the door walk. The
+chairs do NOT face the table — a sitter aimed at a round table shows no
+face from any aisle — they carry the yaws `cats-face-the-room` measures:
+each faces the aisle a standing player will be on (north chair south
+down the west aisle, east chair east down its own shoulder of the room,
+south chair west across the room, west chair south). chair-s re-measured
+3.93 → 1.57 on the check's first run: the intuitive yaw read 135° off its
+approach. The desk-chair sits as `laundry-nap`, not `sink-sit`: the run
+draw already locks the bedroom to exactly five of the ten moment types
+(`run-draw-legal`'s bound) and laundry-nap is one of them — a sixth
+bedroom sink-sit spot would break the alternation, a fourth laundry-nap
+spot is free. `window-bird.e-window` is gone from this table on purpose:
+#81 removed the spot with the kitchen window's plaster and the row was
+the last place it still lived.
+
+Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 11 · living 6 ·
+kitchen 5 · dining 6 (chairs by #82) · bathroom 3 · hall 2 · entry 2 · balcony 2. Two data moves got
 there (issue #53): `hall-chase.living` (2.6, 0.2) **moved** to
 `hall-chase.entry-door` — living had 6 spots, entry only 1, and (2.6, 0.2)
 sat on the rug beside the style-test box anyway — and `window-bird.balcony-door`
@@ -312,7 +337,8 @@ aim exemption is structural, not a special case: `catUnderCrosshair()` in
 `game/engine.js` raycasts only the two cat root groups, so no prop mesh can
 ever stand between a shout and a cat. Walking is likewise untouched:
 hiding added **zero colliders** (`collider-set-stable` still holds) and zero
-draw calls (worst full-flat frame still **149 / 150**).
+draw calls (worst full-flat frame still **149 / 150** — issue #82's heat
+pad has since taken it back to 150 / 150, within budget).
 
 Six spots hide today — five of Bobo's, one decoy's (★ = hidden):
 
@@ -350,7 +376,7 @@ engine's eye-level 1.05 m LOS clip) + the hide box — and fails the build
 naming the spot if any hiding cat has **no** vantage that sees it
 ("partly hidden, never unfindable"). It also fails a `hide` that hides
 nothing (≥ 50 % of the ring sees the cat), enforces ≤ 25 % of the pool
-hiding (5/30 = 17 % today), and requires ≥ 6 hiding spots overall so the
+hiding (6/37 = 16 % today), and requires ≥ 6 hiding spots overall so the
 feature can't silently rot away. Full check count 81 → **82**, and
 `playtest:stress:full` passes `--checks 82` to match.
 
@@ -367,17 +393,26 @@ moment type (labels, voice, pose anims key off it). Decoys now *prefer* a
 different room than Bobo's new spot (legality unchanged: never Bobo's spot,
 ≥ 1.2 m, facing).
 
-## Respawns (8) and decoy spots (5)
+## Respawns (8) and decoy spots (13)
 
 Spawns: living (0.98,−1.5)+0.6 · living (−1.5,−1.8)+2.6 · living
 (−2.2,1.7)−2.2 · hall (−0.55,3.5)0 · bathroom (−2.3,3.3)+1.9 · bedroom
 (−2.6,6.55)−0.79 · bedroom (−1.2,4.7)−1.4 · bedroom (−1.35,6.6)+0.85
 (was (−0.2,6.75), which sat on the basket's pad — issue #27).
-Decoys: d-rug (0.15,0.55) · d-plant (2.55,−1.6) · d-hall (−0.5,3.45) ·
-d-bath (−2.4,3.4, lying on its side there — pose `side`, issue #27) · d-bed
-(−1.7,6.8) — one per room so the wrong cat can ambush anywhere.
+Decoys (issue #82: thirteen, every room covered and the balcony holding
+three lazy options): d-living (−1.45, 1.8) · d-tv (0.9, −2.0) · d-dining
+(3.35, 1.3, `side`) · d-kitchen (3.5, −1.5, hides behind `counter-w`) ·
+d-bar (4.05, −0.62, `side`) · d-hall (0.35, 3.0) · d-entry (2.0, 2.5) ·
+d-bath (−1.65, 3.2, `side`) · d-bedroom (−0.55, 6.45) · d-balcony (1.4,
+−3.35, `side`) — plus the three #82 adds: **d-balcony-chair** (2.18,
+chairSeat, −3.58, `sit`, the deck chair's lazy twin), **d-balcony-deck**
+(1.1, floor, −3.98, `sprawl`, full length on the boards) and **d-heatpad**
+(−2.73, heatPad, 0.355, `side`, curled on the yellow pad). Decoys may
+*share* a Bobo spot — `pickDecoySpot`'s legality filter (never Bobo's live
+spot, ≥ 1.2 m, facing) is what keeps the pair honest — so the pad and the
+deck chair can wrong-cat exactly like the couch does.
 
-## Full-flat colliders (16)
+## Full-flat colliders (16 in Step 8 — 43 today)
 
 | name | x0, z0 → x1, z1 |
 |---|---|
@@ -573,3 +608,75 @@ hides it. Measured, every one of the 546 capture frames lands at exactly
 before+1; worst frame 149 → **150 / 150** (`npm run capture:full`). Full
 check count 82 → **87** and `playtest:stress:full` passes `--checks 87`
 to match.
+
+## Issue #82 — cat furniture: a litter box, bowls, a bigger bin, a heat pad
+
+Brandon's list, kept literal: litter box, food and water bowls **on a mat**,
+a **bigger** kitchen trash can, a yellow heat pad on the couch (plus the
+chair spots and balcony decoys — see "The spot pool" and the decoy list
+above). Everything is plain static-file procedural geometry at real pet
+gear's size; nothing gross anywhere (a plain litter tray, a bin with a
+closed lid — the owner was explicit).
+
+**Kitchen trash can (bigger).** Was 0.30 m across; now a cylinder Ø 0.35 ×
+0.62 m with a lid rim and a foot pedal, standing flush in the east run's
+south corner: x 5.17 … 5.52, z 0.26 … 0.61. The `kitchen-bin` collider grew
+2 cm each way in place; its `SIGHT_HEIGHTS` row rose 0.5 → **0.645** with
+the lid rim. Old lid and pedal details were *moved* onto the new mouth and
+south face, not duplicated.
+
+**Food + water bowls on a mat.** Two porcelain bowls (Ø 0.16, tops 0.082)
+side by side on a soft 0.34 × 0.55 m feeding mat, 12 mm proud, against the
+pass-wall south of the counter return: x 3.10 … 3.44, z −1.60 … −1.05. One
+push box (`pet-bowls`) covers mat and bowls together — the mat itself never
+collides. The mat's east face sits at x 3.44 so the d-kitchen decoy's
+shoulder room at x 3.5 survives (the envelope started at 3.48 and the raw
+mat box ate the gap; that's how it ships). Ruler-wise the *pair* is one
+row — `food-bowl` w 0.33 … 0.36 d 0.15 … 0.17 h 0.06 … 0.08 — measured
+across both bowls as the piece that actually sits on the floor.
+
+**Litter box.** Open tray 0.46 × 0.32 × 0.15 m, plain sand tile, in the
+bathroom's tub-flank pocket: x −1.66 … −1.34, z 4.44 … 4.90, east wall
+flush, 4 cm clear of the tub's flank. The first placement — the open floor
+between tub and bath bin — failed three checks at once (`bath-clear-path`
+dropped to 1.99 < 2 m² of clear bath floor, `findable` pinned the tub cat's
+ring, `decor-off-openings` caught the mat-bath overlap), and the pocket
+passes everything because it stands on cells already in the tub's shadow.
+New `litter-box` collider; `SIGHT_HEIGHTS` 0.15; `SCALE_RANGES` row w
+0.46 … 0.54 d 0.30 … 0.34 h 0.13 … 0.18.
+
+**Heat pad on the couch.** Folded fabric 0.55 × 0.40 × 0.03 m in a warm
+yellow (0xf2b63f, its own fabric material — the pad is the only cat prop
+that buys its own draw call), centred on the sofa's south cushion: top
+surface 0.48 = the `heatPad` support, and the new `heat-pad-rests-on-cushion`
+check pins pad-bottom to cushion-top 0.45 and support to mesh top within a
+millimetre. A three-box cord folds into the living room's dark-detail merge
+— no extra draw. `SCALE_RANGES` `heat-pad` w 0.52 … 0.6 d 0.38 … 0.44 h
+0.02 … 0.06, top 0.46 … 0.50.
+
+**Where things rest / how they get found.** Pad → new support `heatPad`;
+chairs → new supports `diningSeatN/E/S/W` (seat top 0.45); desk-chair nap →
+`deskChair` (0.41). `SIGHT_HEIGHTS` rows: `kitchen-bin` 0.645, `pet-bowls`
+0.082, `litter-box` 0.15. Bobo's six new spots and their yaws are in the
+pool table above; the three new decoys are in the decoy list above.
+
+**Pool after #82.** 37 spots · 8 rooms · thirteen decoys. Over the 500-seed
+coverage run every spot is drawn and the rarest is `sink-sit.fridge` at
+**8.8 %** (chairs land 9.4 … 12.6 % — nine sink-sit spots share the type's
+one draw per run); the pad holds ~25 % like every couch-loaf alternate.
+`seed:coverage` passes.
+
+**Draw budget.** The pad's fabric is +1 draw in the living room and the
+bowls+mat +1 in the kitchen's detail merge; the kitchen carcass mesh gives
+back a slot (untagged pieces now fold nameless into the merge, one more
+material bucket absorbed). Worst frame lands **150 / 150** — the budget
+exactly. Max draw per camera room over all 546 capture frames:
+
+| room | living | dining | kitchen | bedroom | balcony | entry | hall |
+|---|---|---|---|---|---|---|---|
+| max draws | **150** | 149 | 129 | 125 | 115 | 103 | 96 |
+
+**Checks.** Two new selfTests — `heat-pad-rests-on-cushion` and
+`cat-props-clear-the-plan` (no prop rect covers a spawn, a floor moment
+spot or a decoy) — full check count 91 → **93**, and `playtest:stress:full`
+passes `--checks 93` to match.
