@@ -2349,6 +2349,9 @@ export function bootGame(cfg) {
       },
       renderNow() {
         resizeIfNeeded();
+        // #86: the lap gate goes UP before the cull reads it, so a scene's
+        // very first frame (the t=0 capture) already shows the man.
+        updateLapScene(); // issue #86: the owner's gate, breathing and blink
         // Issue #61: rooms the camera cannot reach are hidden before the pass,
         // so three prunes them instead of submitting and frustum-rejecting
         // them one box at a time. A level with no cull (the slice, the demo)
@@ -2356,7 +2359,6 @@ export function bootGame(cfg) {
         apt.cull?.update(camera);
         apt.onRender?.(camera); // issue #84: the level's once-per-frame nudge (TV screen)
         updateRoombaPose(); // issue #85: the vacuum (and a riding Bobo) to metre-now
-        updateLapScene(); // issue #86: the owner's gate, breathing and blink
         setRendering(true);
         try {
           renderer.render(scene, camera);
