@@ -473,10 +473,14 @@ the level changing.
 
 Light, then. Still four point fills and still `realLights = 6`, exactly the
 budget: the bathroom keeps a fill (3.9 @ 5.8 m, cooler, under its own new
-ceiling body) and the hall's fill was **moved to the entry side of the corridor
-at 5.4** so it serves both rooms — that is the whole lighting change, and it is
-why the bathroom sits at mean luma ~149 where the flat's median is ~109 (tile
-and porcelain, lit).
+ceiling body). The hall/entry fill has moved twice since: #67 stepped it to
+the entry side of the corridor at 5.4 so it serves both rooms, and #81 hung
+it under the entry pendant ([1.85, 2.34, 3.5] @ 5.6) because at the widened
+hall the old point grazed the front-door leaf and the `front-door-shut-and-
+found` pixel probe read the leaf face as a black hole. That is the whole
+lighting change — plus the dining pendant, which is emissive-only, so the
+budget holds — and it is why the bathroom now sits at mean luma ~183 where
+the played rooms' median is ~141 (tile and porcelain, lit).
 
 Four checks came with it, in `game/full.js`:
 
@@ -484,7 +488,7 @@ Four checks came with it, in `game/full.js`:
 |---|---|
 | `bath-clear-path` | a 0.60 m body has a flooded route from the flat's root to 0.40 m off every fixture, and ≥ 2 m² of standable floor (measured 2.67 m², against 0.24 m² before the enlargement) |
 | `bath-luma-in-band` | the bathroom's mean luma is 0.7 … 1.5 of the median of the played rooms and 90 … 200 absolute, so it is neither the dark room again nor a milky one |
-| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (4 % / 128) |
+| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (2 % / 178 since #81; 4 % / 128 at #67) |
 | `front-door-shut-and-found` | `door-front` is built shut, its leaf is `LEAF_W` in the cased 1.02 m opening, the entry camera sees it, and no walk rect is reachable past it |
 
 The three pixel checks render once per page and remember it, the way

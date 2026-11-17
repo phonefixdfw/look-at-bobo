@@ -1744,6 +1744,31 @@ under the rim is what bought the aisle back. And the `decor-off-openings`
 collider clause talked the table vase off the `sink-sit.table` capsule
 before it was ever placed.
 
+**One bug the stress harness caught in the checker itself.** The full stress
+suite boots at 800×500 — a smaller canvas than the capture's 1280×720 — and on
+the first full chain it failed `doorways-read-open` on `door-living-hall`
+("hole pixel is leaf-coloured, distance 36") while every capture run passed
+91/91 on the same build. The flat was fine; the probe was not. `readPatch`
+mapped NDC to pixels with `(1 - ndc.y) / 2` — top-left canvas arithmetic —
+while `gl.readPixels` counts rows from the **bottom** of the framebuffer:
+every pixel `doorways-read-open` and the `front-door-shut-and-found` probe
+measured was the vertically mirrored one. Latent since issue #65 wrote the
+helper, because on the old geometry the mirrored row happened to be a
+plausible surface for all three doors and the leaf; #81's widened hall and
+moved fill shifted what the mirror saw, and at the stress resolution the
+mirrored hall floor landed within 36 RGB units of the walnut leaf's face —
+a false positive. Corrected to `(ndc.y + 1) / 2` at both sites, 91/91 passes
+at 800×500 *and* 1280×720. The fix is read-only — it changes no render, and
+`capture:full:determinism` is re-proved on the fixed HEAD. Honest footnote:
+with the true mapping the probe **fails origin/main's `door-living-kitchen`
+hole** — the ray clause passes, but the kitchen floor beyond that opening
+shares the walnut leaf's palette and lands distance 7 off the parked leaf's
+face colour; the mirror had been hiding the collision all along. #81 cases
+that opening, so this branch's three live doorways all read open for real.
+If a future leaf ever stands in front of same-palette oak again, the honest
+lever is the leaf's face colour or a per-door threshold with a written
+reason — not the mapping.
+
 **Suites.** `capture:full` 546 frames **91/91 PASS** (four new issue-#81
 checks, three new `furniture-real-scale` rows, 87 → 91); worst frame 149 ≤
 150; `capture:full:determinism` 8/8 byte-identical; planted-fault runs
