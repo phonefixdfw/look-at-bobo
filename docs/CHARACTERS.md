@@ -119,3 +119,28 @@ Nintendo's characters, tracks, logos or name appear anywhere — the check
 `kart-words-original` scans every string the screen ever draws to keep that
 promise mechanically. The joke the screen tells is the genre's, not one
 company's; the person playing it is yours.
+
+## The robot vacuum (issue #85)
+
+A household appliance, not a character — but it is *alive-ish* scenery the
+cats tolerate, so it belongs in this file. A plain round vacuum: graphite
+disc, darker bumper collar, pale sensor dome, one acid-green status LED
+(the only bright thing on it). **No brand, no name, no logo, no text, no
+sound** — the sort of thing any flat has, and nothing like anyone's
+trademark. It does not speak, react, or acknowledge anybody.
+
+- **Its loop.** It trundles a closed circuit through the open rooms
+  (living, hall, kitchen, dining) at the sedate 0.18 m/s, planned per run
+  from the seed — `docs/LEVEL_LAYOUT.md` "Issue #85" owns the maths. It
+  never enters the bedroom, bathroom, entry or balcony, and it is a soft
+  obstacle: a player walks over it; it never blocks feet.
+- **Bobo rides it — about one run in six.** One seeded dice per run plans
+  a ride; when it fires it is a normal find with a twist: Bobo sits on the
+  lid facing the direction of travel, and the shout, catch, +1 and DAG!
+  rules are the ordinary ones. It is never the run's first find, never
+  before the vacuum has completed a whole loop (the wait has a shape), and
+  never twice. Riding is cute, never a hazard: no bumping, no chasing, no
+  startle; Bobo looks like a cat who found a moving throne, because that
+  is the joke.
+- **The decoy doesn't.** He stays the still furniture he is (above); the
+  ride is Bobo's perk alone.

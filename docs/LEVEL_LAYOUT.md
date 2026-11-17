@@ -821,3 +821,68 @@ living/balcony or outside every rect; every other room culls it, and
 share of the street/balcony frames < 35 %, near-black < 25 %),
 `street-clear-of-the-walk` (no `findable` tag, no card inside a walk rect)
 — full check count 95 → **99**, `playtest:stress:full` runs `--checks 99`.
+
+## Issue #85 — the robot vacuum's loop
+
+The flat has a plain round robot vacuum (nobody's brand: no name, no logo,
+no sound) that trundles a closed circuit while you play. The circuit is
+**pure data**: `game/full-roomba-route.js` plans it from the run seed alone,
+the same determinism contract the spot pool signs. `game/full-roomba-mesh.js`
+builds the appliance as ONE merged mesh — the street's trick at furniture
+scale — and `game/full-roomba-{route,mesh}.js` are import-light: the route
+module touches only `WALK_RECTS`/`COLLIDERS`, the mesh module touches nothing
+but THREE.
+
+**The grid.** A 0.25 m planning grid over the union of the walk rects, with
+two differences from the player's (`src/reach.js`): clearance off plaster is
+`wallClr` 0.16 m (the vacuum's radius 0.15 plus a finger of feeler bar —
+against the player's 0.30 m body radius), and clearance off furniture is
+`collMargin` 0.25 m. Clearance is measured as a box of samples around the
+centre on the rect UNION, not a per-rect shrink: the rects overlap at the
+doorways, and a per-rect shrink would cut the route off at every seam.
+
+**Rooms served: living · hall · kitchen · dining.** The four doorways
+between them (`door-living-hall`, `door-living-kitchen`,
+`door-kitchen-dining`, `door-living-dining`) are legal passages. Every
+other rect — bedroom, bathroom, entry, balcony floors and THEIR doorways
+(`door-hall-bedroom`, `open-hall-bath`, `open-hall-entry`,
+`slider-balcony`) — is not walkable for the vacuum at all, so no seed can
+plan a route that grazes a bathroom jamb. (The kitchen↔dining door turns
+out to be fully blocked by the bar pad's 0.25 m margin; the BFS simply
+routes living↔dining instead. The passage stays legal in principle.)
+
+**Stations.** Ten named places — sofa, slider, TV, hearth, hall north/south,
+kitchen run/bar, dining wide/south — each inside one room's floor, never a
+doorway. A per-run seeded shuffle picks SIX and the tour rotates to start
+at a living-room stop, so a fresh run always opens with the vacuum in the
+room the player spawns in. Between stations a 4-connected BFS threads the
+furniture; corners collapse (the metre-0 corner is sticky), and the loop
+closes back home. Measured over the seeds: loops **33.5–56.0 m** = one lap
+in **186–311 s** at the aimable tempo `speed` 0.18 m/s — the same 0.18 m/s
+that keeps a moving Bobo catchable, so a riding Bobo is no harder to hit
+than a walking one has ever been. Doorway time is a crossing, not a stay:
+worst 7 % of a loop inside doors, longest single dwell 0.4 m.
+
+**Engine side.** The vacuum adds no colliders and no walk rects — it is a
+soft obstacle; feet win. The engine keeps a run odometer (metres = 0.18 m/s
+× run time) and calls `apt.roomba.place(metres)` once per render — position,
+heading, and a small lean into the corner just turned. Under `?gate=off`
+metres are pure seek time (`0.18 × game.time`), so a staged ride is
+arithmetically impossible — captures cannot meet Bobo aboard. `?roomba=off`
+deletes the appliance, its draw call, the route AND the ride.
+
+**Culling and budget.** The mesh group carries
+`userData.cullRooms = ['living','hall','kitchen','dining']` — the #83 invite
+list again: shown from any of the four rooms (and from outside every rect,
+fail-open), hidden for free from the other four. **+1 draw call, 328 tris
+(144 at `?quality=low`), one material** — the LED is bright vertex colour,
+not an emissive map, so it costs no draw.
+
+**Bobo's ride.** About one run in six (one seeded dice per run, tag
+`roomba-ride`) has a find where Bobo rides: never the first find, never
+before the vacuum has completed a whole loop, once per run. While riding he
+sits on the lid at y 0.105 facing the direction of travel, hittable by the
+same centre ray as any cat; the synthetic `roomba-ride` spot record speaks
+the pool's shape but lives outside it (a moving place cannot join the
+static spread/contact tables). `docs/STORY.md` keeps the story rule; the
+eleven checks (`roomba-*`, 105 → **116**) pin all of it.
