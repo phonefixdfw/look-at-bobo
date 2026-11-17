@@ -570,10 +570,16 @@ export function spotRoom(id) {
 }
 
 /** The decoy: 22 lb of scenery, mostly black, white on his feet only, no dash
- *  (docs/DECOY_CAT.md). Issue #33 grew the lazy-spot pool to ten, and issue #82 to thirteen — one or two
- *  per room, so "is that…?" can happen anywhere, balcony included. Still never
- *  Bobo's spot and never closer than DECOY_MIN_DIST, which the engine enforces
- *  per round by filtering this list, not by hoping. */
+ *  (docs/DECOY_CAT.md). Issue #33 grew the lazy-spot pool to ten, issue #82 to
+ *  thirteen, and issue #89 to twenty-one — eight of them ON furniture now, so
+ *  "is that…?" can happen at cat height OR on a couch back, a chair, the foot
+ *  of the bed, the bar, the toilet lid, the TV stand or the coffee table. The
+ *  furniture rule the `decoy-on-furniture` check enforces: a decoy that shares
+ *  a named support with a Bobo spot stands within DECOY_MIN_DIST of it — the
+ *  engine's per-round filter then makes the pair un-drawable, so the two cats
+ *  can never be seen on one surface in one run. Still never Bobo's spot and
+ *  never closer than DECOY_MIN_DIST, which the engine enforces per round by
+ *  filtering this list, not by hoping. */
 export const DECOY_SPOTS = [
   { id: 'd-living', room: 'living', pos: [-1.45, 'floor', 1.8], faceYaw: 0.06 },
   { id: 'd-tv', room: 'living', pos: [0.9, 'floor', -2.0], faceYaw: 0.21 },
@@ -593,6 +599,23 @@ export const DECOY_SPOTS = [
   { id: 'd-balcony-chair', room: 'balcony', pos: [2.18, 'chairSeat', -3.58], faceYaw: 1.77, pose: 'sit' }, // the same yaw its Bobo twin measures: west down the deck
   { id: 'd-balcony-deck', room: 'balcony', pos: [1.1, 'floor', -3.98], faceYaw: 2.82, pose: 'sprawl' }, // full length on the deck boards, turned to the door (the yaw d-balcony's sweep proved)
   { id: 'd-heatpad', room: 'living', pos: [-2.73, 'heatPad', 0.355], faceYaw: -1.57, pose: 'side' }, // curled on the pad facing east into the room, like the real spot's loaf
+  // Issue #89: the couch's own back — the heat pad decoy stays, and the north
+  // end of the sofa-back top joins it (Bobo's sofa-back spot is the south end;
+  // 0.63 m apart, so the filter never draws the pair). Loaf, same yaw its
+  // south-end twin measures: east over the rug.
+  { id: 'd-sofa-back', room: 'living', pos: [-3.16, 'sofaBackTop', -0.28], faceYaw: -1.6, pose: 'loaf' },
+  // Issue #89: seven more furniture places, in the rooms that had none. Every point sits inside its SUPPORT_DEFS patch,
+  // every pair on a shared support stays under DECOY_MIN_DIST (the filter
+  // makes those pairs un-drawable — the cats never share a surface in a run),
+  // and the poses are the ones the surface reads: a chair takes a sit, a
+  // fold or a top takes a loaf, a low wide top takes a sprawl.
+  { id: 'd-chair-s', room: 'dining', pos: [4.06, 'diningSeatS', 2.83], faceYaw: 1.57, pose: 'sit' }, // the south chair, facing south up the room like its Bobo twin; all four seats are within 1.2 m of it, so no dining cat can share a chair line
+  { id: 'd-bed-foot', room: 'bedroom', pos: [-0.755, 'blanketTop', 7.45], faceYaw: -1.57, pose: 'loaf' }, // the foot-of-bed fold north of Bobo's blanket spot (0.47 m — never drawable together), loafed along the fold
+  { id: 'd-desk-chair', room: 'bedroom', pos: [-2.0, 'deskChair', 6.28], faceYaw: 3.14, pose: 'sit' }, // the human's seat by the desk, turned to the door like its Bobo twin (5 cm off it — the filter splits them)
+  { id: 'd-bar-loaf', room: 'kitchen', pos: [4.0, 'barTop', 0.4], faceYaw: 3.0, pose: 'loaf' }, // the bar's west end facing back down it into the kitchen — 0.55 m from Bobo's east-end sit, never both
+  { id: 'd-toilet', room: 'bathroom', pos: [-1.825, 'toiletLid', 2.705], faceYaw: 3.14, pose: 'sit' }, // the closed lid, facing south into the room (support #49 kept honest: the FIRST spot to use it)
+  { id: 'd-tv-stand', room: 'living', pos: [2.19, 'tvTop', -1.2], faceYaw: -1.57, pose: 'side' }, // sprawled full length on the TV stand, clear of the panel's base stem (z −1.78…−1.62)
+  { id: 'd-coffee', room: 'living', pos: [-1.6, 'coffeeTop', -0.75], faceYaw: -1.57, pose: 'side' }, // the coffee table's clear north half — the pot and the books are south of him
 ];
 /** Q2/Q6: never the same spot, never closer than this (selfTest enforces). */
 export const DECOY_MIN_DIST = 1.2;
