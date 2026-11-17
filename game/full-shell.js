@@ -428,7 +428,7 @@ export const SUPPORT_DEFS = {
   counterTopW: { x0: 2.54, z0: -2.28, x1: 3.1, z1: -1.07, top: 0.9 },
   // issue #81: the bar stepped 0.44 m east (its old west end stood where the
   // kitchen→dining doorway's jamb now is) and gave up 0.20 m of length
-  barTop: { x0: 3.76, z0: 0.22, x1: 5.12, z1: 0.58, top: 1.05 },
+  barTop: { x0: 3.92, z0: 0.22, x1: 5.12, z1: 0.58, top: 1.05 }, // #100: west edge followed the shortened bar (was 3.76 — 0.14 m of it would have floated west of the new top)
   // issue #88: the fridge's own top face (KITCHEN_FRIDGE x 4.92…5.52,
   // z −2.90…−2.20, fridgeH 1.8) inset a step — the warm box's roof, the one
   // place in the kitchen a cat claims for the view over the counter run.

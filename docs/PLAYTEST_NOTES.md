@@ -2455,3 +2455,73 @@ green, console clean. `stress:full` 77 PASS / 0 FAIL at `--checks 116`,
 files, 3.17 MB. `check:mobile` PASS twice — 147 rows pre-build and 151
 after (the four dist-stamp rows join), 0 FAIL, scenario 15 (#99) green
 both times.
+
+## 39. Issue #100 — the kitchen↔dining doorway actually walks (2026-11-17)
+
+Issue #100: the opening between the kitchen and the dining room reads as
+an opening, looks as an opening, and you cannot walk through it — the
+dining room was only reachable the long way, living → dining. Both halves
+of the level data agreed that the door exists (OPENINGS lists it for
+culling, PASSAGE_IDS lists it for the vacuum); the walk grid disagreed
+with both, twice over.
+
+- **A floating bridge.** The `door-kitchen-dining` WALK_RECT started at
+  z 0.68 — *inside* the far jamb line of the wall band (z 0.60–0.80)
+  rather than at the near face. The kitchen rect ends at z 0.52 and
+  dining-n starts at z 0.88, so the rect union carried a 0.16 m DEAD band
+  straight through the doorway: march north from the kitchen and you stop
+  mid-jamb, no collider touched. The rect now spans z 0.50…1.0 — the band
+  plus its 0.08 m table insets and the same 0.02 m overlap into each room
+  every other bridge rect already takes (`docs/ISSUE_33_REBUILD.md` keeps
+  the openings table; its row was updated to match).
+- **The bar eating the doorway.** The breakfast bar's west end sat at
+  x 3.74 with the body push pad (radius 0.30) reaching to x 3.44 — 0.14 m
+  west of the casing inset line at x 3.58 — so the clear span was 0.81 m,
+  below the 0.90 m this game asks of every doorway. The bar's west end
+  rode to x 3.90 (its pad edge at 3.60 clears the casing line; the east
+  end keeps its 3 cm berth off the bin at x 5.17, so the bar becomes
+  1.24 m long). `bar-carcass`/`bar-top` PIECES, the single shared
+  `kitchen-bar` collider, the `barTop` stand rect in `full-shell.js`
+  (3.92–5.12, same 2 cm inset), and `d-bar-loaf` (now 4.25) all follow —
+  one source of truth, no floating support. Straight measure after the
+  move: **0.90 m clear** at body size — jamb inset to jamb inset, the
+  exact cased width — and 1.22 m at the vacuum's 0.25 m pad.
+- **Why no check ever caught it.** `walk-reachable` and
+  `dining-reachable-from-every-spawn` both flood the rect UNION, and the
+  union does connect dining — via the living room. A hole that only bites
+  when a body walks straight through one specific door is invisible to a
+  flood fill. Three new selfTests (116 → **119**) close that shape of
+  hole: `dining-two-entrances` (seal each legal dining entrance in turn,
+  the spots must still flood via the other), `kitchen-dining-straight-walk`
+  (a body pushed with the REAL collision code — `createWorld` from
+  `src/collision.js` — due north through the door and back south, plus a
+  body-width sweep so the clear span must be one continuous gap), and
+  `dining-spots-from-both-sides` (every dining spot's `nearestStandable`
+  reached from a kitchen standable AND a living standable, walked from
+  the correct side). `stress:full` runs at `--checks 119`.
+- **The vacuum is honest about it.** At the roomba's 0.25 m margin the
+  door was blocked before and is legal now, and `PASSAGE_IDS` always
+  listed it — but a 200-seed re-measure finds ZERO loop crossings either
+  side of the fix and the same 27.0–61.0 m loop range. What did move: the
+  bar's freed pad lets 93 of 200 seeds re-path inside the kitchen by up
+  to 7.5 m, never through the door. All three `roomba-*` checks pass
+  unchanged. The stale "fully blocked, routes living↔dining" parenthetical
+  in `docs/LEVEL_LAYOUT.md` was corrected to say exactly this.
+
+**Suites at this HEAD.** capture 585 frames **119/119** worst frame
+**152/250** (the #85 ceiling re-affirmed by #99 — this fix adds zero draw
+calls; the only pixel movers are the shortened bar and the vacs'
+re-pathed kitchen legs, and with no committed PNG baselines determinism
+re-proves at HEAD), console clean · determinism **8/8** byte-identical ·
+gate PASS · mobile **150 rows PASS / 0 FAIL** (first attempt of the night
+timed out waiting 45 s for boot while seven suites shared one machine —
+a solo re-run is green; the boot path itself is untouched) · stress
+**77/0** at 119 checks (+ slice green) · bots slice + full **10/10**
+queue 10/10 distinct, console clean · build **73 files, 3.18 MB**, graph
++ stamps verified. Skipped this round: `capture:full:weak`,
+`capture:full:spots`, `capture:full:patriot`, audio 23, music 29+28,
+`seed:coverage`, slice/demo captures — none of the four changed files
+(level data, kitchen details, shell support rects, the three new checks)
+touch their subjects, and the two captures that could notice (living,
+kitchen) are in the 585-frame run that passed.
+

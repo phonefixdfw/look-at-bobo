@@ -847,9 +847,16 @@ between them (`door-living-hall`, `door-living-kitchen`,
 other rect — bedroom, bathroom, entry, balcony floors and THEIR doorways
 (`door-hall-bedroom`, `open-hall-bath`, `open-hall-entry`,
 `slider-balcony`) — is not walkable for the vacuum at all, so no seed can
-plan a route that grazes a bathroom jamb. (The kitchen↔dining door turns
-out to be fully blocked by the bar pad's 0.25 m margin; the BFS simply
-routes living↔dining instead. The passage stays legal in principle.)
+plan a route that grazes a bathroom jamb. (The kitchen↔dining door was
+blocked at the vacuum's 0.25 m margin until #100 shortened the bar; it is
+legal at both margins now, and the router always knew it — `PASSAGE_IDS`
+lists `door-kitchen-dining`. A 200-seed re-measure still finds zero loop
+crossings, and the loop-length range is identical (27.0–61.0 m). What DID
+move: with the bar's west end 0.16 m further east, its 0.25 m pad frees a
+few cells at the kitchen's north-west corner, so 93 of the 200 seeds
+re-path inside the kitchen by up to 7.5 m — never through the door. All
+three vacuum checks — `roomba-route-legal`, `roomba-doorway-dwell`,
+`roomba-route-deterministic` — pass on the new routes.)
 
 **Stations.** Ten named places — sofa, slider, TV, hearth, hall north/south,
 kitchen run/bar, dining wide/south — each inside one room's floor, never a
@@ -886,3 +893,50 @@ same centre ray as any cat; the synthetic `roomba-ride` spot record speaks
 the pool's shape but lives outside it (a moving place cannot join the
 static spread/contact tables). `docs/STORY.md` keeps the story rule; the
 eleven checks (`roomba-*`, 105 → **116**) pin all of it.
+
+## Issue #100 — the kitchen↔dining doorway, made walkable
+
+The opening itself was always legal (cased, no leaf, clear span
+x 2.68…3.58 inside the wall band z 0.6…0.8 — `docs/ISSUE_33_REBUILD.md`
+keeps the openings table) and the culling adjacency already knew the two
+rooms adjoin (`OPENINGS` lists the door). What was broken was the walk
+data on top of it, in two layers:
+
+1. **A floating bridge.** The `door-kitchen-dining` WALK_RECT was
+   z 0.68…1.0 — it starts *inside* the far wall's opening instead of at
+   the near face (z 0.60). The kitchen rect stops at z 0.52 and dining-n
+   starts at z 0.88, so the union had a 0.16 m dead band straight through
+   the doorway: every approach died mid-jamb. Both rooms still flooded in
+   every reach check (the dining room is reachable the long way, living →
+   hall side door), so `walk-reachable` and
+   `dining-reachable-from-every-spawn` were both technically true and
+   completely blind. The rect now runs z 0.50…1.0 — band + the 0.08 m side
+   insets the openings table gives it, plus the same 0.02 m overlap every
+   other bridge rect takes into its rooms.
+2. **The bar eating the opening.** The kitchen bar's south face sat at
+   z 0.52 with its west end at x 3.74; the body push pad (radius 0.30)
+   reached to x 3.44 — 0.14 m west of the casing line at 3.58 — leaving
+   0.81 m of clear at body size, under the 0.90 m every doorway must
+   give. The bar now runs x 3.90…5.14 (its pad edge at 3.60 finally
+   clears the casing line; the east end is pinned by the bin at x 5.17;
+   PIECES, the one shared collider in `full-kitchen-details.js` and the
+   `barTop` stand rect in `full-shell.js` all follow), and `d-bar-loaf`
+   rode east with it to (4.25, barTop, 0.4). Straight measure after:
+   **0.90 m clear** at body size (1.22 m at the vacuum's 0.25 m pad) —
+   the exact cased width, jamb inset to jamb inset, nothing left over.
+
+**Why the new checks are shaped like that.** `walk-reachable` floods the
+rect union, so it cannot see a hole that only bites when a body actually
+walks through it. Three checks close that hole (116 → **119**):
+
+- `dining-two-entrances` — remove each legal dining entrance in turn;
+  the dining spots must still flood from the *other* one. (Both pass
+  today; if either is ever sealed the check says which.)
+- `kitchen-dining-straight-walk` — push a body with the real collision
+  code (`createWorld` from `src/collision.js`, not a rect test) due north
+  from kitchen centre through the door to dining centre, and south back;
+  also a full body-width sweep across the doorway so the clear span must
+  be one continuous gap.
+- `dining-spots-from-both-sides` — every dining spot's `nearestStandable`
+  must be reachable from a kitchen standable AND a living standable,
+  walked through the collision code from the correct side.

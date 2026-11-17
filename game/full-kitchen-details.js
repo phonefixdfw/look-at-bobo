@@ -15,13 +15,16 @@
  * four chairs are the LIVING ROOM's ("table SE" on the plan's map, chunk 3),
  * so they are deliberately absent — this is the bar, not the table. The bar
  * stands exactly where the merged level data says it does: support
- * `barTop` (game/full-shell.js — since issue #81 patch x 3.76–5.12,
- * z 0.22–0.58, top 1.05) and the placeholder footprints in COLLIDERS, which
- * KITCHEN_DETAILS_COLLIDERS below replaces value for value. Issue #81 rode
- * the whole run 0.44 m east and shortened it 0.20: the kitchen→dining
- * doorway's structural gap (x 2.60–3.66) took the old west end out from
- * under it, and the bar now stands 8 cm clear of the new casing, with the
- * stools, pendants and the `sink-sit.bar` spot riding along.
+ * `barTop` (game/full-shell.js — since issue #100 x 3.92–5.12, z 0.22–0.58,
+ * top 1.05; #100 kept this rect's 2 cm inset on the bar's new west end) and
+ * the placeholder footprints in COLLIDERS, which KITCHEN_DETAILS_COLLIDERS
+ * below replaces value for value. Issue #81 rode the whole run 0.44 m east
+ * and shortened it 0.20 when the hall was widened; issue #100 pulled the
+ * west end a further 0.16 — the body push pad on the old 3.74 edge reached
+ * 0.14 m into the kitchen→dining doorway's clear span and left 0.81 m,
+ * under the 0.90 a doorway must give. The bar now stands 24 cm clear of the
+ * structural gap (x 2.60–3.66), the stools, pendants and the `sink-sit.bar`
+ * spot riding along.
  *
  * The worktop props (rows 23 to 28) all stand on the 0.90 worktop INSIDE the
  * counters' existing padded footprints: a pad on top of a pad carves nothing
