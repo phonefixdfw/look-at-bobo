@@ -2219,3 +2219,72 @@ PASS — low quality holds under `LOW_QUALITY_DRAW_CALL_CAP` because the
 culling makes only street-seeing frames pay for the card.
 `playtest:bot:full` wins 10/10 with console clean; `playtest:stress:full`
 is 77 PASS / 0 FAIL at `--checks 99`.
+
+## 36. Issue #84 — the living-room TV plays KART DASH (2026-11-17)
+
+**Asked for (issue #84):** *"The living-room TV is a glowing grey slab.
+Make it play a cartoon kart-racing look-alike as its screen texture —
+original art and names only, nothing Nintendo; a small canvas (≤512 px)
+repainted at a throttled rate only while the screen is actually on screen;
+no new draw calls; original words on screen, asserted; photosensitivity
+probes stay green."*
+
+**Delivered:** `src/kart-screen.js` — a pure painter plus a throttled
+`CanvasTexture`. A 320×180 canvas (256×144 under `?quality=low`) carries a
+Mode-7-style road with rumble strips and rainbow edging, a mountain and
+sun, drifting clouds, a leader box with a "?" item, two original karts
+(round heads, plain one-colour helmets — invented drivers, no Nintendo
+art, name or trademarked string anywhere near it) and a HUD reading
+`LAP 2/3` and `1st`, under soft scanlines. It is a screen, not a mesh:
+**zero new draw calls — the flat's measured worst frame is unchanged at
+151 of 250 / 100 348 triangles** (the same numbers §35 recorded before
+this feature).
+
+- **The repaint is a cost the game only pays when it is looked at.**
+  `tick(nowMs, camera)` checks three gates before painting: the TV's
+  ancestor `visible` chain (so per-room culling counts), a
+  `THREE.Frustum` bounding-sphere test against the live camera, and
+  `document.hidden`. All three pass, it paints at ~10–12 fps (6 fps on
+  `?quality=low`, 4 fps calm / reduced-motion — and calm mode drops the
+  speed lines entirely); any gate fails, it does nothing at all. Measured
+  cost when it DOES paint: **0.10 ms per repaint** on the low canvas
+  (`kart-update-cheap`, live in the stress harness). One texture upload
+  per update, and the screen plane (`keepUV`) maps it exactly once.
+- **Captures stay deterministic by construction, not by luck.** `?gate=off`
+  freezes the animation (`tick` refuses unless a check forces it), so all
+  585 capture frames show the same poster frame; `kart-frozen-under-gate-off`
+  proves it. The six kart checks paint only inside `tv.probe()`, which
+  restores the exact static pixels on exit, so no screenshot can catch an
+  animated frame. The living-room TV capture frames do differ from pre-#84
+  ones — standby glow became race still — and that re-baseline IS the
+  feature; there are no committed PNG baselines, determinism re-proves at
+  this HEAD.
+- **Photosafety is measured, not promised.** `kart-brightness-steady`
+  forces a full animation cycle and reads the screen's mean luminance per
+  frame: worst drift **2.1 %**, limit 10 % — no strobing anywhere near the
+  Harding flash threshold, and the `gate` suite's contrast and
+  photosensitivity probes still bite. The bright title pill and the second
+  kart are full-quality-only flourishes.
+- **Originality is a check, not a hope.** `kart-words-original` asserts the
+  painter never issues a `fillText` whose string matches `TRADEMARK_WORDS`
+  (`mario|luigi|nintendo|donkey kong|zelda|pokémon|...`) and that the words
+  that DO appear are the invented ones (`KART DASH`, `LAP 2/3`, `1st`).
+- **Six new selfTests, 99 → 105** (`--checks 105`): `kart-screen-built`,
+  `kart-updates-when-seen` (looking +3/3 ticks, camera-turned-away +0,
+  room-culled +0), `kart-frozen-under-gate-off`, `kart-words-original`,
+  `kart-brightness-steady`, `kart-update-cheap`. The engine learned two
+  generic hooks to make this possible: `buildApartment(scene, { SETTINGS,
+  gateOff })` and an `apt.onRender?.(camera)` beat inside `renderNow()` —
+  nothing TV-specific lives in `engine.js`.
+
+**Suites at this HEAD (all thirteen, none skipped).** `capture:full` PASS
+— 585 frames, 105/105 every frame, worst 151 draws / 100 348 tris / 1
+pass, console clean. `capture:full:determinism` 8/8 byte-identical.
+`weak` 105/105 (93 draws on low). `gate` PASS with every planted fault
+still caught. `check:mobile` PASS end to end. `build` PASS — 71 files,
+3.12 MB. `playtest:stress:full` **77 PASS / 0 FAIL** at `--checks 105`.
+Slice suites untouched and green: `capture:slice` 51/51, slice determinism
+8/8, `capture:demo:determinism` 37/37 8/8. `playtest:bot:full` wins 10/10,
+console clean. Music 28/28, audio 23/23. Art direction: `docs/ART_STYLE.md`
+§13; the little driver on the screen: `docs/CHARACTERS.md` "The player on
+the couch".
