@@ -20,6 +20,7 @@
     "capture:planted": "node tools/capture.mjs tools/testscene.html --times 2.4 --views overview,contact --moments default,cardboard-box --out captures/testscene-planted --param plant=lift --selftest",
     "gate": "node tools/gate.mjs",
     "logo:export": "node tools/export-logo.mjs",
+    "icons:make": "node tools/make-icons.mjs",
     "capture:style": "node tools/capture.mjs design/style-test.html --times 0,2.4,5 --views diorama,first-person,cats-close,bobo-face --moments default,lineup,loaf-couch,hud-score,hud-dag,win --out captures/style-test --selftest",
     "capture:patriot": "node tools/capture.mjs design/style-test.html --times 0,2.4 --views diorama,cats-close,bobo-face --moments patriot-bobo --out captures/patriot-bobo --selftest",
     "capture:demo": "node tools/capture.mjs demo/talking-demo.html --times 0,1.2,2.4 --views diorama,first-person,bobo-face,decoy-face --moments idle,catch,wrong,win --out captures/talking-demo --selftest --param gate=off --param score=7",

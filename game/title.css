@@ -17,7 +17,7 @@
 /* ---------- the title card ------------------------------------------------ */
 #gate .gate-card {
   width: min(660px, calc(100vw - 24px));
-  max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
+  max-height: calc(100vh - var(--safe-t, 0px) - var(--safe-b, 0px) - 24px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -94,6 +94,52 @@ body.hc .title-word {
   padding: clamp(10px, 1.6vh, 16px) clamp(34px, 6vw, 54px);
   font-size: clamp(17px, 2.8vh, 24px);
   letter-spacing: 0.06em;
+}
+
+/* The one-line iPhone install hint (issue #77): injected by game/title.js,
+   and only there on iPhone/iPad that are not already installed — so under
+   ?gate=off and on desktop/Android it never exists, never just hides. Same
+   pill vocabulary as .title-mini, one notch quieter. The whole pill is the
+   dismiss target; its click handler stops propagation so dismissing cannot
+   also start the game. */
+#gate-install-hint {
+  pointer-events: auto;
+  cursor: pointer;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(440px, 86vw);
+  padding: 6px 14px;
+  border: 1px solid rgba(232, 176, 74, 0.34);
+  border-radius: 999px;
+  background: rgba(232, 176, 74, 0.08);
+  color: rgba(247, 244, 238, 0.86);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+#gate-install-hint b {
+  color: var(--ui-mustard);
+  font-weight: 800;
+}
+#gate-install-hint .hint-share {
+  flex: none;
+  color: var(--ui-mustard);
+}
+#gate-install-hint-x {
+  flex: none;
+  border: 0;
+  padding: 0 2px;
+  background: none;
+  color: rgba(247, 244, 238, 0.6);
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+#gate-install-hint-x:hover {
+  color: var(--ui-paper);
 }
 
 /* The little row under START: how-to-play toggle + comfort note. (Settings
@@ -300,6 +346,27 @@ body.splash #moment-label {
   .gate-note {
     display: none; /* the how-to panel carries the controls on phones */
   }
+  body.install-hint .title-comfort {
+    display: none; /* short pocket: the install hint line earns its space, the comfort note gives it up */
+  }
+  body.install-hint .title-hint {
+    display: none; /* and the flavour line goes the same way — the install one-liner outranks it */
+  }
+  /* With the install hint on any landscape pocket this short, every
+     decorative line gives way: the one instruction that gets the game
+     fullscreen outranks flavour. (Scoped to body.install-hint — a
+     non-iPhone pocket is untouched.) */
+  body.install-hint .title-mark {
+    width: 44px;
+    font-size: 21px;
+  }
+  body.install-hint .title-word {
+    font-size: 21px;
+  }
+  body.install-hint #gate-btn {
+    padding: 4px 24px;
+    font-size: 14px;
+  }
 }
 /* A landscape pocket ~360–420 px tall (the phone cases #38 cares about):
    the whole card — logo, instructions, START, the how-to row and the build
@@ -339,6 +406,14 @@ body.splash #moment-label {
   .title-comfort {
     font-size: 10px;
   }
+  #gate-install-hint {
+    font-size: 10.5px;
+    padding: 4px 10px;
+    gap: 6px;
+  }
+  #gate-install-hint-x {
+    font-size: 14px;
+  }
   #build-stamp {
     margin-top: 0;
     font-size: 10px;
@@ -346,8 +421,8 @@ body.splash #moment-label {
 }
 @supports (padding: env(safe-area-inset-left)) {
   #gate .gate-card {
-    padding-left: max(30px, env(safe-area-inset-left));
-    padding-right: max(30px, env(safe-area-inset-right));
+    padding-left: max(30px, var(--safe-l, 0px));
+    padding-right: max(30px, var(--safe-r, 0px));
   }
 }
 

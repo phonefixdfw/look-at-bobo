@@ -1548,3 +1548,95 @@ polices (never six same-room catches in the ten) can never be forced. 2 000
 seeded draws verified legal; both new spots land in ≈ 34 % of runs, far over
 the `pool-coverage-over-random-seeds` floor. `capture:full:spots` and
 `capture:full:patriot` stage named ids — every one still exists.
+
+## 28. Issue #77 — the iPhone gets the whole screen, and a way to install it
+
+**Asked for (Brandon, 2026-11-16):** play it on the iPhone with the game
+filling the screen — no black band beside the notch, no Safari bar eating the
+bottom — and a way to install it from the home screen so it opens like a
+native game.
+
+**iPhone Safari cannot be forced fullscreen; only the home screen can.**
+`requestFullscreen()` on iOS Safari has no API — the honest fix is an
+installable web app, so the issue became four pieces.
+
+**Installable.** `manifest.webmanifest` at the site root: `start_url` the game
+entry, `scope "."`, `display:fullscreen` plus `display_override` (Safari reads
+one, Chrome the other), `orientation:landscape`, the existing dark
+`#14181f` for theme and background, and `icons[]` covering 192, 512 and a
+maskable 512. `game/full.html` carries the iOS half the manifest still needs
+(`apple-touch-icon`, `apple-mobile-web-app-capable`, status-bar style). The
+viewport meta already carried `viewport-fit=cover` (issue #25) — without it
+`env(safe-area-inset-*)` reports zeros and the notch problem could not be
+solved at all, so this issue leans on it. `tools/make-icons.mjs` (`npm run icons:make`) renders
+`assets/logo/logo.svg` through headless Chrome exactly the way
+`export-logo.mjs` does, then fails the build unless every PNG really measures
+what the manifest claims, has opaque corners (a transparent icon turns black
+on the home screen) and is not a flat fill; `maskable-512.png` carries the
+mark at 60 % so no launcher circle clips the ears.
+
+**Fullscreen.** The canvas was `100vh`, which on iOS is the *large* viewport —
+Safari's bar sits on top of the bottom of it. Now it takes `100svh` after the
+existing `100vh` (progressive: browsers that don't know `svh` keep the old
+line) and `100dvh` stays for touch. All nineteen `env(safe-area-inset-*)`
+uses — 15 in `game/full.html`, 4 in `game/title.css` — read through
+`--safe-t/-r/-b/-l` custom properties declared once as
+`env(safe-area-inset-*, 0px)` inside the existing `@supports` guard, so real
+insets flow through unchanged and the values are also overridable, which is
+what makes the third piece possible.
+
+**Testable without a phone.** `?safe=notch` (test-only, read by one inline
+head script) puts `html.safe-notch` on the document and the four properties
+become 0 / 44 / 21 / 59 px — the real iPhone 15 landscape numbers. Headless
+Chrome then gets a notch on demand and `check:mobile` scenario 14 measures
+it: the canvas rect equals the viewport at 844×390, 932×430 and 667×375; the
+left-edge pixel column is game picture rather than letterbox (screenshot strip
+sampled in-page, pure-black count 0 of ~6 000); gear, stick, score and shout
+stay clear of the inset and the home bar; the title card is padded past both
+sides. `?safe=notch` is never in a capture URL, so no baseline can see it.
+
+**The hint, and where it must not appear.** iPhone users get one line under
+START — "For full screen: tap Share, then Add to Home Screen" — once, ever.
+`game/title.js` shows it only on iOS touch that is not standalone and not
+`?gate=off`; the tap dismisses without starting the game (the click stops
+propagation before the card's handler) and writes a localStorage flag, with
+an in-memory fallback where storage is blocked. The whole gate is
+`display:none` under `?gate=off`, so nothing lands in a captured pixel; on
+desktop, Android and a standalone install the element is never created at
+all, which scenario 14 proves four ways round plus a counter wrapping
+`requestFullscreen`: a browser tap asks exactly once (Android's behaviour,
+unchanged), a standalone tap asks zero.
+
+**Short pockets keep their promise.** The hint is a row inside a card that
+`@media (max-height: 420px)` had already sized to fit a 360 px pocket exactly,
+so it pushed `#build-stamp` out of the card — the same check #57 polices,
+caught by scenario 13c. `body.install-hint` (set only when the hint exists)
+trades the comfort note, the flavour line and 30 % of the logo/START size for
+it. A non-iPhone pocket is untouched, byte for byte, and the card fits again
+at 740×360 and at 844×390 with a notch.
+
+**Numbers at this HEAD.** `check:mobile` **125 PASS / 0 FAIL**, every earlier
+scenario still green. `capture:full` 546 frames, selfTest **82/82** every
+frame, worst frame **149 of 150 draws** / 99 420 tris — unchanged — plus
+`capture:full:determinism` **8/8 byte-identical** and weak-GPU PASS; slice
+51/51 and demo 37/37, both with determinism 8/8; bots 10/10 to the exact
+`your did it! you wind`; stress **77 PASS / 0 FAIL** at `--checks 82`; music
+28/28; build 64 files / 2.94 MB with 116 stamped URLs and every
+manifest icon present in `dist/`.
+
+**One check fails, and it failed before this issue.** `audio:fullcheck` is
+**22/23**: `aim-ray-hits-bobo` says the centre ray from `LC.aimAt('bobo')`
+hits a wall/prop. Run the identical command on clean `origin/main`
+(`0d83074`) it is **21/23** — both aim-ray rows fail there. Issue #70's
+shower curtain legitimately blocks that *test helper's* ray; the player's
+shout uses `catUnderCrosshair()`, which raycasts only the cat roots and is
+provably unaffected. Left as #70's checker debt rather than quietly
+loosened.
+
+**What is emulation, not proof.** Headless Chrome cannot install anything.
+The Add-to-Home-Screen sheet, `apple-mobile-web-app-*` chrome, a real
+manifest install and a physical notch are unverified by every check here.
+`docs/DEPLOY.md` carries the eight-point real-iPhone checklist (install,
+chrome-free launch, edge-to-edge at both orientations' safe areas, the
+hint's one-time behaviour, offline icon, no fullscreen ask, Android
+regression, return visit) for the pass Brandon does on hardware.

@@ -46,6 +46,14 @@
 //   13  #57 the title screen: up before the start (inline-SVG logo + START,
 //       selfTest green from behind it), lifted by Play, laid out clean at
 //       desktop / 3440×1440 / 740×360, and FULLY absent under ?gate=off
+//   14  #77 the installable web app: manifest + icons + iOS tags exist and
+//       are right; the one-time install hint shows ONLY on an iPhone in the
+//       browser (never desktop, Android, standalone or ?gate=off), sits under
+//       START, dismisses for good and never blocks it; the start tap stops
+//       asking for fullscreen once standalone; with ?safe=notch (a simulated
+//       iPhone-landscape inset) the canvas fills the screen edge to edge —
+//       no black band on the notch side — and gear, stick, score and shout
+//       all stay inside the safe area
 //
 //   npm run check:mobile
 
@@ -989,6 +997,233 @@ try {
     check('#57 ?gate=off: title screen fully absent — no splash class, nothing painted', off.gateHidden && !off.gateShown && !off.splash && off.word === 'unpainted', JSON.stringify({ gateShown: off.gateShown, splash: off.splash, word: off.word }));
     check('#57 ?gate=off: the title checks say "absent" and pass', off.st.length === 3 && off.st.every((c) => c.p) && off.st[0].v === 'absent', JSON.stringify(off.st));
     check('#57 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // ===========================================================================
+  // 14. Issue #77: the installable web app — the manifest and icons and iOS
+  //     tags (checked from the files themselves), the one-time iPhone install
+  //     hint (shown only where page fullscreen is actually impossible), the
+  //     standalone path that no longer re-asks for fullscreen, and the
+  //     notch-fill layout under ?safe=notch, the test-only simulated
+  //     iPhone-landscape inset (players never set it).
+  // ===========================================================================
+
+  // 14a. Node side: the manifest file and the page's own tags.
+  {
+    let mf = null;
+    let mfErr = '';
+    try {
+      mf = JSON.parse(readFileSync(join(REPO, 'manifest.webmanifest'), 'utf8'));
+    } catch (e) {
+      mfErr = String(e);
+    }
+    check('#77 manifest.webmanifest parses as JSON', !!mf, mfErr);
+    const req = mf && {
+      name: mf.name === 'Look at Bobo',
+      short: mf.short_name === 'Look at Bobo',
+      start: mf.start_url === 'game/full.html',
+      scope: mf.scope === '.',
+      display: mf.display === 'fullscreen',
+      override: Array.isArray(mf.display_override) && mf.display_override[0] === 'fullscreen' && mf.display_override.includes('standalone'),
+      orient: mf.orientation === 'landscape',
+      colors: mf.theme_color === '#14181f' && mf.background_color === '#14181f',
+      icons: Array.isArray(mf.icons) && mf.icons.length >= 3,
+    };
+    check('#77 manifest: name, short_name, relative start_url to the game entry, scope, fullscreen display + override, landscape, dark theme/background, icons[]',
+      !!req && Object.values(req).every(Boolean), req ? Object.entries(req).filter(([, v]) => !v).map(([k]) => k).join(',') : 'unparsed');
+    const pngSize = (rel) => {
+      const p = join(REPO, rel);
+      if (!existsSync(p)) return null;
+      const b = readFileSync(p);
+      if (b.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return null;
+      return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
+    };
+    check('#77 every manifest icon exists at its stated REAL pixel size',
+      !!mf && (mf.icons || []).length >= 3 && mf.icons.every((i) => pngSize(i.src) === i.sizes),
+      mf ? (mf.icons || []).map((i) => `${i.src}=${pngSize(i.src) || 'missing'} want ${i.sizes}`).join(' | ') : '');
+    check('#77 a maskable icon is declared (purpose:"maskable") and real',
+      !!mf && (mf.icons || []).some((i) => i.purpose === 'maskable' && pngSize(i.src) === i.sizes));
+    const touchSize = pngSize('assets/icons/apple-touch-icon.png');
+    check('#77 apple-touch-icon.png exists at 180x180', touchSize === '180x180', String(touchSize));
+    const htmlSrc = readFileSync(join(REPO, 'game/full.html'), 'utf8');
+    check('#77 game/full.html carries the manifest link + iOS home-screen tags',
+      htmlSrc.includes('rel="manifest"') && htmlSrc.includes('manifest.webmanifest') &&
+      htmlSrc.includes('<meta name="mobile-web-app-capable" content="yes"') &&
+      htmlSrc.includes('name="apple-mobile-web-app-capable" content="yes"') &&
+      htmlSrc.includes('name="apple-mobile-web-app-status-bar-style" content="black-translucent"') &&
+      htmlSrc.includes('name="apple-mobile-web-app-title" content="Look at Bobo"') &&
+      htmlSrc.includes('rel="apple-touch-icon"') && htmlSrc.includes('assets/icons/apple-touch-icon.png') &&
+      htmlSrc.includes('name="theme-color" content="#14181f"'));
+    check('#77 viewport meta: viewport-fit=cover present, user-scalable=no kept',
+      /viewport" content="[^"]*viewport-fit=cover[^"]*user-scalable=no[^"]*"/.test(htmlSrc));
+  }
+
+  // 14b–14d. The install hint, in the browser contexts it cares about.
+  const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+  const AS_STANDALONE = () => {
+    Object.defineProperty(navigator, 'standalone', { get: () => true });
+  };
+  const FS_COUNTER = () => {
+    window.__fs = 0;
+    const orig = Element.prototype.requestFullscreen;
+    Element.prototype.requestFullscreen = function (...a) {
+      window.__fs++;
+      return orig.apply(this, a);
+    };
+  };
+  /** phonePage, but with a chosen UA and extra init scripts. */
+  async function mobilePage(params, { ua = IPHONE_UA, viewport = LAND, dsf = 3, inits = [] } = {}) {
+    const context = await browser.newContext({ viewport, deviceScaleFactor: dsf, hasTouch: true, isMobile: true, userAgent: ua });
+    await context.addInitScript(LOCK_COUNTER);
+    for (const init of inits) await context.addInitScript(init);
+    contexts.push(context);
+    const page = await context.newPage();
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(String(e)));
+    page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
+    await page.goto(`${server.url}${PAGE}${params}`, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    page.__errs = errs;
+    return page;
+  }
+  {
+
+    // iPhone in Safari, not installed: the hint is there, under START, and
+    // dismisses for good — and START itself still starts the game.
+    const page = await mobilePage('?seed=11', { inits: [FS_COUNTER] });
+    const seen = await page.evaluate(() => {
+      const h = document.getElementById('gate-install-hint');
+      if (!h) return null;
+      const r = h.getBoundingClientRect();
+      const b = document.getElementById('gate-btn').getBoundingClientRect();
+      return {
+        text: h.textContent.replace(/\s+/g, ' ').trim(),
+        share: !!h.querySelector('svg.hint-share'),
+        under: r.top >= b.bottom - 1 && Math.abs((r.left + r.right) / 2 - (b.left + b.right) / 2) < 40,
+        shown: getComputedStyle(h).display !== 'none' && r.width > 40 && r.height > 8,
+        gateUp: !document.getElementById('gate').classList.contains('hidden'),
+      };
+    });
+    check('#77 iPhone in the browser: install hint under START with a share glyph, game still on the title screen',
+      !!seen && seen.shown && seen.share && seen.under && seen.gateUp && /Share/.test(seen.text) && /Add to Home Screen/.test(seen.text), JSON.stringify(seen));
+    await page.tap('#gate-install-hint');
+    const gone = await page.evaluate(() => ({
+      gone: !document.getElementById('gate-install-hint'),
+      gateUp: !document.getElementById('gate').classList.contains('hidden'),
+      flag: localStorage.getItem('lookatbobo.install-hint') === '1',
+    }));
+    check('#77 a tap dismisses the hint for good — and does NOT start the game', gone.gone && gone.gateUp && gone.flag, JSON.stringify(gone));
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    check('#77 after a reload the hint stays dismissed', await page.evaluate(() => !document.getElementById('gate-install-hint')));
+    await page.evaluate(() => localStorage.removeItem('lookatbobo.install-hint'));
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    check('#77 with the dismissal cleared the hint is back', await page.evaluate(() => !!document.getElementById('gate-install-hint')));
+    await page.tap('#gate-btn');
+    await waitPhase(page, 'find');
+    check('#77 the hint never blocks START: the live loop runs after the tap', (await st(page)).playing);
+    check('#77 in the browser the start tap still asks for fullscreen exactly once (Android path untouched)',
+      (await page.evaluate(() => window.__fs)) === 1, `__fs=${await page.evaluate(() => window.__fs)}`);
+    check('#77 iPhone hint page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+
+    const desk = await desktopPage('?seed=11');
+    check('#77 desktop: no install hint', await desk.evaluate(() => !document.getElementById('gate-install-hint')));
+    await desk.context().close();
+
+    const and = await mobilePage('?seed=11', { ua: ANDROID_UA });
+    check('#77 Android phone: no install hint (its browser already goes fullscreen)',
+      await and.evaluate(() => !document.getElementById('gate-install-hint')));
+    await and.context().close();
+
+    const sa = await mobilePage('?seed=11', { inits: [AS_STANDALONE, FS_COUNTER] });
+    const s = await sa.evaluate(() => ({ hint: !!document.getElementById('gate-install-hint'), standalone: navigator.standalone === true }));
+    check('#77 standalone (launched from the home-screen icon): no hint', s.standalone && !s.hint, JSON.stringify(s));
+    await sa.tap('#gate-btn');
+    await waitPhase(sa, 'find');
+    const saFs = await sa.evaluate(() => window.__fs);
+    check('#77 standalone: the start tap does NOT re-ask for fullscreen (there is nothing to ask for)', saFs === 0, `__fs=${saFs}`);
+    await sa.context().close();
+
+    const off = await mobilePage('?gate=off&seed=11');
+    const o = await off.evaluate(() => ({ hint: !!document.getElementById('gate-install-hint'), gateHidden: document.getElementById('gate').classList.contains('hidden') }));
+    check('#77 ?gate=off on an iPhone UA: the hint never exists, so every capture baseline stays byte-identical',
+      !o.hint && o.gateHidden, JSON.stringify(o));
+    await off.context().close();
+  }
+
+  // 14e. The notch: ?safe=notch at real iPhone landscape sizes. The canvas
+  // must fill the whole screen (the Chrome-on-iPhone black band on the notch
+  // side is exactly what this kills), the left-edge column must be game
+  // pixels not letterbox, and every control stays inside the simulated inset
+  // (--safe-l 59, --safe-r 44, --safe-b 21 — see game/full.html).
+  {
+    for (const vp of [{ width: 844, height: 390 }, { width: 932, height: 430 }, { width: 667, height: 375 }]) {
+      const page = await mobilePage('?seed=11&safe=notch', { viewport: vp, dsf: 2 });
+      await page.tap('#gate-btn');
+      await waitPhase(page, 'find');
+      await simSteps(page, 24);
+      const geo = await page.evaluate(() => {
+        const r = document.querySelector('canvas').getBoundingClientRect();
+        return {
+          notch: document.documentElement.classList.contains('safe-notch'),
+          sl: getComputedStyle(document.documentElement).getPropertyValue('--safe-l').trim(),
+          x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height),
+          vw: innerWidth, vh: innerHeight,
+        };
+      });
+      check(`#77 ?safe=notch ${vp.width}×${vp.height}: the canvas fills the viewport edge to edge — notch zone included`,
+        geo.notch && geo.sl === '59px' && Math.abs(geo.x) <= 1 && Math.abs(geo.y) <= 1 && geo.w >= geo.vw - 1 && geo.h >= geo.vh - 1,
+        JSON.stringify(geo));
+      const shot = (await page.screenshot({ clip: { x: 0, y: 0, width: 4, height: vp.height } })).toString('base64');
+      const strip = await page.evaluate(async (b64) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${b64}`;
+        await img.decode();
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth;
+        cv.height = img.naturalHeight;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+        let pure = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] <= 2 && d[i + 1] <= 2 && d[i + 2] <= 2) pure++;
+        return { pure, total: d.length / 4 };
+      }, shot);
+      check(`#77 ?safe=notch ${vp.width}×${vp.height}: the left-edge column is game picture, not a black letterbox band`,
+        strip.pure / strip.total < 0.2, JSON.stringify(strip));
+      if (vp.width === 844) {
+        const pad = await page.evaluate(() => {
+          const r = (id) => {
+            const e = document.getElementById(id);
+            const b = e.getBoundingClientRect();
+            return { x0: Math.round(b.left), x1: Math.round(b.right), y1: Math.round(b.bottom), shown: getComputedStyle(e).display !== 'none' };
+          };
+          return { gear: r('settings-btn'), stick: r('stick-base'), score: r('hud-score'), shout: r('shout-btn') };
+        });
+        const L = 59 - 1;
+        const R = geo.vw - 44 + 1;
+        const B = geo.vh - 21 + 1;
+        check('#77 the notch inset holds every control: gear+stick off the notch side, score+shout off the right edge and the home bar',
+          pad.gear.shown && pad.gear.x0 >= L && pad.stick.shown && pad.stick.x0 >= L && pad.score.shown && pad.score.x1 <= R && pad.shout.shown && pad.shout.x1 <= R && pad.shout.y1 <= B,
+          JSON.stringify(pad));
+        check('#77 notch page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+      }
+      await page.context().close();
+    }
+
+    // The title card under the same simulated notch: padded INSIDE it, and
+    // still laid out clean.
+    const page = await mobilePage('?seed=11&safe=notch');
+    const t = await page.evaluate(() => {
+      const cs = getComputedStyle(document.querySelector('#gate .gate-card'));
+      return { pl: parseFloat(cs.paddingLeft), pr: parseFloat(cs.paddingRight) };
+    });
+    const lay = await page.evaluate(TITLE_LAY);
+    check('#77 title card with a notch: padded past both insets, layout still clean',
+      t.pl >= 59 && t.pr >= 44 && lay.n >= 5 && lay.bad.length === 0, JSON.stringify({ ...t, bad: lay.bad }));
     await page.context().close();
   }
 } finally {
