@@ -54,6 +54,14 @@
 //       iPhone-landscape inset) the canvas fills the screen edge to edge —
 //       no black band on the notch side — and gear, stick, score and shout
 //       all stay inside the safe area
+//   15  #99 the desktop path to the settings gear: Play captures the pointer
+//       (the gear takes no click while locked, by browser rule), Esc/P release
+//       to a paused card whose gear is the TOP element, the gear and the card's
+//       Settings/Resume buttons work, a changed setting sticks through the URL
+//       reload, O opens settings straight from play, Esc-on-card resumes (M is
+//       the menu door), a DENIED pointer lock still pauses with a free cursor
+//       and a MISSING one resumes without ever a dead state, the touch card is
+//       unchanged, and the card fits a 740×360 window clear of the gear
 //
 //   npm run check:mobile
 
@@ -1224,6 +1232,240 @@ try {
     const lay = await page.evaluate(TITLE_LAY);
     check('#77 title card with a notch: padded past both insets, layout still clean',
       t.pl >= 59 && t.pr >= 44 && lay.n >= 5 && lay.bad.length === 0, JSON.stringify({ ...t, bad: lay.bad }));
+    await page.context().close();
+  }
+
+  // ===========================================================================
+  // 15. Issue #99: desktop settings reachability. The mouse is captured while
+  //     playing, so the gear can only ever be reached from a PAUSED state —
+  //     and #hud's fixed-stacking-context used to paint #pause (45) OVER the
+  //     gear (55 inside #hud), so paused clicks re-grabbed the pointer. The
+  //     card now carries Settings + Resume, Esc/P toggle the pause, O opens
+  //     the panel directly, and a denied (or missing) pointer-lock API must
+  //     still leave a working, resumable pause. Touch pages change nowhere.
+  // ===========================================================================
+  {
+    const page = await desktopPage('?seed=11');
+    const s = () =>
+      page.evaluate(() => ({
+        paused: window.LC.state().paused,
+        locked: document.pointerLockElement !== null,
+        card: document.getElementById('pause').classList.contains('show'),
+        panel: document.getElementById('settings-panel').classList.contains('show'),
+        open: !!window.__lcSettingsOpen,
+        menu: !document.getElementById('gate').classList.contains('hidden'),
+      }));
+
+    await page.click('#gate-btn');
+    await page.waitForTimeout(400);
+    const play = await s();
+    check('#99 mouse: Play grabs the pointer and plays', play.locked === true && play.paused === false && play.card === false, JSON.stringify(play));
+
+    // While the pointer is CAPTURED no click can reach anything but the view —
+    // the browser routes it there. That is the physical half of the bug; the
+    // way in is Esc/P, which is what the next checks prove works.
+    await page.mouse.click(36, 36);
+    await page.waitForTimeout(250);
+    const lockedGear = await s();
+    check('#99 mouse: while locked the gear takes no click (browser rule — the pause state is the door)', lockedGear.panel === false && lockedGear.locked === true, JSON.stringify(lockedGear));
+
+    // Esc: release + paused card, with the gear CLICKABLE under a normal cursor.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const paused = await s();
+    const hit = await page.evaluate(() => {
+      const r = document.getElementById('settings-btn').getBoundingClientRect();
+      const tops = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { first: tops[0]?.id, hasGear: tops[0]?.id === 'settings-btn' };
+    });
+    check('#99 mouse: Esc pauses with the card up, pointer free', paused.paused === true && paused.card === true && paused.locked === false, JSON.stringify(paused));
+    check('#99 mouse: paused state — the gear is the TOP element (was #pause before #99)', hit.hasGear === true, `elementFromPoint → ${hit.first}`);
+
+    // Click the gear → panel over the card; Esc → back onto the card.
+    await page.click('#settings-btn');
+    await page.waitForTimeout(250);
+    const gearClick = await s();
+    check('#99 mouse: paused gear click opens the panel over the pause card', gearClick.panel === true && gearClick.paused === true && gearClick.card === true && gearClick.locked === false && gearClick.open === true, JSON.stringify(gearClick));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+    const panelEsc = await s();
+    check('#99 mouse: Esc closes the panel back onto the pause card (never a dead state)', panelEsc.panel === false && panelEsc.card === true && panelEsc.paused === true, JSON.stringify(panelEsc));
+
+    // Change a setting from there — settings live in the URL, so this reloads
+    // the page with the new param (the step-9 design, unchanged by #99).
+    await page.evaluate(() => {
+      const q = document.getElementById('set-sens');
+      q.value = '1.5';
+      q.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    const changed = await page.evaluate(() => ({ url: location.search, sens: document.getElementById('set-sens').value }));
+    check('#99 mouse: a setting changed from the paused panel sticks', changed.url.includes('sens=1.5') && changed.sens === '1.5', changed.url);
+
+    // The card's own buttons: Settings opens the panel, Resume re-grabs.
+    await page.click('#gate-btn');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.click('#pause-settings');
+    await page.waitForTimeout(250);
+    const cardBtn = await s();
+    check('#99 mouse: the pause card has a working Settings button', cardBtn.panel === true && cardBtn.paused === true, JSON.stringify(cardBtn));
+    await page.click('#settings-close');
+    await page.waitForTimeout(200);
+    await page.click('#pause-resume');
+    await page.waitForTimeout(400);
+    const resumed = await s();
+    check('#99 mouse: the pause card has a working Resume button (re-locks, plays)', resumed.paused === false && resumed.locked === true && resumed.card === false, JSON.stringify(resumed));
+
+    // O from play: releases the mouse, pauses, opens the panel directly.
+    await page.keyboard.press('KeyO');
+    await page.waitForTimeout(400);
+    const oKey = await s();
+    check('#99 mouse: O releases the pointer and opens settings straight from play', oKey.paused === true && oKey.locked === false && oKey.panel === true && oKey.card === true, JSON.stringify(oKey));
+    await page.keyboard.press('KeyO'); // again: close back onto the card
+    await page.waitForTimeout(250);
+    const oClose = await s();
+    check('#99 mouse: O again closes the panel back onto the card', oClose.panel === false && oClose.card === true && oClose.paused === true, JSON.stringify(oClose));
+
+    // P toggles both ways; the card background still clicks back into play.
+    await page.click('#pause'); // click anywhere = ask for the pointer back
+    await page.waitForTimeout(400);
+    const cardClick = await s();
+    check('#99 mouse: clicking the card background re-grabs the pointer', cardClick.paused === false && cardClick.locked === true, JSON.stringify(cardClick));
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(300);
+    const p1 = await s();
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(400);
+    const p2 = await s();
+    check('#99 mouse: P pauses and P resumes', p1.paused === true && p1.card === true && p2.paused === false && p2.locked === true, JSON.stringify({ p1, p2 }));
+
+    // Esc on the card RESUMES now (issue #99 took over the #57 "Esc = menu"
+    // shortcut); M is the menu door, exactly as the how-to line teaches.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const escTwice = await s();
+    check('#99 mouse: Esc again resumes — it no longer leaves the run', escTwice.paused === false && escTwice.menu === false && escTwice.locked === true, JSON.stringify(escTwice));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('KeyM');
+    await page.waitForTimeout(300);
+    const mMenu = await s();
+    check('#99 mouse: M from the pause card still goes back to the menu', mMenu.menu === true && mMenu.card === false, JSON.stringify(mMenu));
+
+    // The one-line hint: on the pause card and in the how-to copy (desktop).
+    const copy = await page.evaluate(() => ({
+      card: document.querySelector('.pause-help')?.textContent ?? '',
+      howto: document.querySelector('#gate-howto-panel .only-desktop')?.textContent ?? '',
+    }));
+    check('#99 mouse: "Esc or P: pause and settings" reads on the pause card and the how-to', /Esc or P: pause and settings/.test(copy.card.replace(/\s+/g, ' ')) && /Esc or P: pause and settings/.test(copy.howto.replace(/\s+/g, ' ')), JSON.stringify(copy));
+    check('#99 mouse page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // 15b. The pointer lock is DENIED (a hardened browser, an iframe, the
+  // instant-re-lock Chrome refuses after a quick Esc double-press): the game
+  // must still pause with a normal cursor and the overlay must keep working —
+  // a refused grab leaves the card up instead of eating the click.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await context.addInitScript(() => {
+      Element.prototype.requestPointerLock = function () {
+        setTimeout(() => document.dispatchEvent(new Event('pointerlockerror')), 0);
+        return Promise.resolve();
+      };
+    });
+    contexts.push(context);
+    const page = await context.newPage();
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(String(e)));
+    page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
+    await page.goto(`${server.url}game/full.html?seed=11`, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    await page.click('#gate-btn');
+    await page.waitForTimeout(500);
+    const running = await page.evaluate(() => ({ paused: window.LC.state().paused, locked: document.pointerLockElement !== null }));
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(300);
+    const denied = await page.evaluate(() => ({
+      paused: window.LC.state().paused,
+      card: document.getElementById('pause').classList.contains('show'),
+      gear: document.elementsFromPoint(36, 36)[0]?.id,
+    }));
+    check('#99 denied lock: the game runs with a free cursor and P still pauses with the card up', running.paused === false && running.locked === false && denied.paused === true && denied.card === true, JSON.stringify({ running, denied }));
+    await page.click('#pause-resume'); // refused again — the card must stay, not a dead state
+    await page.waitForTimeout(300);
+    const refused = await page.evaluate(() => ({ paused: window.LC.state().paused, card: document.getElementById('pause').classList.contains('show') }));
+    await page.click('#settings-btn');
+    await page.waitForTimeout(250);
+    const panel = await page.evaluate(() => document.getElementById('settings-panel').classList.contains('show'));
+    check('#99 denied lock: a refused Resume keeps the card up and the overlay stays usable (gear opens the panel)', refused.paused === true && refused.card === true && panel === true, JSON.stringify({ refused, panel }));
+    check('#99 denied-lock page: console clean', errs.length === 0, errs.join(' | '));
+    await context.close();
+  }
+
+  // 15c. The pointer lock API is MISSING entirely (some iframes/browsers):
+  // Resume must take the game back with a normal cursor — never a dead click.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await context.addInitScript(() => {
+      Element.prototype.requestPointerLock = undefined;
+    });
+    contexts.push(context);
+    const page = await context.newPage();
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(String(e)));
+    page.on('console', (m) => m.type() === 'error' && !IGNORE.test(m.text()) && errs.push(m.text()));
+    await page.goto(`${server.url}game/full.html?seed=11`, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    await page.click('#gate-btn');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(300);
+    const paused = await page.evaluate(() => ({ paused: window.LC.state().paused, card: document.getElementById('pause').classList.contains('show') }));
+    await page.click('#pause-resume');
+    await page.waitForTimeout(300);
+    const resumed = await page.evaluate(() => ({ paused: window.LC.state().paused, card: document.getElementById('pause').classList.contains('show') }));
+    check('#99 no lock API at all: P pauses, Resume resumes with a normal cursor (no dead state)', paused.paused === true && paused.card === true && resumed.paused === false && resumed.card === false, JSON.stringify({ paused, resumed }));
+    check('#99 no-lock-API page: console clean', errs.length === 0, errs.join(' | '));
+    await context.close();
+  }
+
+  // 15d. Touch unchanged: the card keeps its tap-anywhere wording, the new
+  // desktop doors retire on phones (the gear stays always-visible, and now
+  // sits above the title card instead of under it — same pixels, real reach),
+  // and on a short landscape window the card fits with nothing overlapping.
+  {
+    const page = await desktopPage('?touch=on&seed=11');
+    const dom = await page.evaluate(() => ({
+      resume: getComputedStyle(document.getElementById('pause-resume')).display,
+      settings: getComputedStyle(document.getElementById('pause-settings')).display,
+      help: getComputedStyle(document.querySelector('.pause-help')).display,
+      sub: document.querySelector('#pause .pause-sub')?.textContent,
+      gear: getComputedStyle(document.getElementById('settings-btn')).display,
+      gearTop: document.elementsFromPoint(23, 23)[0]?.id,
+    }));
+    check('#99 touch: the card is untouched — no resume/settings/help, tap-anywhere wording', dom.resume === 'none' && dom.settings === 'none' && dom.help === 'none' && dom.sub === 'tap anywhere to keep looking', JSON.stringify(dom));
+    check('#99 touch: the gear stays always-visible (and reaches the finger over the title card)', dom.gear === 'flex' && dom.gearTop === 'settings-btn', JSON.stringify({ gear: dom.gear, gearTop: dom.gearTop }));
+    await page.context().close();
+  }
+  {
+    const page = await desktopPage('?seed=11', { viewport: { width: 740, height: 360 } });
+    await page.click('#gate-btn');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(300);
+    const lay = await page.evaluate(() => {
+      const card = document.querySelector('#pause .pause-card').getBoundingClientRect();
+      const gear = document.getElementById('settings-btn').getBoundingClientRect();
+      const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return { card, gear, vh: innerHeight, inView: card.top >= -1 && card.bottom <= innerHeight + 1, overlap: hit(card, gear), shown: document.getElementById('pause').classList.contains('show') };
+    });
+    check('#99 short window 740×360: the pause card fits and clears the gear', lay.shown && lay.inView && lay.overlap === false, JSON.stringify(lay));
+    check('#99 short-window page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
   }
 } finally {
