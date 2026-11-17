@@ -782,7 +782,7 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
    * look like". 500 pseudo-random 31-bit seeds — drawn from a fixed base, so
    * the check itself stays deterministic — through the two pure functions the
    * engine actually plays with: pickSpotCycle and runPatriotPlan. Measured
-   * over 500 random seeds: every one of the 28 spots lands in 12%…100% of
+   * over 500 random seeds: every one of the 30 spots lands in 12%…100% of
    * runs, the balcony is reached by ~49% of runs, 83% of runs find at least
    * one Patriot, 1.24 finds per run. tools/seed-coverage.mjs prints the
    * per-spot table this one summarises. */
