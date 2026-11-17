@@ -372,3 +372,47 @@ every other frame is the untouched cat, proven by `patriot-only-in-its-moment`.
   every grid. Textures are canvas-made (flag, cape, button, cheeks), nothing
   is downloaded, and the build is hash1-only, so the costume is determinism-
   clean inside `measured()`.
+
+## 13. The living-room TV plays a kart game (issue #84)
+
+Brandon asked for Mario Kart on the living-room TV. Nintendo's characters,
+logos, tracks and name are theirs, and we ship none of them — so the TV plays
+**"KART DASH", an original look-alike of the genre** painted in code on a
+small canvas (`src/kart-screen.js`): a Mode-7 pseudo-3D road (perspective
+stripes, alternating rumble strips, a rainbow edging, a dashed centre line)
+winding under a sunny sky with one snowcapped mountain, three tiny karts seen
+from behind with round-headed, invented drivers (a red kart for the player —
+plain round noggins and one-colour helmets; no plumber, no turtle, no
+mushroom, no red-white cap), a floating plain yellow "?" item box, and a
+chunky HUD in a bold system font: `LAP 2/3`, `1st`, a rounded mini-map with
+three dots, and the made-up title `KART DASH`. The painter records every
+string it ever draws and `kart-words-original` scans the list — "mario" and
+"nintendo" can no more reach the screen than reach the repo.
+
+- **Cost is the whole trick: zero draw calls.** The screen mesh, material and
+  halo already exist (row 39, issue #46); this changed only the emissiveMap's
+  pixels. The canvas is 320×180 (256×144 on `?quality=low`, where the scene
+  also drops clouds, speed lines and one kart), redrawn at 12 fps — 6 fps on
+  low, a slow 4 fps in calm mode — ONE texture upload per repaint, and ONLY
+  while the screen passes the visibility test: the per-room cull's visible
+  flags (§7) plus a frustum sphere test, so a player standing in the living
+  room looking at the bookshop costs nothing, and `document.hidden` closes
+  the tap when the tab goes away. Measured repaint cost on the capture
+  machine: ~0.1 ms (`kart-update-cheap`).
+- **Determinism and captures:** under `?gate=off` the screen is one FIXED
+  frame painted at construction — `tick()` refuses to repaint the page at
+  all (`kart-frozen-under-gate-off`), so captures and the determinism suites
+  stay byte-identical apart from the living-room frames, whose screen pixels
+  deliberately re-baseline (the standby glow they matched is the thing the
+  issue replaced). The selfTest half that does paint runs inside `probe()`,
+  which puts the exact static pixels back afterwards, so no check can leak
+  an animated frame into a capture frame that renders after it.
+- **Photosensitivity:** every frame keeps its average brightness — the
+  scrolling trades one green for a near-equal green, one grey for a near-
+  equal grey — and nothing flashes; speed lines are steady streaks and never
+  appear in calm mode. `kart-brightness-steady` holds a whole scroll cycle
+  to ~2% mean-luma drift (limit 8%).
+- **Originality is a style rule, not a disclaimer:** the invented drivers,
+  the invented title, the invented course are what make the genre joke
+  land; nothing on the screen depicts, copies or names a Nintendo asset.
+  See `docs/CHARACTERS.md` for who is actually holding the controller.

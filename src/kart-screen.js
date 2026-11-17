@@ -332,7 +332,7 @@ export function createKartScreen({ quality = 'full', calm = false, gateOff = fal
       if (!force && typeof document !== 'undefined' && document.hidden) return false;
       tv.tAnim += Math.min(Math.max(nowMs - (tv.lastSeen ?? nowMs), 0), 250) / 1000;
       tv.lastSeen = nowMs;
-      if (nowMs - (tv.lastPaint ?? -1e9) < 1000 / fps - 1) return false;
+      if (!force && nowMs - (tv.lastPaint ?? -1e9) < 1000 / fps - 1) return false; // the live pacing
       if (!tv.onScreen(camera)) return false;
       tv.lastPaint = nowMs;
       tv.paint(tv.tAnim);
