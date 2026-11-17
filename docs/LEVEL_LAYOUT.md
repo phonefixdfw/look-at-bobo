@@ -494,3 +494,60 @@ off screen: near-black with one diagonal sheen). The whole furniture set
 merges into **two** meshes (`fur` casts shadows, `furSoft` doesn't) by
 sharing material consts — the round took the draw count from the 150 cap
 back down to **126** at 98,576 triangles, 5 lights, 1 shadow light, 1 pass.
+
+## Lookalike decor (issue #69) — the one list, in prose
+
+Black-and-white wall art, bedding and bath things that read, for one
+frame, as "is that Bobo?" — and resolve as scenery on the second frame.
+The data lives in `game/full-decor.js` (`DECOR`, one row per piece, room
+order); the mesh is `game/full-decor-mesh.js`; the rules below are what
+the five `decor-*` checks in `game/full.js` enforce. Nothing here is a
+cat: no piece carries eyes, ears, whiskers, a blaze or a bib, none is
+hit-testable, and no new collider exists — the full decoy-vs-lookalike
+distinction is docs/CHARACTERS.md.
+
+**Living room** — 4 framed abstracts: `art-living-sofa-n` (portrait,
+above the sofa's north end, clear of the colour-block piece),
+`art-living-npier` (the pier between window and slider),
+`art-living-south` (south plaster west of the hall door),
+`art-living-dine` (south plaster east of the hall door and its parked
+leaf — the kitchen door's leaf owns the east pier, measured);
+`pot-coffee`, the black pot with its white ring-and-dot band, empty, on
+the coffee table's clear north half; `books-coffee-1/2`, two B/W books
+flat under its elbow, page edges up.
+
+**Kitchen** — `art-kitchen-e`, the one bare stretch of east wall between
+fridge and range, under no upper cabinet.
+
+**Hall** — `art-hall-w`, west plaster between the bathroom opening and
+the console end.
+
+**Entry** — `art-entry-e` over the coat bench, below the hat shelf's
+sight line, clear of the pendant.
+
+**Bathroom** — `art-bath-e` on the east plaster south of the doorway,
+hung above the tile band (bottom edge 1.36) and clear of the curtain
+rod's findable gap; `towel-bath-hang`, a striped hand towel on the same
+bar as the duck-egg one; `towel-bath-stack`, a folded stack on the
+vanity's rim band; `mat-bath`, the patchy mat east of the seafoam one
+that the #67 enlargement left room for.
+
+**Bedroom** — `art-bed-head` over the headboard, `art-bed-desk` on the
+north plaster above the monitor; `duvet-bw`, the cow-patch duvet panel
+across the bed's middle (12 mm proud, bedding — not a lying place of its
+own); `cushion-bed-n/s`, two patchwork cushions off the pillow ends;
+`throw-bed`, the check throw folded into the gap between the pillows;
+`books-dresser-1/2` low on the dresser top; `box-wardrobe` under the
+wardrobe's 2.10 m lid.
+
+All 10 artworks are 0.4 … 1.0 m on a side, hung with centres around
+1.5 m, none over a door or window; every pattern is static (painted once
+into the atlas at boot from `hash1` — same seed, same art, byte for
+byte), moderate contrast, no moire.
+
+Budget: the whole collection is **one draw call in every frame** — one
+atlas material, one merged mesh, spans five rooms so the culler never
+hides it. Measured, every one of the 546 capture frames lands at exactly
+before+1; worst frame 149 → **150 / 150** (`npm run capture:full`). Full
+check count 82 → **87** and `playtest:stress:full` passes `--checks 87`
+to match.

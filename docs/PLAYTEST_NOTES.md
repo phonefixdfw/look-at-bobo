@@ -1640,3 +1640,47 @@ manifest install and a physical notch are unverified by every check here.
 chrome-free launch, edge-to-edge at both orientations' safe areas, the
 hint's one-time behaviour, offline icon, no fullscreen ask, Android
 regression, return visit) for the pass Brandon does on hardware.
+
+## 29. Issue #69 — lookalike decor: a flat full of black-and-white almost-cats
+
+**What the pass added.** Twenty-three pieces of black-and-white dressing —
+ten framed abstracts, the cow-patch duvet, two patchwork cushions, a check
+throw, a patchy bath mat, two striped towels, the black pot with white
+accents, four B/W books and a storage box (the one list: docs/LEVEL_LAYOUT.md,
+data: `game/full-decor.js`, drawn: `game/full-decor-mesh.js`).
+
+**How it plays.** The first-glance double-take is real where the pieces are
+big and low: the duvet panel from the bedroom diorama, the cushion pair from
+the bed-foot approach, the folded throw from the pillow line — each holds
+"is that Bobo?" for about a frame before the pattern resolves as cloth. The
+wall art never reads as a cat from the room's standing distances (blots and
+rings stay blots at 3 m), which is the right balance: the doubt belongs to
+floor level where the find happens, and the second frame always resolves it.
+Pointing at any of it does nothing — no hover, no reticle softening, no
+"DAG!" — because the whole collection is one untagged mesh the aim code never
+sees. No piece blocks or crowds a cat spot: the 0.21 m capsule rule and the
+re-run of the findable sight maths (`decor-findable-clear`) cover every spot,
+every hiding prop, with all 23 boxes added as blockers.
+
+**What it cost.** One draw call, in every frame — measured per-frame across
+all 546 capture frames, each came out at exactly the no-decor number +1; the
+worst frame (win/overview) is 149 → **150 of 150**, +320 triangles, one 64 Ki
+canvas atlas. The cap is not exceeded, but the margin is now zero: **any
+future full-flat geometry must come with a draw it removes.** Textures: one
+new 256 px canvas (budget check `decor-budget`); the slice and the talking
+demo came back byte-identical (`capture:slice`, `capture:demo` re-run against
+a pre-change build and diffed by sha256).
+
+**Bugs the checks caught before any pixels did.** The fifth living artwork
+wanted the east pier; the kitchen door's PARKED LEAF lies along that same
+plaster (z 0.38 … 1.24) — `decor-off-openings` found it against the leaf
+boxes and the piece moved to the south wall (`art-living-dine`). Same check's
+collider clause needed one honest exemption (`DECOR_HOSTS.restOn`): a duvet
+lies ON the bed, and the bed's own collider is the bed.
+
+**Suites.** `capture:full` 87/87 PASS (five new `decor-*` checks); worst
+frame 150 ≤ 150; `capture:full:determinism` 8/8 byte-identical (the atlas is
+seeded `hash1`-painted once at boot, never in the render path); `gate` PASS;
+slice + demo byte-identical; `check:mobile` PASS; bots 10/10 with the ending
+text exact; `playtest:stress:full` at `--checks 87`; audio 23/23;
+`capture:full:weak` clean under swiftshader; `build` stamps 124 URLs.

@@ -50,6 +50,7 @@ import { buildFullLiving } from './full-living-mesh.js';
 import { buildFullBath } from './full-bath-mesh.js';
 import { buildFullBedroom } from './full-bedroom-mesh.js';
 import { buildFullEntry } from './full-entry-mesh.js';
+import { buildFullDecor } from './full-decor-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
 import { createRoomCull } from './full-cull.js';
 
@@ -605,6 +606,13 @@ export function buildFullApartment(scene) {
   // dead end. The two colliders this realises (`coat-bench`, `hall-console`)
   // have been in game/full-level.js since the first walk grid, undrawn.
   buildFullEntry(flat);
+
+  // ── the lookalike decor (issue #69) ───────────────────────────────────────
+  // B/W art, bedding, towels, pot, books: every piece shares one canvas
+  // atlas (game/full-decor-mesh.js), so the whole collection lands as ONE
+  // merged mesh. Its box spans five rooms, so the culler below files it as
+  // shared — one always-drawn call, paid once, not once per room.
+  buildFullDecor(flat);
 
   // ── issue #61: fold the static geometry the five builders just emitted ────
   // Every room is a data table that drew one mesh per box, so a run of cabinet
