@@ -62,7 +62,7 @@ correct, so a passing suite proves the checks work, not that they were skipped.
 | `score` | wrong-cat penalty not floored at 0 | `score-floors-at-zero` | exit 1 |
 | `repeats` | queue never advances | `queue-no-repeats` | exit 1 |
 | `decoy-share` | decoy placed on Bobo's spot | `decoy-never-shares-spot` | exit 1 |
-| `over-budget` | 170 extra draws pinned to the camera | tool's budget check (`drawCalls 245 > 150`) | exit 1 |
+| `over-budget` | 300 extra draws pinned to the camera | tool's budget check (`drawCalls 370 > 250`; 300 since issue #87 so it overshoots the 250 cap) | exit 1 |
 | `no-collision` | player walks through furniture | `walk-blocked` | exit 1 |
 
 (`npm run capture:slice:planted` runs the `text` plant; the other six were run
@@ -1733,7 +1733,9 @@ furniture bucket) plus the room's details — and the flat came out **under**
 its old worst frame: capture:full's worst frame is **149 of 150 draws** —
 the heaviest frame in the flat is the new dining view itself (sink-sit,
 t=0, 98,948 tris) — with the win/overview next at 148 / 100,204 tris;
-#69's was 150 with zero margin, so the cap has a draw of room again. The
+#69's was 150 with zero margin, so the cap has a draw of room again (the
+150 quoted here is the cap of the day — the budget is the one shared
+`DRAW_CALL_CAP = 250` now, issue #87). The
 pendant is emissive, so `realLights` stays at 6. Zero new lights, zero new
 textures; slice, talking demo and every earlier suite stay byte-identical.
 
@@ -1845,7 +1847,10 @@ free.
 draw (atlas materials can't wear a second colour); its cord folds into the
 living room's dark-detail merge, and the kitchen's carcass merge gives a
 slot back the same way (untagged pieces fold nameless). Worst frame lands
-on **150 of 150** — the budget exactly, no more and no less; per-room max
+on **150 of 150** (of the 150 cap of the day — the draw budget is now the
+one shared `DRAW_CALL_CAP = 250` in `tools/capture.mjs`, issue #87, so this
+frame ships with a hundred draws of headroom) — the budget exactly, no more
+and no less; per-room max
 over all 546 frames: living 150 · dining 149 · kitchen 129 · bedroom 125 ·
 balcony 115 · entry 103 · hall 96. Zero new lights, zero new textures,
 slice and demo byte-identical.
@@ -1866,7 +1871,8 @@ report the engine's crosshair find-ray (`cat-bobo through shower-curtain`),
 open rounds keep the strict visual ray.
 
 **Suites.** `capture:full` 546 frames **93/93 PASS**, worst frame **150 ≤
-150**; `capture:full:determinism` 8/8 byte-identical; `capture:full:spots`
+150** (the 150-cap day — the shared cap is `DRAW_CALL_CAP = 250` since
+#87); `capture:full:determinism` 8/8 byte-identical; `capture:full:spots`
 PASS (three new spot moments added, the stale #81-era `window-bird.e-window`
 moment dropped); `capture:full:weak` clean under swiftshader;
 `capture:full:planted` caught by name; `gate` PASS; `check:mobile` PASS;
@@ -1876,3 +1882,69 @@ exact); `seed:coverage` PASS over 500 seeds — every spot drawn, rarest
 `sink-sit.fridge` **8.8 %**, the nine-way chairs land 9.4 … 13.2 %, pad loaf
 24.0 %, desk-chair nap 27.8 %; `audio:fullcheck` at the documented live-seed
 coin flip (22/23, exit 0, same footnote as #81); `build` stamps every URL.
+
+## 32. Issue #87 — the draw-call cap becomes one shared constant, and it is 250
+
+**What was asked.** Brandon (2026-11-16): "Let's raise it to 250 limit." Issue #69's
+decor had left the flat at exactly 150 of 150 — the ceiling reached with zero
+margin — and the ask was headroom, not content.
+
+**What changed.** One number in `tools/capture.mjs`: `export const
+DRAW_CALL_CAP = 250`, the draw budget for EVERY page — slice, talking demo,
+style test and full flat alike. The flat's own `FULL_GAME_DRAW_CALLS` (issue
+#59's 180, brought back to 150 by #61) retired into it, and an explicit
+`--budget drawCalls=…` still overrides everything as it always did. Zero
+content changes: no mesh, material, merge rule or cull rule was touched.
+Merging (`game/full-merge.js`) and per-room culling (`game/full-cull.js`) stay
+the preferred way to pay for geometry — the cap is a ceiling, not a target.
+
+**Weak GPUs keep the ceiling they already shipped under.** The old cap lives on
+as `LOW_QUALITY_DRAW_CALL_CAP = 150`, which the tool swaps in when a page
+reports `quality: 'low'` through `LC.comfort()` (the `?quality=low` path,
+issue #25). Chosen because 150 is exactly the cap that path was always measured
+under (worst 122 — about 25 draws lighter at the same frame), phones were
+granted no headroom, and 150 stays proportionally below the main cap (60 % of
+250). `?cull=off` and `?merge=off` behaviour is unchanged, and no capture run
+boots a page at `?quality=low`, so no existing baseline could move.
+
+**Worst frame per room, measured at this HEAD against the 250 cap** — the
+headroom record later features will plan against. This is the flat after #81's
+dining room and #82's cat care merged in: both shipped inside the 150 cap of
+their day, so the flat's worst draw is still 150 — now of 250, with a hundred
+draws of headroom where #69 had none:
+
+| Room (camera room) | Worst frame | tris at that frame | Which frame |
+|---|---|---|---|
+| living | **150** | 100,324 | overview (every moment) |
+| dining | 149 | 99,100 | sink-sit / dining |
+| kitchen | 129 | 97,508 | sink-sit / kitchen |
+| bedroom | 125 | 99,854 | window-bird / desk |
+| balcony | 115 | 80,994 | sink-sit / balcony |
+| entry | 103 | 96,340 | desk-pen / entry |
+| hall | 96 | 96,096 | blanket-biscuits / door-hall-bedroom |
+| bathroom | 86 | 68,934 | desk-pen / bathroom |
+
+The flat's worst frame is **150 of 250** — a hundred draws of headroom on the
+heaviest view (the overview, which sees the whole flat and loses nothing to
+culling). A feature wanting more than that on this view still comes with
+merging or culling work, exactly as before.
+
+**The `over-budget` plant moved with the ceiling, or it stopped being a
+fault.** Its +170 pinned boxes reached only 240 on the slice's 70-draw win
+frame — UNDER 250, so the budget tripwire would have been quietly passing the
+run that exists to prove the budget catches overruns. `game/engine.js` now
+pins **300** boxes: slice `win/first-person` = **370 > 250 → exit 1**, full
+flat `win/first-person` = **382 > 250 → exit 1** (382 post-merge: #81's dining
+room rebuilt the base win frame), still caught by the tool's own budget line,
+still failing by design. The loop runs only under `?plant=over-budget`, which
+no baseline uses — determinism was re-run after this edit and stayed
+byte-identical.
+
+**Suites at this HEAD** (re-run after merging #81 + #82): `capture:full` 546
+frames PASS · selfTest 93/93 every frame · budget PASS (worst frame 150 ≤ 250;
+worst tris 100,324 ≤ 150k); `capture:full:determinism` 8/8 byte-identical,
+re-run after the plant edit; `gate` PASS — every planted fault still fails by
+design; `check:mobile` PASS (124 checks); `build` PASS (68 files, 3.04 MB, 133
+URLs stamped). Held for the PR to record as skipped (constant-only diff: the
+cap loosens, pixels cannot): slice/demo captures and their determinism,
+`capture:full:spots|patriot|weak`, bots, stress, audio/music, seed:coverage.

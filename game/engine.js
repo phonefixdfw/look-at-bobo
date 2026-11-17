@@ -2885,8 +2885,13 @@ export function bootGame(cfg) {
   } else if (PLANT === 'over-budget') {
     const g = new THREE.BoxGeometry(0.02, 0.02, 0.02);
     const m = new THREE.MeshStandardMaterial({ color: 0x223344 });
-    for (let i = 0; i < 170; i++) {
-      const mesh = new THREE.Mesh(g, m); // 170 separate draws: the budget must notice
+    // Issue #87 recalibration: 300 separate draws, so the fault overshoots
+    // tools/capture.mjs's DRAW_CALL_CAP (250) on EVERY page it was ever run
+    // on. At the old 150 cap 170 was plenty; at 250 the slice's ~70-draw win
+    // frame (70+170 = 240) would have snuck under the ceiling it is supposed
+    // to prove is real — a fault too light for the budget is no fault at all.
+    for (let i = 0; i < 300; i++) {
+      const mesh = new THREE.Mesh(g, m); // 300 separate draws: the budget must notice
       // children of the camera: in frustum for EVERY view, so no view escapes
       mesh.position.set((i % 13) * 0.01 - 0.06, (Math.floor(i / 13) * 0.01 - 0.06), -1);
       camera.add(mesh);

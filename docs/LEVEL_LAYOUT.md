@@ -551,6 +551,10 @@ off screen: near-black with one diagonal sheen). The whole furniture set
 merges into **two** meshes (`fur` casts shadows, `furSoft` doesn't) by
 sharing material consts — the round took the draw count from the 150 cap
 back down to **126** at 98,576 triangles, 5 lights, 1 shadow light, 1 pass.
+(Cap note, issue #87: the capture cap has since become one shared constant,
+`DRAW_CALL_CAP = 250` in `tools/capture.mjs`, up from the 150 quoted above —
+and the merging/culling habits this section documents stay the preferred way
+to pay for geometry: the cap is a ceiling, not a target.)
 
 ## Lookalike decor (issue #69) — the one list, in prose
 
@@ -670,7 +674,9 @@ one draw per run); the pad holds ~25 % like every couch-loaf alternate.
 bowls+mat +1 in the kitchen's detail merge; the kitchen carcass mesh gives
 back a slot (untagged pieces now fold nameless into the merge, one more
 material bucket absorbed). Worst frame lands **150 / 150** — the budget
-exactly. Max draw per camera room over all 546 capture frames:
+of that day; the draw budget is now the one shared `DRAW_CALL_CAP = 250`
+(tools/capture.mjs, issue #87), so this table reads as headroom, not
+headroom-left-to-cap. Max draw per camera room over all 546 capture frames:
 
 | room | living | dining | kitchen | bedroom | balcony | entry | hall |
 |---|---|---|---|---|---|---|---|
