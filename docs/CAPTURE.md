@@ -117,16 +117,22 @@ real bug in the finished game, and it is caught here, on a placeholder scene, al
 
 Checked on every frame, overridable with `--budget`:
 
-`drawCalls ≤ 150` · `triangles ≤ 150 000` · `passes ≤ 3` · `shadowLights ≤ 2` · `realLights ≤ 6`
+`drawCalls ≤ 250` · `triangles ≤ 150 000` · `passes ≤ 3` · `shadowLights ≤ 2` · `realLights ≤ 6`
 
-`game/full.html` is held to all five again (issue #61). It had been given `drawCalls ≤ 180` as
-one named constant (`FULL_GAME_DRAW_CALLS` in `tools/capture.mjs`) while the room furniture
-landed (issue #59); the flat came back inside 150 by folding its static geometry into shared
-per-shading buffers (`game/full-merge.js`, `?merge=off` to un-fold) and hiding the rooms a
-camera cannot reach (`game/full-cull.js`, `?cull=off` to keep every room drawn). The worst
-frame of the 507-frame matrix is now **147 draws**. The constant stays separate from
-`BUDGET.drawCalls` because the full flat is a different page from the slice and the demo; an
-explicit `--budget drawCalls=…`, every other page, and the `?quality=low` path are unchanged.
+`drawCalls` is ONE shared constant — `DRAW_CALL_CAP` in `tools/capture.mjs`, every page
+(250 since issue #87, up from 150: the flat had reached 150 of 150 with issue #69's decor,
+a ceiling with zero margin, and Brandon asked for headroom). Merging static geometry into
+shared per-shading buffers (`game/full-merge.js`, `?merge=off` to un-fold) and hiding the
+rooms a camera cannot reach (`game/full-cull.js`, `?cull=off` to keep every room drawn)
+remain the preferred way to pay for new geometry: the cap is a ceiling, not a target, and
+the per-room worst-frame table in `docs/PLAYTEST_NOTES.md` §28 is the headroom record.
+The weak-GPU path (`?quality=low` — the page reports its quality through `LC.comfort()`)
+keeps the OLD cap as `LOW_QUALITY_DRAW_CALL_CAP = 150`: weak GPUs were granted no headroom,
+and that path measures ~25 draws lighter at the same frame (worst 122), so its behaviour is
+unchanged while the main cap stays proportionally above it. The full flat used to be held
+to its own named constant (`FULL_GAME_DRAW_CALLS` — 180 in issue #59, back to 150 in
+issue #61); it has retired into the single cap. An explicit `--budget drawCalls=…` still
+overrides everything, as it always did.
 
 (The intent is VISION.md: 60 fps at 1080p on a mid-range laptop. The build-a-game process
 also wants these numbers in `AGENTS.md`, which does not exist in this repo yet — see

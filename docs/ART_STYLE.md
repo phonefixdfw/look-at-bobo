@@ -194,8 +194,11 @@ neck band back onto the decoy (241 white verts, the old count) and
   celebration is 3 `InstancedMesh` layers + 2 `Points` bursts. Worst measured
   frame: **89 draws / 101,636 tris** (win moment) — inside the tool's 150 /
   150k budget with room for more room content.
-- **Budget for the full flat is 150 draws again** (issue #61). It had been
-  given 180 while the room furniture landed (#59); two files earned the 150
+- **The full flat's draw budget is the one shared cap — 250 draws** (`DRAW_CALL_CAP`
+  in `tools/capture.mjs`, raised from 150 by issue #87; a ceiling, not a target —
+  merging and culling below are still how geometry gets paid for). Back at 150
+  (issue #61) it had been given 180 while the room furniture landed (#59); two
+  files earned the 150
   back. `game/full-merge.js` folds static siblings that shade identically into
   one buffer each — a run of twelve cabinet doors is one draw, not twelve —
   and refuses anything a check measures by mesh (the ruler rows, the named

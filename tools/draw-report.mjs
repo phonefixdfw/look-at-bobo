@@ -15,7 +15,8 @@
 // capture.mjs says HOW MANY draws a frame costs; this says WHICH objects they
 // were. It boots a page exactly like the capture tool does, instruments Three's
 // per-object render callback, renders one frame per (moment, view) and prints
-//   - a per-room summary (the number the 150 budget is spent against), and
+//   - a per-room summary (the number the draw-call cap — DRAW_CALL_CAP in
+//     capture.mjs, 250 since issue #87 — is spent against), and
 //   - the objects that cost the most, tagged with the room they stand in,
 //     their merged-material colour, vertex count and world position.
 //

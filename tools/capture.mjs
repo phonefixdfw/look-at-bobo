@@ -48,22 +48,33 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // the numbers is VISION.md: 60 fps at 1080p on a mid-range laptop. Note that the
 // build-a-game process also wants these in AGENTS.md, which does not exist yet
 // (see docs/HANDOFF.md, open question 1).
+
+// Issue #87: ONE shared draw-call cap for every page, raised from 150 to 250
+// (Brandon: "Let's raise it to 250 limit."). The full flat sat at 150 of 150
+// after issue #69's decor — at the cap with zero margin — and the ceiling, not
+// the content, was what left no room. Merging (game/full-merge.js) and per-room
+// culling (game/full-cull.js) stay the preferred way to pay for geometry: this
+// cap is a ceiling, not a target, and the measured worst frame (docs/
+// PLAYTEST_NOTES.md §28) is the headroom number to keep an eye on. The full
+// flat's own FULL_GAME_DRAW_CALLS constant retires into this one; an explicit
+// --budget drawCalls=… still overrides it, as it always did.
+export const DRAW_CALL_CAP = 250;
+
+// The weak-GPU path (?quality=low, issue #25) keeps the OLD cap: 150. Brandon
+// asked for headroom for desktop full-quality content, not a looser budget on
+// phones — and the weak path measured 25 draws lighter at the same frame
+// (worst 122, docs/HANDOFF.md issue #61), so 150 is exactly the ceiling it was
+// already shipping under: its behaviour is unchanged, and it stays
+// proportionally lower than the main cap (150 = 60 % of 250).
+export const LOW_QUALITY_DRAW_CALL_CAP = 150;
+
 const BUDGET = {
-  drawCalls: 150,
+  drawCalls: DRAW_CALL_CAP,
   triangles: 150_000,
   passes: 3,
   shadowLights: 2,
   realLights: 6,
 };
-
-// Issue #61: the FULL GAME page is back on the slice's 150. It had been given
-// 180 (issue #59) while the room furniture landed, and earned its 150 back
-// with the fold in game/full-merge.js and the per-room cull in
-// game/full-cull.js — the measured worst frame of the 507-frame matrix is in
-// docs/PLAYTEST_NOTES.md. It stays its own constant because the full flat is a
-// different page from the slice and the demo; an explicit
-// --budget drawCalls=… still overrides it.
-const FULL_GAME_DRAW_CALLS = 150;
 
 // A frame that averages this dark, or has no variation at all, is a broken capture
 // (WebGL fell over / nothing rendered), not an intentional look.
@@ -142,11 +153,11 @@ function parseArgs(argv) {
   if (rest.length > 1) fail(2, 'One page at a time, please.');
   if (rest.length === 1) opts.page = rest[0];
   if (!['default', 'swiftshader'].includes(opts.gpu)) fail(2, "--gpu takes 'swiftshader' or 'default'");
-  // The full flat is its own page with its own worst frame — see
-  // FULL_GAME_DRAW_CALLS above.
-  if (/game\/full\.html$/.test(opts.page) && !budgetOverridden.has('drawCalls')) {
-    opts.budget.drawCalls = FULL_GAME_DRAW_CALLS;
-  }
+  // Issue #87: every page now shares DRAW_CALL_CAP, so the full flat's own
+  // constant is gone. The weak-GPU page (?quality=low) is held to
+  // LOW_QUALITY_DRAW_CALL_CAP once its quality is known from the page; an
+  // explicit --budget drawCalls=… still wins over both, exactly as before.
+  opts.budgetDrawCallsGiven = budgetOverridden.has('drawCalls');
   return opts;
 }
 
@@ -398,8 +409,14 @@ try {
     hasSeek: typeof window.LC.seek === 'function',
     hasSelfTest: typeof window.LC.selfTest === 'function',
     hasMoments: typeof window.LC.setMoment === 'function' && (window.LC.moments || []).length > 0,
+    // Issue #87: the draw-call cap follows the page's quality (see
+    // LOW_QUALITY_DRAW_CALL_CAP). Pages without a comfort model report null.
+    quality: window.LC.comfort?.().quality ?? null,
   }));
   if (!contract.views.length) fail(2, 'The page declares no views (window.LC.views).');
+  if (!opts.budgetDrawCallsGiven && contract.quality === 'low') {
+    opts.budget.drawCalls = LOW_QUALITY_DRAW_CALL_CAP;
+  }
   await page.evaluate(() => window.LC.pause?.());
 
   // Count what the GPU is actually told to do, from the WebGL context itself.
