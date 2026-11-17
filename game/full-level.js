@@ -735,7 +735,7 @@ export const VIEWS = {
   // standing on the balcony, due north over the railing: near rooftops, the
   // roadway with the parked cars, storefronts, midrise, skyline on the
   // horizon. 0.60 m off the balcony view, so `views-distinct` holds.
-  street: { pos: [1.5, 1.62, -3.6], yaw: 0, pitch: -0.34, fov: 55, hand: false },
+  street: { pos: [1.5, 1.62, -4.15], yaw: 0, pitch: -0.55, fov: 55, hand: false },
   // The doorways, from standing height, aimed through the hole at a
   // point in the room beyond (issue #65). `doorways-read-open` in game/full.js
   // keys off these ids — one per `kind:'door'` opening — and reads the pixel

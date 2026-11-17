@@ -232,7 +232,7 @@ export const CARDS_LOW = [
 // the backdrop must stay clear of (the balcony + living-room walkable floors —
 // geometry there would read as floating cards, issue #83).
 export const EYEWITNESS = {
-  view: { pos: [1.5, 1.62, -3.6], yaw: 0, pitch: -0.34, fov: 55 },
+  view: { pos: [1.5, 1.62, -4.15], yaw: 0, pitch: -0.55, fov: 55 },
   windowCard: CARDS_FULL[0],
   clearRects: [
     { x0: -3.3, x1: 2.4, z0: -2.9, z1: 2.1 }, // living room floor

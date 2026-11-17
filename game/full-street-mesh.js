@@ -256,9 +256,13 @@ function paintRoad(P) {
   P.rect(0, 33, w, 1, 'rgba(214,206,182,0.5)'); // parking-lane lines
   P.rect(0, 64, w, 1, 'rgba(214,206,182,0.5)');
   for (let dx = 8; dx < w - 24; dx += 40) P.rect(dx, 49, 16, 2, 'rgba(214,206,182,0.55)'); // centre dashes
+  // parked cars sit in the cell's middle third: that's the stretch of road
+  // still visible past the near rooftops from the balcony (see full-street.js
+  // ground card — the swapped UVs map cell columns to the street's z)
   const rand = rng(90210);
-  for (let cx = 4; cx < w - 32; cx += Math.round(between(rand, 36, 58))) paintCar(P, rand, cx, 20, 1);
-  for (let cx = 12; cx < w - 32; cx += Math.round(between(rand, 38, 62))) paintCar(P, rand, cx, 52, -1);
+  for (let cx = 96; cx < w - 114; cx += Math.round(between(rand, 30, 40))) paintCar(P, rand, cx, 20, 1); // west curb
+  for (let cx = 90; cx < w - 118; cx += Math.round(between(rand, 32, 44))) paintCar(P, rand, cx, 52, -1); // centre lane
+  for (let cx = 92; cx < w - 122; cx += Math.round(between(rand, 30, 42))) paintCar(P, rand, cx, 76, 1); // east curb
   // a box truck in the near lane
   P.rect(w - 66, 72, 32, 11, '#dcd6ca');
   P.rect(w - 36, 74, 8, 9, '#8c9299');
