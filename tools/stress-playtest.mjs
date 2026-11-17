@@ -126,8 +126,23 @@ try {
     let won = false;
     for (let round = 1; round <= 6 && !won; round++) {
       await waitPhase(page, 'find');
-      const hits = await page.evaluate(() => window.LC.aimAt('bobo').hits);
-      check(`seed ${seed} aim reaches Bobo (round ${round})`, hits === 'cat-bobo', `centre ray: ${hits}`);
+      const aim = await page.evaluate(() => {
+        const a = window.LC.aimAt('bobo');
+        return { hits: a.hits, probe: window.LC.aimProbe(), hide: window.LC.spot().hide };
+      });
+      // Issue #70 changed the rule for the six `hide` spots: the drawn cover
+      // is meant to hide the cat from the EYE (a props-visible centre ray can
+      // legitimately never reach him — measured: zero vantages within 3.4 m
+      // centre-ray the in-tub nap through the curtain's folds), while the
+      // SHOUT's find-ray — cat meshes only, props never between — must.
+      // Open spots keep the strict visual rule; hidden spots prove the find
+      // lands by reading the engine's own crosshair ray where aimAt parked
+      // the player, which is exactly how a real find works.
+      check(
+        `seed ${seed} aim reaches Bobo (round ${round})`,
+        aim.hide ? aim.probe === 'cat-bobo' : aim.hits === 'cat-bobo',
+        aim.hide ? `${aim.hide}: find-ray through the cover reads ${aim.probe} (visual centre ray: ${aim.hits})` : `centre ray: ${aim.hits}`,
+      );
       await page.evaluate(() => window.LC.trigger('catch'));
       const now = await page.evaluate(() => window.LC.state());
       won = now.phase === 'win';
@@ -159,12 +174,20 @@ try {
   const scores = [];
   for (let i = 0; i < 4; i++) {
     await waitPhase(page, 'find');
-    const hits = await page.evaluate(() => {
-      const h = window.LC.aimAt('decoy').hits;
+    const aim = await page.evaluate(() => {
+      const a = window.LC.aimAt('decoy');
+      const hide = window.LC.spot(window.LC.state().decoyId).hide; // #70: decoys may hide too
+      const probe = window.LC.aimProbe();
       window.LC.trigger('wrong'); // what aimShout does on a decoy hit
-      return h;
+      return { hits: a.hits, probe, hide };
     });
-    check(`seed 5 aim reaches the decoy (DAG! ${i + 1})`, hits === 'cat-decoy', `centre ray: ${hits}`);
+    // Same #70 split as the Bobo rule above: hidden decoys are proven by the
+    // find-ray (props never block a shout), open ones by the visual centre ray.
+    check(
+      `seed 5 aim reaches the decoy (DAG! ${i + 1})`,
+      aim.hide ? aim.probe === 'cat-decoy' : aim.hits === 'cat-decoy',
+      aim.hide ? `${aim.hide}: find-ray through the cover reads ${aim.probe} (visual centre ray: ${aim.hits})` : `centre ray: ${aim.hits}`,
+    );
     await waitPhase(page, 'wrong');
     scores.push((await page.evaluate(() => window.LC.state())).score);
     await waitPhase(page, 'find');
@@ -489,11 +512,20 @@ try {
   });
   check('a clear line to nothing exists to test', pose !== null, JSON.stringify(pose));
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })));
-  await page.waitForTimeout(120);
-  const tell = await page.evaluate(() => ({
-    nudge: document.getElementById('reticle').classList.contains('nudge'),
-    score: window.LC.state().score,
-    phase: window.LC.state().phase,
+  // Wait for the pulse to LAND rather than betting a fixed 120 ms: the nudge
+  // class rides the render loop, and a swiftshader frame under CPU load can
+  // outlast that fixed window — the old wait saw nudge=false with the game
+  // itself fine. Poll across frames for up to 1.2 s instead (the pulse is
+  // 0.6 s, so any frame that lands inside the window is proof enough).
+  const tell = await page.evaluate(() => new Promise((resolve) => {
+    const t0 = performance.now();
+    const poll = () => {
+      const s = window.LC.state();
+      if (document.getElementById('reticle').classList.contains('nudge')) resolve({ nudge: true, score: s.score, phase: s.phase });
+      else if (performance.now() - t0 > 1200) resolve({ nudge: false, score: s.score, phase: s.phase });
+      else requestAnimationFrame(poll);
+    };
+    poll();
   }));
   check('a shout at nothing nudges the reticle (and scores nothing)', tell.nudge && tell.score === 0 && tell.phase === 'find', `nudge=${tell.nudge}, score ${tell.score}`);
   await page.waitForTimeout(700);

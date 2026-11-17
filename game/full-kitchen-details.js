@@ -14,10 +14,14 @@
  * the KITCHEN gets the breakfast bar and two stools; the dining table and its
  * four chairs are the LIVING ROOM's ("table SE" on the plan's map, chunk 3),
  * so they are deliberately absent — this is the bar, not the table. The bar
- * stands exactly where the merged level data already says it does: support
- * `barTop` (game/full-shell.js — patch x 3.32–4.88, z 0.22–0.58, top 1.05) and
- * the placeholder footprints in COLLIDERS, which KITCHEN_DETAILS_COLLIDERS
- * below replaces value for value, so no walk rect, spot or spawn moves.
+ * stands exactly where the merged level data says it does: support
+ * `barTop` (game/full-shell.js — since issue #81 patch x 3.76–5.12,
+ * z 0.22–0.58, top 1.05) and the placeholder footprints in COLLIDERS, which
+ * KITCHEN_DETAILS_COLLIDERS below replaces value for value. Issue #81 rode
+ * the whole run 0.44 m east and shortened it 0.20: the kitchen→dining
+ * doorway's structural gap (x 2.60–3.66) took the old west end out from
+ * under it, and the bar now stands 8 cm clear of the new casing, with the
+ * stools, pendants and the `sink-sit.bar` spot riding along.
  *
  * The worktop props (rows 23 to 28) all stand on the 0.90 worktop INSIDE the
  * counters' existing padded footprints: a pad on top of a pad carves nothing
@@ -115,13 +119,13 @@ export const PIECES = [
   // ── the breakfast bar (row 31), where game/full-shell.js `barTop` says ──
   // Carcass 0.40 deep on the south wall; top 0.70 deep — the 0.30 overhang
   // runs north over the stools. Measured: the top's 1.05.
-  piece('bar-carcass', 'front', [3.3, 4.9], [0, KIT_D.barTopY - KIT_D.barTopT], [0.2, 0.6], null, 'the bar base; its collider is exactly this box'),
-  piece('bar-top', 'worktop', [3.3, 4.9], [KIT_D.barTopY - KIT_D.barTopT, KIT_D.barTopY], [-0.1, 0.6], ['bar-height'], 'row 31: 1.05 with the 0.30 overhang north'),
-  // Two stools under the overhang at the placeholder footprints the merged
-  // COLLIDERS already carry (x 3.55-3.91 and 4.29-4.65, z −0.15…0.21), one on
+  piece('bar-carcass', 'front', [3.74, 5.14], [0, KIT_D.barTopY - KIT_D.barTopT], [0.2, 0.6], null, 'the bar base; its collider is exactly this box (issue #81: rode 0.44 east of the kitchen→dining doorway)'),
+  piece('bar-top', 'worktop', [3.74, 5.14], [KIT_D.barTopY - KIT_D.barTopT, KIT_D.barTopY], [-0.1, 0.6], ['bar-height'], 'row 31: 1.05 with the 0.30 overhang north'),
+  // Two stools under the overhang, one on each pendant (issue #81 moved them
+  // with the bar; the footprints kept their 0.36 × 0.36 size),
   // each side of the `sink-sit.bar` spot at x 4.1.
-  piece('bar-stool-a', 'wood', [3.55, 3.91], [0, KIT_D.stoolSeat], [-0.15, 0.21], ['bar-stool'], 'row 32: backless, seat top 0.68', { parts: 'stool' }),
-  piece('bar-stool-b', 'wood', [4.29, 4.65], [0, KIT_D.stoolSeat], [-0.15, 0.21], ['bar-stool'], 'row 32: the second stool', { parts: 'stool' }),
+  piece('bar-stool-a', 'wood', [3.99, 4.35], [0, KIT_D.stoolSeat], [-0.15, 0.21], ['bar-stool'], 'row 32: backless, seat top 0.68', { parts: 'stool' }),
+  piece('bar-stool-b', 'wood', [4.73, 5.09], [0, KIT_D.stoolSeat], [-0.15, 0.21], ['bar-stool'], 'row 32: the second stool', { parts: 'stool' }),
   // ── the runner, in the galley aisle in front of the sink run ────────────
   // No collider, on purpose (see the header): this is floor dressing you walk
   // ON, not furniture that keeps a body out.
@@ -163,8 +167,8 @@ export const DETAILS = [
   { id: 'bin-rim', mat: 'steel', x0: 2.71, y0: KIT_D.binH, z0: -1.09, x1: 2.99, y1: KIT_D.binH + 0.025, z1: -0.81 },
   { id: 'bin-pedal', mat: 'steel', x0: 2.78, y0: 0.012, z0: -0.79, x1: 2.92, y1: 0.04, z1: -0.755 },
   // the bar: recessed toe and a drawer line across the carcass front (z 0.2)
-  { id: 'bar-toe', mat: 'dark', x0: 3.34, y0: 0, z0: 0.2, x1: 4.86, y1: 0.1, z1: 0.26 },
-  { id: 'bar-drawer', mat: 'handle', x0: 3.42, y0: 0.86, z0: 0.185, x1: 4.78, y1: 0.875, z1: 0.2 },
+  { id: 'bar-toe', mat: 'dark', x0: 3.78, y0: 0, z0: 0.2, x1: 5.10, y1: 0.1, z1: 0.26 },
+  { id: 'bar-drawer', mat: 'handle', x0: 3.82, y0: 0.86, z0: 0.185, x1: 5.06, y1: 0.875, z1: 0.2 },
   // a few things that make the counters look used: a cutlery jar with three
   // bars of steel in it, a jar beside it, and two mugs by the coffee maker
   { id: 'cutlery-jar', mat: 'steel', x0: 3.16, y0: KIT_D.WT, z0: -2.62, x1: 3.28, y1: KIT_D.WT + 0.14, z1: -2.5 },
@@ -180,7 +184,7 @@ export const DETAILS = [
  *  meshes only — no light is added, and they need no collider because the
  *  bar's own pad already keeps every body 0.30 m clear of them, the same
  *  argument the upper cabinets in game/full-kitchen.js make. */
-export const PENDANTS = [{ x: 3.73, z: 0.25 }, { x: 4.47, z: 0.25 }];
+export const PENDANTS = [{ x: 4.17, z: 0.25 }, { x: 4.91, z: 0.25 }];
 
 /* -------------------------------------------------------------------------- *
  *  COLLIDERS: spliced into game/full-level.js. The bar, its two stools and
@@ -190,8 +194,8 @@ export const PENDANTS = [{ x: 3.73, z: 0.25 }, { x: 4.47, z: 0.25 }];
  *  existing pads); neither does the runner or the pendants (see above).
  * -------------------------------------------------------------------------- */
 export const KITCHEN_DETAILS_COLLIDERS = [
-  { id: 'kitchen-bar', x0: 3.3, z0: 0.2, x1: 4.9, z1: 0.6 },
-  { id: 'bar-stool-a', x0: 3.55, z0: -0.15, x1: 3.91, z1: 0.21 },
-  { id: 'bar-stool-b', x0: 4.29, z0: -0.15, x1: 4.65, z1: 0.21 },
+  { id: 'kitchen-bar', x0: 3.74, z0: 0.2, x1: 5.14, z1: 0.6 },
+  { id: 'bar-stool-a', x0: 3.99, z0: -0.15, x1: 4.35, z1: 0.21 },
+  { id: 'bar-stool-b', x0: 4.73, z0: -0.15, x1: 5.09, z1: 0.21 },
   { id: 'kitchen-bin', x0: 5.19, z0: 0.28, x1: 5.49, z1: 0.58 }, // issue #59: east run's south end corner (was x 2.7-3.0, z -1.1--0.8)
 ];

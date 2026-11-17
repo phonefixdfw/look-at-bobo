@@ -177,24 +177,29 @@ full game builds the same living room, hall and bedroom, then adds the
 rooms `docs/LOCATIONS.md` promised: a **kitchenette** along the living
 room's north-east arm (counter run x∈[0.6,2.4] z≈2.24, marble laminate,
 fridge + kettle), and a **bathroom** off the hall's west side (tub, vanity,
-toilet, round mirror, bath mat, tiled walls). The bedroom gains a desk +
+toilet, round mirror, bath mat, tiled walls); since issue #81 also a
+**dining room** in the flat's east arm (round table, four chairs, a pendant,
+a sideboard under a new south window), and the hall at the issue's own 2.40 m.
+The bedroom gains a desk +
 keyboard against the west wall, a laundry basket, and a window with
 curtains. `game/full.html` boots `bootGame()` from `game/engine.js` against
 this file; every number below is what `game/full-level.js` uses.
 
 ```
-                 ┌ LIVING + DINING ─────────────┐ ┌ KITCHEN ─────────┐
-                 │ sofa W · coffee table · rug  │ │ L-counters · sink│
-                 │ box · floor lamp · plant     │ │ uppers · fridge  │
-                 │ TV + bookshelf N · table SE  │ │ window over sink │
-                 └──────┐ living→hall ╔═╗  ┌────┘ └───────┬──────────┘
-                        └── door 0.90─╨─╨──╢pass-through  ╟ 0.90
-                 ┌ BATHROOM ──────┐  HALL  ╚══════════════╣
-                 │ 2.28 × 2.98    │ 1.80   ┌ ENTRY ───────┴─────────┐
-                 │ tub · vanity   │ × 2.98 │ 1.38 × 1.68            │
-                 │ · toilet · mat │        │ mat · hooks · console  │
-                 │ bin · window   │  open  │ FRONT DOOR (closed)    │
-                 └────────────────┘ doorway└────────────────────────┘
+                 ┌ LIVING ──────────────┐ ┌ KITCHEN ────────┐  ┌ DINING ┐
+                 │ sofa W · coffee      │ │ L-counters ·    │  │table Ø │
+                 │ table · rug · box    │ │ sink · fridge · │  │1.05 ·4 │
+                 │ lamp · plant · TV N  │ │ bar             │  │chairs  │
+                 │              ╔═══════╡ │ window over     │  │pendant │
+                 │              ║ pass- ║ │ the sink        │  │side-   │
+                 └──────┐       ║ 0.90  ║ └───door 0.90(N)──┤  │board · │
+                        │       ╚═══════╡                   │  │art · S │
+                 ┌ BATHROOM ──────┐  HALL║  door 1.22 (W) ──┤  │window  │
+                 │ 1.98 × 2.98    │ 2.40 ║ ┌ ENTRY ─────────┴──┤        │
+                 │ tub · vanity   │ ×2.98│ │ 1.40 × 1.68       │        │
+                 │ · toilet · mat │      │ │ mat · bench ·     │        │
+                 │ · bin · window │ open ║ │ hooks · console   │        │
+                 └────────────────┘doorw.║ └ FRONT DOOR(sealed)┴────────┘
                         bedroom→hall door 0.90
                  ┌ BEDROOM ────────────────────────────────┐
                  │ bed W · desk · keyboard · dresser ·     │
@@ -204,7 +209,11 @@ this file; every number below is what `game/full-level.js` uses.
 
 The plan with every measurement on it is `docs/ISSUE_33_REBUILD.md` §2; the
 rooms' rectangles are that table plus issue #67's two changes (bathroom south
-face z 3.90 → 5.20, hall's east band built out to z 5.20).
+face z 3.90 → 5.20, hall's east band built out to z 5.20) and issue #81's:
+the hall widened to 2.40 m (x −1.20 … 1.20, the bathroom's and entry's old
+bands giving 0.30 each), the entry rebuilt x 1.32 … 2.72 with the front-door
+case at x 1.32 … 2.34, and the new **dining room** x 2.60 … 5.52 z 0.80 …
+4.40 — south of the kitchen, east of the hall/entry, 9.99 m² usable.
 
 ## The ten moments (all generic — Brandon swaps the real ones later)
 
@@ -235,7 +244,7 @@ no same-spot respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance),
 `winAt: 10`. The full flat draws each run from the spot pool instead —
 see "The spot pool" below (issue #53).
 
-## The spot pool (`SPOTS`, 30 — wired up by issue #53)
+## The spot pool (`SPOTS`, 31 — wired up by issue #53, dining added by #81)
 
 `full-level.js` exports `SPOTS`: 30 authored places Bobo can actually be,
 each with the moment `type` it belongs to, its `room`, `pose`, `spot`
@@ -258,12 +267,14 @@ below the table).
 | `sink-sit.sink` ★ | kitchen | sit | (4.15, counterTop, −2.6) | −2.92 |
 | `sink-sit.counter-return` ‡ | kitchen | loaf | (2.82, counterTopW, −1.5) | 3.02 |
 | `sink-sit.fridge` | kitchen | sit | (5.2, floor, −1.75) | 1.4 |
-| `sink-sit.bar` | kitchen | side | (4.1, barTop, 0.4) | −0.14 |
+| `sink-sit.bar` | kitchen | side | (4.55, barTop, 0.4) | −0.14 |
+| `sink-sit.table` † | dining | sit | (4.3, diningTop, 2.28) | −1.57 |
+| `hall-chase.dining` † | dining | loaf | (4.9, floor, 1.15) | 1.57 |
 | `hall-chase.kitchen` | kitchen | loaf | (4.3, floor, −1.3) | 1.58 |
 | `hall-chase.hall` ★ | hall | loaf | (−0.35, floor, 3.3) | −0.19 |
 | `hall-chase.hall-door` | hall | sit | (0.3, floor, 4.85) | 1.55 |
-| `hall-chase.entry` | entry | loaf | (1.45, floor, 3.4) | 1.81 |
-| `hall-chase.entry-door` | entry | loaf | (1.5, floor, 3.0) | 1.57 |
+| `hall-chase.entry` | entry | loaf | (1.77, floor, 3.4) | 1.81 |
+| `hall-chase.entry-door` | entry | loaf | (1.82, floor, 3.0) | 1.57 |
 | `hall-chase.bath-mat` ‡ | bathroom | side | (−2.2, floor, 4.12) | 1.22 |
 | `hall-chase.vanity` | bathroom | sit | (−2.65, vanityTop, 2.46) | 3.14 |
 | `laundry-nap.bath-tub` ‡ | bathroom | side | (−2.55, tubWell, 4.85) | −0.44 |
@@ -278,8 +289,15 @@ below the table).
 | `blanket-biscuits.wardrobe` | bedroom | loaf | (−1.55, floor, 8) | 0.03 |
 | `blanket-biscuits.dresser-gap` ‡ | bedroom | loaf | (0.95, floor, 6.85) | 2.62 |
 
-Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 10 · living 6 ·
-kitchen 5 · hall 2 · entry 2 · bathroom 3 · balcony 2. Two data moves got
+† — issue #81's two dining spots. Their yaws are the measured `bestApproach`
+ones (the `cats-face-the-room` vantage, not a guess): the table sitter faces
+east at the gap off the table's east end, the loofer faces west along the
+table's north side at the lane a chase would come from. Both rode the table's
+final pin to (4.06, 2.28) — the spot x is the capsule centre, 0.24 east of
+the table's.
+
+Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 10 · living 5 ·
+kitchen 5 · dining 2 (issue #81) · bathroom 3 · hall 2 · entry 2 · balcony 2. Two data moves got
 there (issue #53): `hall-chase.living` (2.6, 0.2) **moved** to
 `hall-chase.entry-door` — living had 6 spots, entry only 1, and (2.6, 0.2)
 sat on the rug beside the style-test box anyway — and `window-bird.balcony-door`
@@ -455,10 +473,14 @@ the level changing.
 
 Light, then. Still four point fills and still `realLights = 6`, exactly the
 budget: the bathroom keeps a fill (3.9 @ 5.8 m, cooler, under its own new
-ceiling body) and the hall's fill was **moved to the entry side of the corridor
-at 5.4** so it serves both rooms — that is the whole lighting change, and it is
-why the bathroom sits at mean luma ~149 where the flat's median is ~109 (tile
-and porcelain, lit).
+ceiling body). The hall/entry fill has moved twice since: #67 stepped it to
+the entry side of the corridor at 5.4 so it serves both rooms, and #81 hung
+it under the entry pendant ([1.85, 2.34, 3.5] @ 5.6) because at the widened
+hall the old point grazed the front-door leaf and the `front-door-shut-and-
+found` pixel probe read the leaf face as a black hole. That is the whole
+lighting change — plus the dining pendant, which is emissive-only, so the
+budget holds — and it is why the bathroom now sits at mean luma ~183 where
+the played rooms' median is ~141 (tile and porcelain, lit).
 
 Four checks came with it, in `game/full.js`:
 
@@ -466,7 +488,7 @@ Four checks came with it, in `game/full.js`:
 |---|---|
 | `bath-clear-path` | a 0.60 m body has a flooded route from the flat's root to 0.40 m off every fixture, and ≥ 2 m² of standable floor (measured 2.67 m², against 0.24 m² before the enlargement) |
 | `bath-luma-in-band` | the bathroom's mean luma is 0.7 … 1.5 of the median of the played rooms and 90 … 200 absolute, so it is neither the dark room again nor a milky one |
-| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (4 % / 128) |
+| `entry-reads-lit` | the front door's room renders under 25 % near-black and ≥ 70 mean luma (4 % / 139 since #81; 4 % / 128 at #67 — and a live boot at 800×500 reads even brighter, 2 % / 178) |
 | `front-door-shut-and-found` | `door-front` is built shut, its leaf is `LEAF_W` in the cased 1.02 m opening, the entry camera sees it, and no walk rect is reachable past it |
 
 The three pixel checks render once per page and remember it, the way
