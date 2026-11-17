@@ -103,7 +103,10 @@ export function buildFullRoomba({ THREE, quality = 'full' }) {
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'robot-vacuum';
-  mesh.castShadow = true;
+  // No shadow: the sun's shadow pass would draw this mesh a SECOND time, and
+  // the issue's promise is +1 draw call, max. For an 11 cm floor disc nobody
+  // sees the missing shadow, but the draw table would see the +2.
+  mesh.castShadow = false;
   mesh.receiveShadow = false;
 
   const group = new THREE.Group();
