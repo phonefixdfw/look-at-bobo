@@ -219,7 +219,7 @@ const WALL_Z = LIVING.z0; // -2.9
  *  Returns { living, supports, wallBoxes, pen } in the shape bootGame reads:
  *  `living.sun`, `living.WALL_Z`, `supports` as name -> surface y, and every
  *  plaster/ceiling slab as an AABB for the camera-gap and sight-line checks. */
-export function buildFullApartment(scene) {
+export function buildFullApartment(scene, boot = {}) {
   const flat = new THREE.Group();
   scene.add(flat);
 
@@ -584,7 +584,8 @@ export function buildFullApartment(scene) {
   // living room is the last big block of the shell left at placeholder size,
   // and its pieces share their footprints with the COLLIDERS splice in
   // game/full-level.js, so what Bobo's body stops against is what gets drawn.
-  buildFullLiving(flat);
+  const livingGroup = buildFullLiving(flat, boot);
+  const tv = livingGroup.userData.tv; // issue #84: the kart screen the TV plays
 
   // ── the bathroom and the balcony (issue #49) ──────────────────────────────
   // Same shape again: every number lives in game/full-bath.js, this is the one
@@ -732,6 +733,14 @@ export function buildFullApartment(scene) {
     // issue #83: the street backdrop — { group, stats, tier } — so the
     // checks can count it, measure the atlas and park the camera per room
     street: { group: street.group, stats: street.stats, tier: street.tier, mesh: street.mesh },
+    // issue #84: the TV's kart screen and the engine's once-a-frame nudge.
+    // tick() repaints and re-uploads the one texture only while the screen
+    // is on camera (per-room cull's visible flags + a frustum test) and the
+    // tab is visible; frozen entirely under `?gate=off`.
+    tv,
+    onRender(camera) {
+      tv.tick(performance.now(), camera);
+    },
     // every plaster slab (walls, parapets, ceilings) as an AABB, from the
     // definitions that were actually built (src/reach.js measures the walls
     // you can actually see — floors are not walls and are deliberately out)

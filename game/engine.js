@@ -356,7 +356,7 @@ export function bootGame(cfg) {
   // ---------------------------------------------------------------------------
   // 2. The apartment, the cast, the celebration, the hand, the world
   // ---------------------------------------------------------------------------
-  const apt = cfg.buildApartment(scene);
+  const apt = cfg.buildApartment(scene, { SETTINGS, gateOff: GATE_OFF });
   const { living, supports } = apt;
   const { sun, WALL_Z } = living;
 
@@ -2078,7 +2078,7 @@ export function bootGame(cfg) {
     // moment's contact band, room coverage). The slice adds none. Issue #58
     // hands the Patriot pieces (rule, reward, costume, pop) down the same way.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
+      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, aptTv: apt.tv ?? null, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
     }
 
     game.score = savedScore;
@@ -2157,6 +2157,7 @@ export function bootGame(cfg) {
         // them one box at a time. A level with no cull (the slice, the demo)
         // draws exactly what it always drew.
         apt.cull?.update(camera);
+        apt.onRender?.(camera); // issue #84: the level's once-per-frame nudge (TV screen)
         setRendering(true);
         try {
           renderer.render(scene, camera);

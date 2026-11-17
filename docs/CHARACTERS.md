@@ -105,3 +105,17 @@ themselves are reviewed against this page.
 ## Casting / reference needs (provisional defaults accepted; real references still TBD if not supplied)
 - **Partially supplied:** one Bobo photo is on file ([`docs/reference/bobo-01.png`](reference/bobo-01.png), shows him at ~10 lb). **Still wanted:** a recent ~15 lb photo, more angles (side/back/tail/belly), a pose video if you have one, and a photo of the decoy cat if he has one — each would replace an assumption, none is invented in the meantime. Without them, art proceeds from the written description + this photo only.
 - **Accepted provisional default / Step 1 direction:** Use **generic "normal cat stuff"** (lounging, rolling over, stretching, napping, curling up, etc.) as placeholders. **No claims are made about Bobo's specific real habits**; Bobo-specific habits remain not specified until references or descriptions are provided.
+
+## The player on the couch (issue #84)
+
+Brandon asked for "Mario Kart on the TV in living room" — so the flat now
+plays a kart game on the living-room TV, and it is fair to say **the real
+Brandon, when he is not hunting Bobo around his own flat, is the person on
+that couch racing cartoon karts.** What the TV actually shows is an
+**original look-alike, "KART DASH"** (`src/kart-screen.js`, design record in
+`docs/ART_STYLE.md` §13): invented round-headed drivers in plain one-colour
+helmets, an invented rainbow-edged course, an invented title. None of
+Nintendo's characters, tracks, logos or name appear anywhere — the check
+`kart-words-original` scans every string the screen ever draws to keep that
+promise mechanically. The joke the screen tells is the genre's, not one
+company's; the person playing it is yours.

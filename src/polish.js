@@ -775,12 +775,14 @@ function fabric(color, { uvTile = 0.12, roughness = 0.92, sheen = 0.25 } = {}) {
 }
 
 /** The TV screen: emissive, so the panel is the brightest thing in the corner
- *  of the room even though it is not a real light (the light cap is 6). */
-function tvScreenMaterial() {
+ *  of the room even though it is not a real light (the light cap is 6).
+ *  Issue #84: the full page passes the animated kart-racing canvas as `map`;
+ *  the default stays the old still frame for any other caller. */
+function tvScreenMaterial(map = tvScreenMap) {
   return new THREE.MeshStandardMaterial({
     color: new THREE.Color(0x0c1017),
     emissive: new THREE.Color(0xffffff),
-    emissiveMap: tvScreenMap,
+    emissiveMap: map,
     emissiveIntensity: 1.12,
     roughness: 0.28,
     metalness: 0,
