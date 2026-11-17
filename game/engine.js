@@ -550,6 +550,13 @@ export function bootGame(cfg) {
   let rng = mulberry32(SEED);
   let queue = [];
   let refills = 0;
+  // issue #88: the spot the queue served LAST, across refills AND across runs
+  // of one session (it is deliberately never reset — see rerollRunSeed's
+  // note). pickSpotCycle takes it as `prevId` so a refill seam, or a fresh
+  // run's first round, can never open on the spot the player has just
+  // watched. capture/bots pin seeds and restart replays the same run; the
+  // seam rule is seed-independent, so those paths are unaffected.
+  let lastServed = null;
   let patriotRng = mulberry32(hashId(`${PATRIOT.seedTag} ${SEED}`)); // issue #58: the costume's own dice stream, re-seeded every run
   let forceNextPatriot = false; // LC.patriot(true): dress the next LEGAL find
   /** Every new run starts the costume story from scratch: fresh dice, fresh
@@ -585,12 +592,14 @@ export function bootGame(cfg) {
       queue = POOL ? MOMENTS.slice(0, 2).map((m) => m.canonical) : MOMENT_IDS.slice(0, 2);
       return;
     }
-    queue = POOL ? pickSpotCycle(mulberry32(SEED + refills++ * 101)) : seededShuffle(MOMENT_IDS, SEED + refills++ * 101);
+    queue = POOL ? pickSpotCycle(mulberry32(SEED + refills++ * 101), lastServed) : seededShuffle(MOMENT_IDS, SEED + refills++ * 101);
   }
   function nextQueueId() {
     if (!queue.length) refillQueue();
     if (PLANT === 'repeats') return queue[0]; // never pops: repeats forever
-    return queue.shift();
+    const id = queue.shift();
+    if (POOL) lastServed = id; // issue #88: the seam rule's memory
+    return id;
   }
   /** The record this round is played from: a spot (pool) or a moment type
    *  (slice). Spot records carry the same shape the hydrated moments do —
@@ -1378,6 +1387,7 @@ export function bootGame(cfg) {
     {
       const savedQ = queue.slice();
       const savedR = refills;
+      const savedLast = lastServed;
       queue = [];
       refills = 7;
       const seen = [];
@@ -1389,6 +1399,7 @@ export function bootGame(cfg) {
       }
       queue = savedQ;
       refills = savedR;
+      lastServed = savedLast;
     }
     add('queue-no-repeats', repeatsOk ? `${MOMENT_IDS.length} distinct per cycle` : 'repeat inside a cycle', 'no repeats within a cycle', repeatsOk, 'shuffled cycle, reshuffle when exhausted');
 
@@ -1426,27 +1437,39 @@ export function bootGame(cfg) {
 
       let drawBad = null;
       for (let k = 1; k <= 200 && !drawBad; k++) {
-        const draw = pickSpotCycle(mulberry32(k * 977 + 13));
-        const rooms = draw.map((id) => POOL.get(id)?.room);
-        const types = draw.map((id) => POOL.get(id)?.type);
-        if (draw.length !== MOMENT_IDS.length || new Set(draw).size !== draw.length) drawBad = `seed ${k}: not ${MOMENT_IDS.length} distinct spots`;
-        else if (rooms.some((r) => !r)) drawBad = `seed ${k}: drew an id outside the pool`;
-        else if (new Set(types).size !== MOMENT_IDS.length) drawBad = `seed ${k}: a moment type played twice`;
-        else for (let i = 1; i < draw.length && !drawBad; i++) if (rooms[i] === rooms[i - 1]) drawBad = `seed ${k}: ${draw[i - 1]}|${draw[i]} same room back to back`;
-        for (const id of draw) {
-          if (drawBad) break;
-          const rec = POOL.get(id);
-          const d = chooseDecoySpot(rec, mulberry32(k * 7 + 3));
-          const dist = d ? Math.hypot(d.pos[0] - rec.spot[0], d.pos[2] - rec.spot[2]) : -1;
-          if (!d || dist < DECOY_MIN_DIST) drawBad = `seed ${k}: decoy illegal at ${id} (${d?.id ?? 'none'} @${dist.toFixed(2)} m)`;
+        // Issue #88: a run is no longer one cycle — this plays three refills
+        // per seed the way the queue does (seed + pass × 101, prevId threaded)
+        // and the seam between refills must be as clean as the joins inside a
+        // cycle: no spot twice in a row, no room twice in a row.
+        let prev = null;
+        let prevRoom = null;
+        for (let pass = 0; pass < 3 && !drawBad; pass++) {
+          const draw = pickSpotCycle(mulberry32(k * 977 + 13 + pass * 101), prev);
+          const rooms = draw.map((id) => POOL.get(id)?.room);
+          const types = draw.map((id) => POOL.get(id)?.type);
+          if (draw.length !== MOMENT_IDS.length || new Set(draw).size !== draw.length) drawBad = `seed ${k}: not ${MOMENT_IDS.length} distinct spots`;
+          else if (rooms.some((r) => !r)) drawBad = `seed ${k}: drew an id outside the pool`;
+          else if (new Set(types).size !== MOMENT_IDS.length) drawBad = `seed ${k}: a moment type played twice`;
+          else for (let i = 1; i < draw.length && !drawBad; i++) if (rooms[i] === rooms[i - 1]) drawBad = `seed ${k}: ${draw[i - 1]}|${draw[i]} same room back to back`;
+          if (prev && draw[0] === prev) drawBad = `seed ${k} refill ${pass}: ${draw[0]} served again across the seam`;
+          else if (prevRoom && rooms[0] === prevRoom) drawBad = `seed ${k} refill ${pass}: ${rooms[0]} across the seam back to back`;
+          prev = draw[draw.length - 1];
+          prevRoom = rooms[rooms.length - 1];
+          for (const id of draw) {
+            if (drawBad) break;
+            const rec = POOL.get(id);
+            const d = chooseDecoySpot(rec, mulberry32(k * 7 + 3));
+            const dist = d ? Math.hypot(d.pos[0] - rec.spot[0], d.pos[2] - rec.spot[2]) : -1;
+            if (!d || dist < DECOY_MIN_DIST) drawBad = `seed ${k}: decoy illegal at ${id} (${d?.id ?? 'none'} @${dist.toFixed(2)} m)`;
+          }
         }
       }
       add(
         'run-draw-legal',
-        drawBad ?? '200 seeded draws: ten distinct, one per type, rooms alternate, decoys legal',
+        drawBad ?? '200 seeded runs × 3 refills: ten distinct, one per type, rooms alternate, seams hold, decoys legal',
         'every draw legal',
         !drawBad,
-        'pickSpotCycle over the whole pool — same seed, same run (issue #53); a +3 win (issue #58) may end a run before the cycle is spent, never out of order',
+        'pickSpotCycle over the whole pool — same seed, same run (issue #53); a +3 win (issue #58) may end a run before the cycle is spent, never out of order; issue #88: the refill seam may not repeat the last spot or its room',
       );
     }
 
@@ -2354,9 +2377,15 @@ export function bootGame(cfg) {
       aimAt(which = 'bobo') {
         const root = which === 'decoy' ? decoy.root : bobo.root;
         const want = root.name; // 'cat-bobo' | 'cat-decoy'
+        // Aim at the centre of what the cat ACTUALLY renders as, not an
+        // authored guess above its root: a sit rig's root sits at the front
+        // paws, and `root + 0.34` flew over the cat at `window-bird.balcony-
+        // rail` — not one vantage within 4 m even landed the find-ray (#88).
+        const bbox = new THREE.Box3().setFromObject(root);
+        const centre = bbox.getCenter(new THREE.Vector3());
         const cx = root.position.x;
         const cz = root.position.z;
-        const headY = root.position.y + (which === 'decoy' ? 0.36 : 0.34);
+        const headY = centre.y;
         const px0 = player.x;
         const pz0 = player.z;
         const dx0 = px0 - cx;
@@ -2366,9 +2395,16 @@ export function bootGame(cfg) {
           raycaster.setFromCamera(CENTER, camera);
           for (const hit of raycaster.intersectObjects(scene.children, true)) {
             if (!hit.object.isMesh || !hit.object.visible) continue;
+            // #88: the eye sees THROUGH glass (patio-door panes are
+            // transparent, opacity 0.22) — a tool ray that stops on a pane
+            // reports a vantage no player would call blocked. Same reason the
+            // curtain exception exists for `hide` spots: the model must match
+            // the eye. Opaque props still count.
+            const mats = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
+            if (mats.some((m) => m && m.transparent)) continue;
             let o = hit.object;
             while (o && !(o.name ?? '').startsWith('cat-')) o = o.parent;
-            return o ? o.name : 'wall/prop';
+            return o ? o.name : ((hit.object.name || (hit.object.userData && hit.object.userData.tag) || 'merged') + '@' + hit.point.toArray().map((v) => v.toFixed(2)).join(','));
           }
           return null;
         };
@@ -2377,8 +2413,8 @@ export function bootGame(cfg) {
         const aimFrom = (probe) => {
           player.x = probe.x;
           player.z = probe.z;
-          const dx = cx - player.x;
-          const dz = cz - player.z;
+          const dx = centre.x - player.x;
+          const dz = centre.z - player.z;
           player.yaw = Math.atan2(-dx, -dz);
           player.pitch = clamp(Math.atan2(headY - MOVE.eye, Math.hypot(dx, dz)), -MOVE.pitchLimit, MOVE.pitchLimit);
           applyCameraFromPlayer();
@@ -2399,16 +2435,43 @@ export function bootGame(cfg) {
         }
         // The line back to where the player was may cross a wall (cross-room
         // respawn): walk a ring around the cat and take the first angle from
-        // which the ray reaches it — every spot in this game is open floor.
+        // which the ray reaches it. The 48-spot pool (#88) proved the old
+        // 3-distances × 8-angles ring too coarse — a baluster or jamb eats a
+        // thin head-ray at single angles — so sample like a player sidestepping.
         if (last !== want) {
-          for (const dist of [1.6, 2.2, 2.8]) {
-            for (let k = 0; k < 8; k++) {
-              const a = (k / 8) * Math.PI * 2 + 0.3;
+          for (let dist = 1.3; dist <= 3.4; dist += 0.3) {
+            for (let k = 0; k < 24; k++) {
+              const a = (k / 24) * Math.PI * 2 + 0.3;
               const probe = { x: cx + Math.sin(a) * dist, z: cz + Math.cos(a) * dist };
               if (!walkable(probe)) continue;
               last = aimFrom(probe);
               if (last === want) break;
             }
+            if (last === want) break;
+          }
+        }
+        // Still nothing: stand on any cell the engine's OWN body grid says a
+        // player can reach and stand on (the same grid the findability and
+        // face checks flood-fill), nearest first, and let the real centre ray
+        // decide. `window-bird.balcony-rail` proved the raw rings insufficient:
+        // the balcony has no floor space 1.3 m from a centre-cat, and the
+        // living-room sight-lines thread the patio door's glass.
+        if (last !== want) {
+          const grid = buildGrid({ rects: WALK_RECTS, colliders: COLLIDERS, radius: MOVE.playerRadius });
+          const at = grid.cellAt(player.x, player.z);
+          const start = at >= 0 && grid.free[at] ? at : grid.nearCell(player.x, player.z);
+          const seen = grid.flood(start);
+          const cands = [];
+          for (let idx = 0; idx < grid.free.length; idx++) {
+            if (!grid.free[idx] || !seen[idx]) continue;
+            const c = grid.centre(idx);
+            const d = Math.hypot(c.x - cx, c.z - cz);
+            if (d < 0.9 || d > 4.2) continue;
+            cands.push({ c, d });
+          }
+          cands.sort((a, b) => a.d - b.d);
+          for (const { c } of cands) {
+            last = aimFrom(c);
             if (last === want) break;
           }
         }

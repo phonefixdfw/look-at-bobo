@@ -247,15 +247,23 @@ no same-spot respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance),
 `winAt: 10`. The full flat draws each run from the spot pool instead —
 see "The spot pool" below (issue #53).
 
-## The spot pool (`SPOTS`, 37 — wired up by issue #53, dining added by #81, cat furniture by #82)
+## The spot pool (`SPOTS`, 48 — wired up by issue #53, dining added by #81, cat furniture by #82, spread by #88)
 
-`full-level.js` exports `SPOTS`: 37 authored places Bobo can actually be,
+`full-level.js` exports `SPOTS`: 48 authored places Bobo can actually be,
 each with the moment `type` it belongs to, its `room`, `pose`, `spot`
 [x, y, z] and `faceYaw`. Every moment's canonical capture spot is one of
 them, named by `MOMENTS[i].canonical` (★ below); the rest are alternates
 drawn into play by issue #53's run draw. Ids are `<type>.<place>`. A spot
 marked ‡ hides its cat behind a prop (issue #70 — see "Partial hiding"
 below the table).
+
+Issue #88 rebuilt the pool around one measurement (docs/PLAYTEST_NOTES.md):
+over 1000 seeds no spot was ever drawn for more than 10 % of all picks,
+and the bedroom alone ate 47.4 % of them. Two structural fixes ride in
+this table — every type that was a 100 %-per-run singleton got a sibling
+in a second room (2 spots ⇒ ≤ 5 % each), and the bedroom gave up three
+spots to the hall runner and the balcony — plus 15 new spots built from
+furniture the flat already draws (and one new prop, the parcel box).
 
 | id | room | pose | Bobo's spot | faceYaw |
 |---|---|---|---|---|
@@ -265,69 +273,86 @@ below the table).
 | `window-bird.n-window` ★ ‡ | living | sit | (−1.35, floor, −2.5) | 1.71 |
 | `window-bird.balcony-door` | living | sit | (1.5, floor, −2.45) | 3.04 |
 | `box-sit.box` ★ | living | sit | (−2.075, boxFloor, 1.575) | −1.57 |
+| `couch-loaf.bookshelf-top` ◊ | living | loaf | (−3.12, shelfTop, −2.42) | −1.57 |
+| `couch-loaf.couch-arm` ◊ | living | side | (−2.8, couchArmS, 0.84) | −2.74 |
 | `window-bird.balcony-rail` | balcony | sit | (1.35, floor, −3.85) | −2.9 |
 | `couch-loaf.balcony-chair` | balcony | loaf | (2.15, chairSeat, −3.6) | 1.77 |
+| `laundry-nap.balcony-pad` ◊ | balcony | side | (1.0, floor, −4.05) | −2.31 |
+| `keyboard-sit.balcony-deck` ◊ | balcony | side | (0.95, floor, −3.45) | 2.31 |
+| `bed-stretch.balcony-stretch` ◊ | balcony | back | (1.7, floor, −4.15) | 1.99 |
 | `sink-sit.sink` ★ | kitchen | sit | (4.15, counterTop, −2.6) | −2.92 |
 | `sink-sit.counter-return` ‡ | kitchen | loaf | (2.82, counterTopW, −1.5) | 3.02 |
-| `sink-sit.fridge` | kitchen | sit | (5.2, floor, −1.75) | 1.4 |
 | `sink-sit.bar` | kitchen | side | (4.55, barTop, 0.4) | −0.14 |
+| `sink-sit.fridge-top` ◊ | kitchen | loaf | (5.22, fridgeTop, −2.55) | −2.2 |
+| `window-bird.counter-n` ◊ | kitchen | loaf | (3.72, counterTop, −2.58) | −2.15 |
+| `laundry-nap.fridge-keep` ◊ | kitchen | side | (4.98, floor, −2.05) | 1.58 |
 | `sink-sit.table` † | dining | sit | (4.3, diningTop, 2.28) | −1.57 |
 | `sink-sit.chair-n` § | dining | sit | (4.06, diningSeatN, 1.73) | 0 |
 | `sink-sit.chair-e` § | dining | sit | (4.61, diningSeatE, 2.28) | −1.57 |
 | `sink-sit.chair-s` § | dining | sit | (4.06, diningSeatS, 2.83) | 1.57 |
 | `sink-sit.chair-w` § | dining | sit | (3.51, diningSeatW, 2.28) | 0 |
+| `box-sit.box-parcel` ◊ | dining | sit | (5.25, parcelBoxFloor, 4.13) | −1 |
+| `keyboard-sit.sideboard` ◊ | dining | loaf | (4.62, sideboardTop, 4.18) | 0.31 |
+| `laundry-nap.dining-corner` ◊ | dining | side | (3.2, floor, 1.2) | 1.48 |
+| `blanket-biscuits.side-nook` ◊ | dining | loaf | (5.28, floor, 2.62) | 0.31 |
 | `hall-chase.dining` † | dining | loaf | (4.9, floor, 1.15) | 1.57 |
 | `hall-chase.kitchen` | kitchen | loaf | (4.3, floor, −1.3) | 1.58 |
-| `hall-chase.hall` ★ | hall | loaf | (−0.35, floor, 3.3) | −0.19 |
+| `hall-chase.hall` ★ | hall | loaf | (−0.35, floor, 3.3) | 0.585 |
 | `hall-chase.hall-door` | hall | sit | (0.3, floor, 4.85) | 1.55 |
+| `bed-stretch.hall-rug` ◊ | hall | back | (0, floor, 4.3) | 3.14 |
+| `laundry-nap.hall-runner` ◊ | hall | side | (0.25, floor, 3.6) | 1.48 |
+| `blanket-biscuits.hall-corner` ◊ | hall | loaf | (−0.6, floor, 4.9) | 0.31 |
 | `hall-chase.entry` | entry | loaf | (1.77, floor, 3.4) | 1.81 |
 | `hall-chase.entry-door` | entry | loaf | (1.82, floor, 3.0) | 1.57 |
 | `hall-chase.bath-mat` ‡ | bathroom | side | (−2.2, floor, 4.12) | 1.22 |
-| `hall-chase.vanity` | bathroom | sit | (−2.65, vanityTop, 2.46) | 3.14 |
+| `hall-chase.vanity` | bathroom | sit | (−2.65, vanityTop, 2.46) | 3.1416 |
 | `laundry-nap.bath-tub` ‡ | bathroom | side | (−2.55, tubWell, 4.85) | −0.44 |
 | `desk-pen.desk` ★ | bedroom | sit | (−1.85, deskTop, 5.7) | 2.89 |
 | `desk-pen.desk-end` | bedroom | loaf | (−2.3, deskTop, 5.85) | 3.01 |
 | `keyboard-sit.keyboard` ★ | bedroom | sit | (−1.85, kbTop, 5.82) | 3.13 |
 | `laundry-nap.basket` ★ | bedroom | side | (0.82, laundryTop, 9) | 1.46 |
-| `laundry-nap.nightstand` | bedroom | side | (0.95, nightstandTop, 6.6) | 0.28 |
-| `laundry-nap.desk-chair` § | bedroom | side | (−1.98, deskChair, 6.29) | 3.14 |
-| `bed-stretch.bed` ★ | bedroom | back | (0.2, bedTop, 7.35) | 0.08 |
-| `bed-stretch.bed-foot` | bedroom | side | (−0.4, bedTop, 8.25) | 1.43 |
-| `blanket-biscuits.blanket` ★ | bedroom | sit | (0.2, blanketTop, 7.15) | 0 |
-| `blanket-biscuits.wardrobe` | bedroom | loaf | (−1.55, floor, 8) | 0.03 |
+| `bed-stretch.bed` ★ | bedroom | back | (−1.6, bedTop, 7.55) | −0.08 |
+| `blanket-biscuits.blanket` ★ | bedroom | sit | (−0.755, blanketTop, 7.855) | 0 |
 | `blanket-biscuits.dresser-gap` ‡ | bedroom | loaf | (0.95, floor, 6.85) | 2.62 |
+| `laundry-nap.desk-chair` § | bedroom | side | (−1.98, deskChair, 6.29) | 3.14 |
 
-† — issue #81's two dining spots. Their yaws are the measured `bestApproach`
-ones (the `cats-face-the-room` vantage, not a guess): the table sitter faces
-east at the gap off the table's east end, the loofer faces west along the
-table's north side at the lane a chase would come from. Both rode the table's
-final pin to (4.06, 2.28) — the spot x is the capsule centre, 0.24 east of
-the table's.
+† — issue #81's two dining spots; § — issue #82's six cat-furniture spots
+(the chairs face the aisle a player will stand on, not the roast — see
+the #82 note in the git history; `cats-face-the-room` re-derives every
+one of these yaws). ◊ — issue #88's fifteen. They ride the same rule as
+the chairs: the yaw is whatever the measured `bestApproach` vantage
+accepts, not a guess. Notes worth keeping:
 
-§ — issue #82's six cat-furniture spots. The pad loaf faces east into the
-living room like the couch loaf it shares the sofa with; the desk chair
-nap faces north down the bedroom's length, toward the door walk. The
-chairs do NOT face the table — a sitter aimed at a round table shows no
-face from any aisle — they carry the yaws `cats-face-the-room` measures:
-each faces the aisle a standing player will be on (north chair south
-down the west aisle, east chair east down its own shoulder of the room,
-south chair west across the room, west chair south). chair-s re-measured
-3.93 → 1.57 on the check's first run: the intuitive yaw read 135° off its
-approach. The desk-chair sits as `laundry-nap`, not `sink-sit`: the run
-draw already locks the bedroom to exactly five of the ten moment types
-(`run-draw-legal`'s bound) and laundry-nap is one of them — a sixth
-bedroom sink-sit spot would break the alternation, a fourth laundry-nap
-spot is free. `window-bird.e-window` is gone from this table on purpose:
-#81 removed the spot with the kitchen window's plaster and the row was
-the last place it still lived.
+- `couch-loaf.bookshelf-top` loafs rather than sits: at shelf top 1.90 a
+  sitting cat's back meets the ceiling clearance the pose sweep checks.
+  The wardrobe top (2.10) was the sibling candidate and lost the same
+  arithmetic — see `SUPPORT_DEFS.shelfTop`.
+- `window-bird.counter-n` is the kitchen's window sill honestly: the
+  north window's sill row is 0.95 and the counter's marble tops out at
+  0.90 directly under it (`win-kitchen-n`), so the counter IS the sill
+  there. The other windows keep ~2 cm of trim board — nothing cat-sized
+  can sit on those, and no spot pretends otherwise.
+- `box-sit.box-parcel` needed a prop: the flat had exactly one box. The
+  parcel box (0.50 × 0.50 × 0.42 cardboard, scale tag `cardboard-box`)
+  stands by the sideboard's east end, takes the ruler row the style-test
+  box already has, and is the pool's only new mesh this round.
+- The three hall-runner spots sit on the drawn 0.68 × 2.70 runner
+  (`full-entry.js` row 22) that no spot ever used; the three balcony
+  floor spots keep the railing's push pad (walkable strip z ≥ −4.32) and
+  the chair's footprint clear of the 0.35 m spacing.
 
-Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 11 · living 6 ·
-kitchen 5 · dining 6 (chairs by #82) · bathroom 3 · hall 2 · entry 2 · balcony 2. Two data moves got
-there (issue #53): `hall-chase.living` (2.6, 0.2) **moved** to
-`hall-chase.entry-door` — living had 6 spots, entry only 1, and (2.6, 0.2)
-sat on the rug beside the style-test box anyway — and `window-bird.balcony-door`
-had its faceYaw corrected −0.1 → 3.04 (the pool sweep found it 96° off its
-approach; it's not a canonical capture spot, so no baseline moved).
+Room coverage (≥ 2 each — `spot-pool-covers-rooms`): dining 10 · living 8
+· bedroom 8 · kitchen 7 · balcony 5 · hall 5 · bathroom 3 · entry 2. The
+issue #88 moves (the table's ◊ rows): `bed-stretch.bed-foot` moved to the
+hall runner, `blanket-biscuits.wardrobe` to the hall corner by the
+bedroom door, and `laundry-nap.nightstand` was dropped — its balcony-pad
+sibling took the sun — because the nightstand's second nap was the
+pool's third bedroom laundry seat and the room needed the spots gone more
+than the moment needed the variety. `sink-sit.fridge` was the one removal
+that was not the bedroom's: the fridge now carries its moment once, from
+the top, and `laundry-nap.fridge-keep` already owns the cool pocket at
+its foot — sitting twice against one appliance was pool padding, not
+variety.
 
 ### Partial hiding (issue #70)
 
@@ -376,19 +401,25 @@ engine's eye-level 1.05 m LOS clip) + the hide box — and fails the build
 naming the spot if any hiding cat has **no** vantage that sees it
 ("partly hidden, never unfindable"). It also fails a `hide` that hides
 nothing (≥ 50 % of the ring sees the cat), enforces ≤ 25 % of the pool
-hiding (6/37 = 16 % today), and requires ≥ 6 hiding spots overall so the
+hiding (6/48 = 12 % today), and requires ≥ 6 hiding spots overall so the
 feature can't silently rot away. Full check count 81 → **82**, and
 `playtest:stress:full` passes `--checks 82` to match.
 
 **Run draw** (`pickSpotCycle`, engine's queue slot): every run draws TEN
-spots — one per moment type, all ten types exactly once — and the round
-order is itself randomised (weighted-random greedy over a dead-end-guarded
-frontier — the bedroom locks exactly five of the ten types, the most one
-room can hold without neighbours colliding, so plain greedy could paint
-itself into a corner; the safety filter keeps it provably deadlock-free). Two catches can therefore never land in the same room
+spots — one per moment type, all ten types exactly once — and the order
+is itself randomised (weighted-random greedy over a dead-end-guarded
+frontier — with the most-loaded room holding five of the ten types, plain
+greedy could paint itself into a corner; the safety filter keeps it
+provably deadlock-free. Since issue #88 spread every type but `desk-pen`
+over two rooms or more, the worst legal run visits even the bedroom twice). Two catches can therefore never land in the same room
 back to back. The draw is seeded per refill (`mulberry32(SEED + refills ×
 101)`), so the same seed replays the same run; `run-draw-legal` sweeps 200
-seeded draws. `game.spotId` names the live spot; `game.momentId` stays the
+seeded draws. Issue #88 closed the last seam: `pickSpotCycle(rand,
+prevId)` takes the spot the queue served LAST and starts the cycle one
+room away from it, and the engine threads its live `lastServed` through
+every refill of a session (never reset on restart — that is what makes
+two consecutive runs of the same sitting never open on the same spot or
+the same room). `game.spotId` names the live spot; `game.momentId` stays the
 moment type (labels, voice, pose anims key off it). Decoys now *prefer* a
 different room than Bobo's new spot (legality unchanged: never Bobo's spot,
 ≥ 1.2 m, facing).

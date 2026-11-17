@@ -63,6 +63,7 @@ const PAGE = arg('page', 'game/slice.html');
 //            seed-reproduces-the-run + pool-coverage-over-random-seeds (70 → 77).
 // issue #81: full gained hall-width-in-band + dining-walkways + the three dining real-scale rows and a doorway case (+4: 87 → 91).
 // issue #82: full gained heat-pad-rests-on-cushion + cat-props-clear-the-plan (91 → 93); slice stays 46.
+// issue #88: full gained spot-pool-spread (93 → 94); slice stays 46.
 const CHECKS = Number(arg("checks", 51));
 
 const server = await startStaticServer({ root: REPO, port: 0 });
@@ -130,7 +131,9 @@ try {
       await waitPhase(page, 'find');
       const aim = await page.evaluate(() => {
         const a = window.LC.aimAt('bobo');
-        return { hits: a.hits, probe: window.LC.aimProbe(), hide: window.LC.spot().hide };
+        // The slice has no spot pool: LC.spot() is null there (issue #88's
+        // slice re-run caught it — #81 wrote this line pool-only).
+        return { hits: a.hits, probe: window.LC.aimProbe(), hide: (window.LC.spot() || {}).hide };
       });
       // Issue #70 changed the rule for the six `hide` spots: the drawn cover
       // is meant to hide the cat from the EYE (a props-visible centre ray can
@@ -178,7 +181,7 @@ try {
     await waitPhase(page, 'find');
     const aim = await page.evaluate(() => {
       const a = window.LC.aimAt('decoy');
-      const hide = window.LC.spot(window.LC.state().decoyId).hide; // #70: decoys may hide too
+      const hide = (window.LC.spot(window.LC.state().decoyId) || {}).hide; // #70: decoys may hide too (null on the slice — no pool)
       const probe = window.LC.aimProbe();
       window.LC.trigger('wrong'); // what aimShout does on a decoy hit
       return { hits: a.hits, probe, hide };

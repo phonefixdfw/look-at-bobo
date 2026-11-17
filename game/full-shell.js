@@ -388,6 +388,15 @@ export const SUPPORT_DEFS = {
   // so the pad cat stands on furniture twice over and the pad never floats.
   heatPad: { x0: -2.93, z0: 0.08, x1: -2.53, z1: 0.63, top: 0.48 },
   sofaBackTop: { x0: -3.28, z0: -1.1, x1: -3.04, z1: 0.9, top: 0.85 },
+  // issue #88: the couch's south arm — the arm slab as game/full-living.js
+  // draws it (bx(S.x0, 0.08, S.z1 − armW, S.x1, armH, S.z1)), inset a step so
+  // the 0.21 m spot capsule lands on the 0.22 m of upholstery, top 0.62.
+  couchArmS: { x0: -3.24, z0: 0.75, x1: -2.4, z1: 0.93, top: 0.62 },
+  // issue #88: the living bookshelf's own top board (row 41: 0.90 × 0.32 ×
+  // 1.90, FOOT.bookshelf) — a cat loafing here leaves his whole back under
+  // the 2.5 m ceiling. (The wardrobe top at 2.10 was the other candidate and
+  // never got a patch: a sitting cat under the ceiling reads as a squeeze.)
+  shelfTop: { x0: -3.24, z0: -2.84, x1: -3.0, z1: -2.02, top: 1.9 },
   coffeeTop: { x0: -1.87, z0: -0.97, x1: -1.33, z1: 0.17, top: 0.45 },
   boxFloor: { x0: -2.3, z0: 1.4, x1: -1.85, z1: 1.75, top: 0.001 },
   tvTop: { x0: 2.0, z0: -2.38, x1: 2.38, z1: -0.87, top: 0.45 },
@@ -405,12 +414,25 @@ export const SUPPORT_DEFS = {
   diningSeatE: { x0: 4.39, z0: 2.055, x1: 4.83, z1: 2.505, top: 0.45 },
   diningSeatS: { x0: 3.84, z0: 2.605, x1: 4.28, z1: 3.055, top: 0.45 },
   diningSeatW: { x0: 3.29, z0: 2.055, x1: 3.73, z1: 2.505, top: 0.45 },
+  // issue #88: the sideboard's own top (game/full-dining.js: sideX 3.6…4.88,
+  // sideZ 3.98…4.38, top 0.86) inset a step — the dishes' shelf becomes the
+  // cat's shelf, and `every-moment-contact` proves the paws land on the wood.
+  sideboardTop: { x0: 3.66, z0: 4.02, x1: 4.82, z1: 4.34, top: 0.86 },
+  // issue #88: the delivered parcel box game/full-dining.js draws by the
+  // sideboard's east end — four walls, no bottom, the living room box's own
+  // trick: Bobo sits on the flat's oak (top 0.001) inside walls that start at
+  // 0.02, exactly like SUPPORT_DEFS.boxFloor does for row 60's hero box.
+  parcelBoxFloor: { x0: 5.05, z0: 3.93, x1: 5.45, z1: 4.33, top: 0.001 },
   // kitchen
   counterTop: { x0: 2.52, z0: -2.88, x1: 4.93, z1: -2.32, top: 0.9 },
   counterTopW: { x0: 2.54, z0: -2.28, x1: 3.1, z1: -1.07, top: 0.9 },
   // issue #81: the bar stepped 0.44 m east (its old west end stood where the
   // kitchen→dining doorway's jamb now is) and gave up 0.20 m of length
   barTop: { x0: 3.76, z0: 0.22, x1: 5.12, z1: 0.58, top: 1.05 },
+  // issue #88: the fridge's own top face (KITCHEN_FRIDGE x 4.92…5.52,
+  // z −2.90…−2.20, fridgeH 1.8) inset a step — the warm box's roof, the one
+  // place in the kitchen a cat claims for the view over the counter run.
+  fridgeTop: { x0: 4.96, z0: -2.86, x1: 5.48, z1: -2.24, top: 1.8 },
   // balcony (docs/CHARACTERS.md: Bobo does go outside)
   chairSeat: { x0: 1.93, z0: -3.87, x1: 2.42, z1: -3.33, top: 0.42 },
   // bathroom — issue #49: the counter grew to its ruler footprint (0.90 ×

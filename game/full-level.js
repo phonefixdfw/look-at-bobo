@@ -167,6 +167,7 @@ export const SIGHT_HEIGHTS = {
   // set's chairs and sideboard are drawn now (the table row stays, 0.75).
   'dining-table': 0.75, 'dining-chair-n': 0.86, 'dining-chair-e': 0.86,
   'dining-chair-s': 0.86, 'dining-chair-w': 0.86, 'sideboard': 0.86,
+  'parcel-box': 0.42, // issue #88: the delivered box's rim height, true as drawn
   'counter-n': 0.9, 'counter-w': 0.9, 'counter-e': 0.9, 'fridge': 1.8,
   'kitchen-bar': 1.05, 'bar-stool-a': 0.62, 'bar-stool-b': 0.62,
   'kitchen-bin': 0.645, // issue #82: the 0.62 food-waste bin plus its lid rim
@@ -290,7 +291,7 @@ function spot(type, place, room, pose, pos, faceYaw, extra) {
 }
 
 export const SPOTS = [
-  // ── living room (6) ──────────────────────────────────────────────────────
+  // ── living room (8) ──────────────────────────────────────────────────────
   spot('couch-loaf', 'couch', 'living', 'side', [-2.75, 'cushion', -0.1], -0.73, { open: true }),
   spot('couch-loaf', 'sofa-back', 'living', 'loaf', [-3.16, 'sofaBackTop', 0.35], -1.6, { open: true }),
   // issue #82: the yellow heat pad on the south cushion — a loaf of cat on
@@ -303,15 +304,54 @@ export const SPOTS = [
   // dining room took the moment on: see the dining spots below.
   spot('window-bird', 'balcony-door', 'living', 'sit', [1.5, 'floor', -2.45], 3.04), // #53: was yaw −0.1 — the pool facing sweep caught him staring at the balcony (96° off the only approach); a cat sitting in the doorway looking back into the room is the same moment, readable
   spot('box-sit', 'box', 'living', 'sit', [-2.075, 'boxFloor', 1.575], -1.57, { open: true }),
-  // ── balcony (2) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md) ──
+  // issue #88: the shelf above the books. The bookshelf's own top board is a
+  // 0.90 × 0.32 ledge at 1.90 — the loaf-a-cat-takes-on-a-high-place moment,
+  // with the loaf (not a sit) so his back stays clear of the 2.5 m ceiling.
+  // The yaw is the measured one: `cats-face-the-room` reads his only legal
+  // approach from the open living-room floor, and the intuitive "along the
+  // boards" facing came out 162° off it. The wardrobe top (2.10) was the
+  // sibling candidate and lost the ceiling arithmetic — see SUPPORT_DEFS.shelfTop.
+  spot('couch-loaf', 'bookshelf-top', 'living', 'loaf', [-3.12, 'shelfTop', -2.42], -1.57, { open: true }),
+  // issue #88: the arm of the couch. The south arm's 0.22 m of upholstery at
+  // 0.62 — higher than the seat, level with the back he already loafed on.
+  // The yaw is measured, not guessed: `cats-face-the-room` put the intuitive
+  // east-over-the-rug facing 118° off the arm's only standable sight line.
+  spot('couch-loaf', 'couch-arm', 'living', 'side', [-2.8, 'couchArmS', 0.84], -2.74, { open: true }),
+  // ── balcony (5) — the owner's feature, and Bobo uses it (docs/CHARACTERS.md).
+  //    Issue #88 sent three more moments out here: the first warm hours of the
+  //    morning sun reach the deck's west end before anything indoors wakes, so
+  //    a pad, a sit-and-groom and a 4 a.m. stretch all read the same way —
+  //    out through the slider, down off the chair, onto the warm concrete.
+  //    Every one keeps the railing's push pad (walkable strip z ≥ −4.32) and
+  //    the chair's footprint clear of his own 0.35 m minimum spacing. ──
   spot('window-bird', 'balcony-rail', 'balcony', 'sit', [1.35, 'floor', -3.85], -2.9),
   spot('couch-loaf', 'balcony-chair', 'balcony', 'loaf', [2.15, 'chairSeat', -3.6], 1.77, { open: true }),
-  // ── kitchen (5) — the room that read like a playset ──────────────────────
+  spot('laundry-nap', 'balcony-pad', 'balcony', 'side', [1.0, 'floor', -4.05], -2.31, { open: true }),
+  spot('keyboard-sit', 'balcony-deck', 'balcony', 'side', [0.95, 'floor', -3.45], 2.31, { open: true }),
+  spot('bed-stretch', 'balcony-stretch', 'balcony', 'back', [1.7, 'floor', -4.15], 1.99, { open: true }),
+  // ── kitchen (7) — the room that read like a playset ──────────────────────
   spot('sink-sit', 'sink', 'kitchen', 'sit', [4.15, 'counterTop', -2.6], -2.92, { open: true }),
-  spot('sink-sit', 'counter-return', 'kitchen', 'loaf', [2.82, 'counterTopW', -1.5], 3.02, { open: true, hide: 'counter-w' }), // issue #70: loafed on the return's own counter, body half behind the run's west flank — 26% of the ring sees him, `findable` holds the guarantee
-  spot('sink-sit', 'fridge', 'kitchen', 'sit', [5.2, 'floor', -1.75], 1.4),
+  spot('sink-sit', 'counter-return', 'kitchen', 'loaf', [2.82, 'counterTopW', -1.5], 3.02, { open: true, hide: 'counter-w' }), // issue #70: loafed on the return's own counter, body half behind the run's west flank — 26% of the ring sees him, `findable` proves he is never invisible
   spot('sink-sit', 'bar', 'kitchen', 'side', [4.55, 'barTop', 0.4], -0.14, { open: true }), // issue #81: rode the bar's 0.44 m east shift (the kitchen→dining doorway took the bar's old west end)
-  // ── dining (6, issues #81 + #82) — the new room joins the pool with the two
+  // issue #88: the fridge's roof. The floor sit the old `sink-sit.fridge`
+  // kept at the fridge's foot went with this loaf: one fridge, one moment —
+  // the cool-pocket floor west of it is `laundry-nap` territory now anyway.
+  // The top (1.80, SUPPORT_DEFS.fridgeTop) is the loaf for the warm box's
+  // view down the counter run; the yaw is the measured one. The 0.4 m of air
+  // above a loafing cat is more than the ceiling asks of him.
+  spot('sink-sit', 'fridge-top', 'kitchen', 'loaf', [5.22, 'fridgeTop', -2.55], -2.2, { open: true }),
+  // issue #88: the window sill, which in this kitchen IS the counter — the
+  // north window's sill row measures 0.95 and the counter's marble tops out
+  // at 0.90 directly under it (win-kitchen-n z −2.90, run z −2.88…−2.32), so
+  // a loaf on the counter under the glass is a cat on the sill. The other
+  // windows keep ~2 cm of trim board for their sills: nothing cat-sized can
+  // honest-ly sit on those, and this PR is not going to pretend otherwise.
+  spot('window-bird', 'counter-n', 'kitchen', 'loaf', [3.72, 'counterTop', -2.58], -2.15, { open: true }),
+  // issue #88: the fridge's shadow. A floor nap in the cool strip by the
+  // fridge door — the spot the 0.85 m fridge pocket leaves between the fridge
+  // and the run's east end, facing south down the aisle he was walked in from.
+  spot('laundry-nap', 'fridge-keep', 'kitchen', 'side', [4.98, 'floor', -2.05], 1.58, { open: true }),
+  // ── dining (10, issues #81 + #82 + #88) — the new room joins the pool with the two
   //    moments the room reads for: a cat on the table, and a zoomie loaf at
   //    its south end. Both are `open`: the room is young and the ring maths
   //    of `findable` is not asked to survive its four chair-height islands
@@ -326,9 +366,22 @@ export const SPOTS = [
   spot('sink-sit', 'chair-e', 'dining', 'sit', [4.61, 'diningSeatE', 2.28], -1.57, { open: true }),
   spot('sink-sit', 'chair-s', 'dining', 'sit', [4.06, 'diningSeatS', 2.83], 1.57, { open: true }),
   spot('sink-sit', 'chair-w', 'dining', 'sit', [3.51, 'diningSeatW', 2.28], 0, { open: true }),
+  // Issue #88: four more dining moments — the delivered box (the second box
+  // the pool needed: `box-sit` was a 100%-per-run singleton until this box
+  // and the living box became a pair), the sideboard's own top, a floor nap
+  // in the wide arm's quiet north-west corner (the chair seats themselves
+  // already carry four sink-sit spots from #82 — a nap would have shared a
+  // seat point for point, which is the same-spot-in-different-clothes cheat),
+  // and a loaf in the cool nook between the parcel and the table's east
+  // flank.
+  spot('box-sit', 'box-parcel', 'dining', 'sit', [5.25, 'parcelBoxFloor', 4.13], -1, { open: true }),
+  spot('keyboard-sit', 'sideboard', 'dining', 'loaf', [4.62, 'sideboardTop', 4.18], 0.31, { open: true }),
+  spot('laundry-nap', 'dining-corner', 'dining', 'side', [3.2, 'floor', 1.2], 1.48, { open: true }),
+  spot('blanket-biscuits', 'side-nook', 'dining', 'loaf', [5.28, 'floor', 2.62], 0.31, { open: true }),
   spot('hall-chase', 'dining', 'dining', 'loaf', [4.9, 'floor', 1.15], 1.57, { open: true }), // issue #81: into the wide arm's north-east corner — clear of the ring's pads. He faces west along the table's north side, at the doorway-side lane his chase would have come from (bestApproach's vantage sits at x 4.0, z 1.15)
   spot('hall-chase', 'kitchen', 'kitchen', 'loaf', [4.3, 'floor', -1.3], 1.58),
-  // ── hall + entry + bathroom (7) — the entry gained the dash spot that used
+  // ── hall + entry + bathroom (10, issues #49 + #67 + #88) — the entry gained the
+  //    dash spot that used
   //    to sit in the living room (issue #53: `spot-pool-covers-rooms` needs ≥ 2
   //    per room and the entry had one; the living room, with the most, gave it
   //    up. A zoomie at the front door is the same moment in a better place.) ──
@@ -336,6 +389,14 @@ export const SPOTS = [
   // bathroom's east band is a nearer vantage than the hall's middle now.
   spot('hall-chase', 'hall', 'hall', 'loaf', [-0.35, 'floor', 3.3], 0.585),
   spot('hall-chase', 'hall-door', 'hall', 'sit', [0.3, 'floor', 4.85], 1.55),
+  // issue #88: the hall runner is a drawn 0.68 × 2.70 rug (game/full-entry.js
+  // row 22's hall-runner part) that no spot ever used. Three moments moved
+  // onto it: the stretch that used to lie at the foot of the bed (bedroom was
+  // the pool's heaviest room — see docs/PLAYTEST_NOTES.md), a nap mid-runner,
+  // and a kneading corner where the runner frays out by the bedroom door.
+  spot('bed-stretch', 'hall-rug', 'hall', 'back', [0.0, 'floor', 4.3], 3.14, { open: true }),
+  spot('laundry-nap', 'hall-runner', 'hall', 'side', [0.25, 'floor', 3.6], 1.48, { open: true }),
+  spot('blanket-biscuits', 'hall-corner', 'hall', 'loaf', [-0.6, 'floor', 4.9], 0.31, { open: true }),
   spot('hall-chase', 'entry', 'entry', 'loaf', [1.77, 'floor', 3.4], 1.81), // issue #81: rode the entry's 0.32 m east shift
   spot('hall-chase', 'entry-door', 'entry', 'loaf', [1.82, 'floor', 3.0], 1.57), // #81: same ride, kept clear of the moved bench
   spot('hall-chase', 'bath-mat', 'bathroom', 'side', [-2.2, 'floor', 4.12], 1.22, { hide: 'tub' }), // issue #67: rode the tub south onto the mat's new place at its face. It turned west-north-west, along the tub's face: with the room opened up, the nearest place a player can stand and see him is now the tile west of him, not the doorway band the old cramped room left (issue #59's -1.67). Issue #70: he lies with his back to the tub's flank — the 0.55 rim is his cover from half the room (29% of the ring sees him)
@@ -346,32 +407,35 @@ export const SPOTS = [
   // around him can see him at all; the gap at the curtain's east end is where
   // he's found, and `findable` fails the build if that gap ever closes up.
   spot('laundry-nap', 'bath-tub', 'bathroom', 'side', [-2.55, 'tubWell', 4.85], -0.44, { hide: 'shower-curtain' }),
-  // ── bedroom (11) — issue #48 turned the bed head-west. The five spots on
-  //    the moved pieces came with it (mirrored across the room's middle and
-  //    nudged 0.20 m south for the longer head clearance); the desk, desk-end,
-  //    keyboard and laundry ones are where they were — those pieces stayed.
-  //    The blanket spot is not a pure mirror: the folded blanket now runs
-  //    across the foot, so it sits mid-blanket on the new foot-of-bed fold. ──
+  // ── bedroom (8, was 11 until issue #88) — issue #48 turned the bed head-west.
+  //    The five spots on the moved pieces came with it (mirrored across the
+  //    room's middle and nudged 0.20 m south for the longer head clearance);
+  //    the desk, desk-end, keyboard and laundry ones are where they were —
+  //    those pieces stayed. The blanket spot is not a pure mirror: the folded
+  //    blanket now runs across the foot, so it sits mid-blanket on the new
+  //    foot-of-bed fold. #88 moved three out (bed-foot → the hall runner, the
+  //    wardrobe loaf → the hall corner, the nightstand nap → the balcony sun)
+  //    and left no new bedroom spot behind: the bedroom went from drawing
+  //    almost half of every run's picks to one quarter, and the desk pair is
+  //    now the only moment a run must spend in this room. ──
   spot('desk-pen', 'desk', 'bedroom', 'sit', [-1.85, 'deskTop', 5.7], 2.89, { open: true }),
   spot('desk-pen', 'desk-end', 'bedroom', 'loaf', [-2.3, 'deskTop', 5.85], 3.01, { open: true }),
   spot('keyboard-sit', 'keyboard', 'bedroom', 'sit', [-1.85, 'kbTop', 5.82], 3.13, { open: true }),
   spot('laundry-nap', 'basket', 'bedroom', 'side', [0.82, 'laundryTop', 9.0], 1.46, { open: true }),
   spot('bed-stretch', 'bed', 'bedroom', 'back', [-1.6, 'bedTop', 7.55], -0.08, { open: true }),
-  spot('bed-stretch', 'bed-foot', 'bedroom', 'side', [-1.0, 'bedTop', 8.45], -1.43, { open: true }),
   spot('blanket-biscuits', 'blanket', 'bedroom', 'sit', [-0.755, 'blanketTop', 7.855], 0, { open: true }),
-  spot('blanket-biscuits', 'wardrobe', 'bedroom', 'loaf', [0.15, 'floor', 8.2], -0.03),
   // issue #70: a corner nook south of the dresser, on the floor east of the
   // door-to-window lane — the dresser's flank and the plaster leave a shallow
   // shadow: 28% of the ring sees this loaf, the lane is his findable front
-  // (0.9 m). Deliberately a blanket-biscuits spot: every spot of this type is
-  // already a bedroom one, so a run can still never draw six bedroom rooms
-  // (the `run-draw-legal` alternation — see the pickSpotCycle note).
+  // (0.9 m). Kept a blanket-biscuits spot for #70's own reason (its hide
+  // needs this corner); since #88 the type also eats dining and hall, so the
+  // alternation note below is nowhere near as tight as it used to be.
   spot('blanket-biscuits', 'dresser-gap', 'bedroom', 'loaf', [0.95, 'floor', 6.85], 2.62, { hide: 'dresser' }),
-  spot('laundry-nap', 'nightstand', 'bedroom', 'side', [-2.35, 'nightstandTop', 6.8], -0.28, { open: true }),
   // Issue #82: the desk chair. Deliberately a `laundry-nap` spot, not another
-  // `sink-sit`: the type already belongs to this room, so `run-draw-legal`'s
-  // bound (bedroom holds at most five of the ten draws, locked at exactly
-  // five today) still holds; a sixth bedroom type would leave no legal order.
+  // `sink-sit`, for #82's own reason; the `run-draw-legal` bound it quoted
+  // ("bedroom locks exactly five") belonged to the 37-spot pool — #88 spread
+  // every type but `desk-pen` over two rooms or more, so the worst legal run
+  // now visits the bedroom once or twice, never five.
   // Facing south into the room with its back to the desk, checking the door.
   spot('laundry-nap', 'desk-chair', 'bedroom', 'side', [-1.98, 'deskChair', 6.29], 3.14, { open: true }),
 ];
@@ -413,11 +477,12 @@ export const MOMENT_ROOMS = Object.fromEntries(
  *  played, ties broken by rand — but a pick is only legal if the rest is
  *  still orderable afterwards (the safety filter below), which keeps the
  *  greedy provably deadlock-free while leaving plenty of freedom: since no
- *  room can hold more than half the ten (the bedroom locks exactly five of
- *  the ten TYPES, and one spot each), almost every pick is safe and the runs
- *  do not all start in the same room. A pool data change that breaks that
- *  bound degrades (appends the rest) instead of hanging, and the
- *  `run-draw-legal` check fails loudly on 200 seeded runs. */
+ *  room can hold more than half the ten (since issue #88 only `desk-pen`
+ *  locks a room at all — one draw — and every other type sleeps in two
+ *  rooms or more), almost every pick is safe and the runs do not all start
+ *  in the same room. A pool data change that breaks that bound degrades
+ *  (appends the rest) instead of hanging, and the `run-draw-legal` check
+ *  fails loudly on 200 seeded runs. */
 function orderable(counts, prev) {
   // Can the remaining spots be laid out with no two neighbours sharing a
   // room, starting somewhere other than `prev`? Let M be the biggest pile:
@@ -438,7 +503,14 @@ function orderable(counts, prev) {
   return maxRoom === prev && !tie ? max <= others : max <= others + 1;
 }
 
-export function pickSpotCycle(rand) {
+export function pickSpotCycle(rand, prevId = null) {
+  // `prevId` (issue #88) is the spot a queue served LAST before this cycle
+  // began — the spot the player has just watched. The first slot then refuses
+  // to repeat it, and refuses its room too, so the seam between two refills
+  // (or two runs of one session: the engine threads the id across both) looks
+  // exactly like every other join in the cycle. `null` — every call site that
+  // predates #88, and seed 11's first cycle — keeps the old stream position
+  // for position: same seed, same ten ids.
   const chosen = MOMENT_IDS.map((t) => {
     const list = SPOTS.filter((s) => s.type === t);
     return list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
@@ -449,7 +521,10 @@ export function pickSpotCycle(rand) {
     groups.get(s.room).push(s.id);
   }
   const order = [];
-  let prev = null;
+  // Issue #88: a cycle handed a `prevId` starts one room away from it, so a
+  // room cannot own the seam between two refills any more than it can own a
+  // join inside a cycle.
+  let prev = prevId ? SPOT_BY_ID.get(prevId)?.room ?? null : null;
   while (order.length < chosen.length) {
     const counts = new Map([...groups].map(([room, list]) => [room, list.length]).filter(([, n]) => n));
     // Candidates: a room not just played whose spots, if one is played NEXT,
@@ -468,6 +543,9 @@ export function pickSpotCycle(rand) {
     if (!pool.length) {
       // Only the room the last spot was in is left — the pool cannot keep the
       // promise. Append the rest rather than hang (run-draw-legal reports it).
+      // Issue #88: even here the seam holds — if the forbidden spot would be
+      // the very first one appended, duck it to the back of its room's queue.
+      if (prevId) for (const [, list] of groups) if (list[0] === prevId && list.length > 1) list.push(list.shift());
       for (const [, list] of groups) order.push(...list.splice(0));
       break;
     }

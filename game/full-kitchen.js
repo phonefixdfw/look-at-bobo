@@ -18,7 +18,8 @@
  *   east   x 4.92–5.52, z −1.35 → 0.30 — the range with the hood over it, then
  *          cabinets. It starts at z −1.35 rather than turning the corner
  *          because the fridge-floor spot (SPOTS `sink-sit.fridge`, x 5.20
- *          z −1.75) has to stay standable floor: MOVE.playerRadius is 0.30, so
+ *          z −1.75 — #88 moved this spot to the fridge roof, but the east run
+  *          still stops where it always did) has to stay standable floor: MOVE.playerRadius is 0.30, so
  *          any piece north of z −1.45 would eat that spot, and the brief says
  *          move the piece, never the spot. That leaves 0.85 m of bare wall
  *          between the fridge and the run, which is the walkway in front of the

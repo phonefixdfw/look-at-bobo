@@ -86,6 +86,20 @@ export const DIN = {
   sideTopY: 0.86,
   sideTopT: 0.04,
 
+  // issue #88: the delivered parcel box, on the floor at the sideboard's east
+  // end — 0.50 × 0.50 × 0.42 (row 60's own range 0.4…0.7, the living room's
+  // hero box is 0.60 × 0.44 × 0.42). 0.02 off both plasters, and 0.12 clear
+  // of the sideboard's corner so the pair reads as two pieces, not one run.
+  // A box-sit spot lives inside it: the moment pool needed a second box to
+  // sit in, and a delivery left by the dining wall is how boxes arrive.
+  parcelX0: 5.0,
+  parcelX1: 5.5,
+  parcelZ0: 3.88,
+  parcelZ1: 4.38,
+  parcelH: 0.42,
+  parcelT: 0.018,
+  parcelY0: 0.02,
+
   // pendant over the table — emissive shade only, the kitchen pendants'
   // convention: the rig is at its six lights and a pendant is a glow.
   pendY: 1.9, // shade top; 1.15 m over the table top
@@ -115,6 +129,7 @@ export const CHAIRS = [
 export const FOOT = {
   table: F(DIN.cx - DIN.tableDia / 2, DIN.cz - DIN.tableDia / 2, DIN.cx + DIN.tableDia / 2, DIN.cz + DIN.tableDia / 2),
   sideboard: F(DIN.sideX0, DIN.sideZ0, DIN.sideX1, DIN.sideZ1),
+  parcel: F(DIN.parcelX0, DIN.parcelZ0, DIN.parcelX1, DIN.parcelZ1),
   ...Object.fromEntries(CHAIRS.map((c) => [
     c.id,
     F(c.x - DIN.chairW / 2, c.z - DIN.chairD / 2, c.x + DIN.chairW / 2, c.z + DIN.chairD / 2),
@@ -131,6 +146,11 @@ export const DINING_COLLIDERS = [
   { id: 'dining-chair-e', ...FOOT['dining-chair-e'] },
   { id: 'dining-chair-s', ...FOOT['dining-chair-s'] },
   { id: 'dining-chair-w', ...FOOT['dining-chair-w'] },
+  // issue #88: the parcel box. A collider like the living room's cardboard
+  // box (a body cannot stand inside a box either) — its spot is reached the
+  // same way: a vantage outside the walls, the line of sight clearing the
+  // 0.42 m rims.
+  { id: 'parcel-box', ...FOOT.parcel },
 ];
 
 /** --------------------------------------------------------------------------
@@ -228,6 +248,24 @@ export const PIECES = [
     ],
     'sideboard',
     'issue #81: 1.28 × 0.40 × 0.86 against the south plaster, under the window',
+  ),
+
+  /* ── parcel box (issue #88): four walls and no bottom, the living room's
+   *  hero-box trick — SUPPORT_DEFS.parcelBoxFloor is 0.001, so Bobo sits on
+   *  the flat's own oak inside walls that start at 0.02. Tagged with the
+   *  cardboard-box ruler row the living box already claims: both boxes are
+   *  measured against row 60's 0.4 … 0.7. ── */
+  piece(
+    'parcel-box',
+    'cardboard',
+    [
+      bx(DIN.parcelX0, DIN.parcelY0, DIN.parcelZ0, DIN.parcelX1, DIN.parcelY0 + DIN.parcelH, DIN.parcelZ0 + DIN.parcelT),
+      bx(DIN.parcelX0, DIN.parcelY0, DIN.parcelZ1 - DIN.parcelT, DIN.parcelX1, DIN.parcelY0 + DIN.parcelH, DIN.parcelZ1),
+      bx(DIN.parcelX0, DIN.parcelY0, DIN.parcelZ0 + DIN.parcelT, DIN.parcelX0 + DIN.parcelT, DIN.parcelY0 + DIN.parcelH, DIN.parcelZ1 - DIN.parcelT),
+      bx(DIN.parcelX1 - DIN.parcelT, DIN.parcelY0, DIN.parcelZ0 + DIN.parcelT, DIN.parcelX1, DIN.parcelY0 + DIN.parcelH, DIN.parcelZ1 - DIN.parcelT),
+    ],
+    'cardboard-box',
+    'issue #88: 0.50 × 0.50 × 0.42, floor y 0.02 — row 60 again, second copy',
   ),
 ];
 
