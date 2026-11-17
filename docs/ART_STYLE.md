@@ -230,6 +230,22 @@ neck band back onto the decoy (241 white verts, the old count) and
   by ClampToEdge + a 1.5 px UV inset + a 2 px painted cell border, so no
   black art smears into the cream cell next door at grazing angles (no
   moire anywhere in the matrix).
+- **The street outside is one mesh and one atlas (issue #83).** The flat blue
+  sky sheets behind the living-room window are gone; what the window and the
+  balcony look at now is a stylized Uptown street — one merged card mesh on
+  ONE 512 px canvas atlas (game/full-street.js + game/full-street-mesh.js),
+  one unlit `MeshBasicMaterial` draw with vertex-colour tints, tone-mapping
+  exempt exactly like the sheets it replaces, painted deterministically at
+  boot (seed 20261117 — capture-grade deterministic, same rule as the decor
+  atlas). The atlas rows are depth bands of a single street (sky, skyline,
+  midrise, storefronts, roadway, near rooftops, side block), so a card's
+  base roots where its sightline crosses it and band seams read as
+  occlusion. The palette keeps the old sky colours (#8ec4ea → #cfe6f4 →
+  #f3ead9) at the top and works warm-grey brick + glass beneath it; parked
+  cars are painted, not animated (static per the card's own cost rule, and
+  zero draw calls). `?quality=low` is the same skyline silhouette in two
+  rows. Cells keep a 1 px UV inset and the painter clips per cell, so
+  nothing bleeds at grazing angles (same guard as the decor atlas).
 - No post-processing (`passes: 1`). Small cat parts and small props have
   `castShadow = false` — only big silhouettes need to shadow.
 - The page implements the `window.LC` contract (`docs/CAPTURE.md`) with the

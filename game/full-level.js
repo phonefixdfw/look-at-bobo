@@ -731,6 +731,11 @@ export const VIEWS = {
   dining: { pos: [3.15, 1.62, 3.6], yaw: -0.604, pitch: -0.31, fov: 55, hand: false },
   desk: { pos: [-1.85, 1.45, 7.05], yaw: 0.0, pitch: -0.437, fov: 45, hand: false }, // the desk on the north wall
   balcony: { pos: [0.95, 1.42, -3.75], yaw: -1.5, pitch: -0.35, fov: 55, hand: false }, // outside, looking at the chair
+  // issue #83: the frame that proves the painted Uptown street is there —
+  // standing on the balcony, due north over the railing: near rooftops, the
+  // roadway with the parked cars, storefronts, midrise, skyline on the
+  // horizon. 0.60 m off the balcony view, so `views-distinct` holds.
+  street: { pos: [1.5, 1.62, -4.15], yaw: 0, pitch: -0.55, fov: 55, hand: false },
   // The doorways, from standing height, aimed through the hole at a
   // point in the room beyond (issue #65). `doorways-read-open` in game/full.js
   // keys off these ids — one per `kind:'door'` opening — and reads the pixel

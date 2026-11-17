@@ -53,6 +53,8 @@ import { buildFullEntry } from './full-entry-mesh.js';
 import { buildFullDining } from './full-dining-mesh.js';
 import { buildFullDecor } from './full-decor-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
+import { buildFullStreet } from './full-street-mesh.js';
+import { autoLowQuality } from '../src/touch.js';
 import { createRoomCull } from './full-cull.js';
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
@@ -349,15 +351,20 @@ export function buildFullApartment(scene) {
           ? { geo: box(o.hi - o.lo + 0.1, 0.04, z1 - z0), mat: trim, at: [(o.lo + o.hi) / 2, o.sill - 0.02, (z0 + z1) / 2] }
           : { geo: box(z1 - z0, 0.04, o.hi - o.lo + 0.1), mat: trim, at: [(z0 + z1) / 2, o.sill - 0.02, (o.lo + o.hi) / 2] },
       );
-      skyPlanes.push({
-        pos:
-          o.axis === 'z'
-            ? [(o.lo + o.hi) / 2, (o.sill + o.head) / 2, faceOut + b.sign * 0.14]
-            : [faceOut + b.sign * 0.14, (o.sill + o.head) / 2, (o.lo + o.hi) / 2],
-        rotY: o.axis === 'z' ? (b.sign < 0 ? 0 : Math.PI) : b.sign < 0 ? Math.PI / 2 : -Math.PI / 2,
-        w: o.hi - o.lo + 1.4,
-        h: Math.max(2, o.head - o.sill + 0.9),
-      });
+      // Issue #83: the living room's street-facing window no longer gets a
+      // flat blue sheet — the painted Uptown street (built below) covers the
+      // exact rectangle this plane used to paint, from the same z -3.24.
+      if (o.id !== 'win-living-n') {
+        skyPlanes.push({
+          pos:
+            o.axis === 'z'
+              ? [(o.lo + o.hi) / 2, (o.sill + o.head) / 2, faceOut + b.sign * 0.14]
+              : [faceOut + b.sign * 0.14, (o.sill + o.head) / 2, (o.lo + o.hi) / 2],
+          rotY: o.axis === 'z' ? (b.sign < 0 ? 0 : Math.PI) : b.sign < 0 ? Math.PI / 2 : -Math.PI / 2,
+          w: o.hi - o.lo + 1.4,
+          h: Math.max(2, o.head - o.sill + 0.9),
+        });
+      }
       continue;
     }
 
@@ -441,22 +448,12 @@ export function buildFullApartment(scene) {
   }
 
   // the sky the flat has windows for: one plane per window outside its own
-  // wall, and three big ones beyond the balcony's parapets (the VIEWS.balcony
-  // camera looks east at the chair, so the "city" has to exist that way too).
-  //
-  // The two side planes are clipped to z <= -3.10, the flat's north exterior
-  // line. Their old 6 m and 7 m spans ran on south of that line, so they stood
-  // INSIDE the flat — the east one at x 3.10, which is the kitchen's west
-  // return's own door-front plane, and it is a DoubleSide sky sheet, so it
-  // painted the whole west run the colour of the sky. Out here they only exist
-  // where a balcony camera can actually see them: VIEWS.balcony sits at
-  // z -3.75 and looks due east and west, which is inside both spans.
-  const skySheets = [
-    ...skyPlanes,
-    { pos: [1.5, 2.2, -5.02], rotY: 0, w: 9, h: 6 }, // beyond the far parapet
-    { pos: [3.1, 2.2, -5.35], rotY: -Math.PI / 2, w: 4.5, h: 6 }, // east, z -7.6 .. -3.1
-    { pos: [-0.2, 2.2, -5.35], rotY: Math.PI / 2, w: 4.5, h: 6 }, // west, z -7.6 .. -3.1
-  ].map((s) => ({
+  // wall. Issue #83 removed the three big sheets that used to stand beyond
+  // the balcony's parapets and the sky plane behind win-living-n — the
+  // painted Uptown street (built below) covers all of those sightlines now.
+  // The kitchen, bath, bedroom and dining windows keep their plain sky: the
+  // street is only visible from the living room and the balcony, by design.
+  const skySheets = skyPlanes.map((s) => ({
     geo: new THREE.PlaneGeometry(s.w, s.h),
     mat: sky,
     at: s.pos,
@@ -639,6 +636,21 @@ export function buildFullApartment(scene) {
     console.info(`[look-at-bobo] issue #61 biggest folds: ${big}`);
   }
 
+  // ── issue #83: Uptown outside the living room ─────────────────────────────
+  // The street the balcony and the living-room windows look onto, replacing
+  // the three balcony sky sheets and the win-living-n sheet: one painted
+  // atlas, one merged mesh, one unlit draw. Filed on the flat BEFORE the
+  // cull is built, so createRoomCull picks up its userData.cullRooms invite
+  // list and shows it from the living room and the balcony only. ?quality=low
+  // (or a phone default) gets the two-row version — same skyline silhouette.
+  const qualityParam = new URLSearchParams(location.search).get('quality');
+  const street = buildFullStreet({
+    THREE,
+    quality: qualityParam === 'low' || (qualityParam !== 'high' && autoLowQuality()) ? 'low' : 'full',
+  });
+  flat.add(street.group);
+  console.info(`[look-at-bobo] issue #83 street: ${street.tier} tier · ${street.stats.triangles} tris in ${street.stats.drawCalls} draw · atlas ${street.stats.atlasWidth}px`);
+
   // ── issue #61: stop submitting rooms the camera cannot see ────────────────
   // Filed now, before game/full.js adds the cast: everything in this list is
   // flat, and anything added afterwards is nobody's room to hide.
@@ -717,6 +729,9 @@ export function buildFullApartment(scene) {
     pen: { root: penRoot, barrel: penBody },
     // issue #61: the per-room draw cull, driven by the camera each frame
     cull,
+    // issue #83: the street backdrop — { group, stats, tier } — so the
+    // checks can count it, measure the atlas and park the camera per room
+    street: { group: street.group, stats: street.stats, tier: street.tier, mesh: street.mesh },
     // every plaster slab (walls, parapets, ceilings) as an AABB, from the
     // definitions that were actually built (src/reach.js measures the walls
     // you can actually see — floors are not walls and are deliberately out)

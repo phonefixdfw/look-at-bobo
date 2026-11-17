@@ -26,6 +26,12 @@
  *     balcony shots sit beyond the walls, where "the room you are in" says
  *     nothing about what is in frame, so the cull fails open rather than
  *     guess.
+ *   - A group may opt OUT of geography and INTO an invite list instead, by
+ *     declaring `userData.cullRooms = ['living', ...]` before the cull is
+ *     built: it is shown exactly when the camera stands in one of those rooms
+ *     (and, fail-open as ever, when the camera is outside every rect). The
+ *     street backdrop of issue #83 is the one user — it is not in any room,
+ *     but it is only ever in frame from the living room and the balcony.
  *
  *  `hops` is 2, and 2 is not a rounded-up number: from the living room the
  *  whole flat is within two openings, so the overview camera loses nothing
@@ -114,7 +120,19 @@ export function createRoomCull(root, { hops = 2, enabled = true } = {}) {
   const byRoom = new Map(ROOMS.map((r) => [r.id, []]));
   /** groups no single room owns: never hidden */
   const shared = [];
+  /** groups that declared userData.cullRooms: shown from exactly those rooms */
+  const named = [];
   for (const child of root.children) {
+    // An opted-in group flips the rule inside out: it lives nowhere in the
+    // flat (the street outside is not a room) but is only ever IN FRAME from
+    // a named set of rooms — the #83 backdrop, visible from the living room
+    // and the balcony only. Same fail-open: a camera outside every rect sees
+    // it too, and showAll hands it back with everything else.
+    if (Array.isArray(child.userData.cullRooms)) {
+      named.push(child);
+      child.userData.cullRoom = `views:${child.userData.cullRooms.join(',')}`;
+      continue;
+    }
     box.setFromObject(child);
     if (!Number.isFinite(box.min.x)) { shared.push(child); continue; } // an empty group lights nothing
     const touched = roomsTouched(box);
@@ -137,6 +155,7 @@ export function createRoomCull(root, { hops = 2, enabled = true } = {}) {
     state.shown = 0;
     for (const list of byRoom.values()) for (const g of list) g.visible = true;
     for (const g of shared) g.visible = true;
+    for (const g of named) g.visible = true;
   }
 
   return {
@@ -170,6 +189,10 @@ export function createRoomCull(root, { hops = 2, enabled = true } = {}) {
         for (const g of list) {
           if (g.visible !== near) g.visible = near;
         }
+      }
+      for (const g of named) {
+        const near = g.userData.cullRooms.includes(room.id);
+        if (g.visible !== near) g.visible = near;
       }
       state.shown = ROOMS.length - state.hidden.length;
       return state;
