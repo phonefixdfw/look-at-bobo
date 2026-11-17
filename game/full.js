@@ -1032,7 +1032,13 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     };
     const readPatch = (ndc) => {
       const x = Math.round(((ndc.x + 1) / 2) * canvas.width);
-      const y = Math.round(((1 - ndc.y) / 2) * canvas.height);
+      // gl.readPixels counts rows from the BOTTOM of the framebuffer, so NDC
+      // y maps straight onto it — the old `(1 - ndc.y) / 2` read the vertically
+      // mirrored pixel. Latent since issue #65 wrote this helper (the mirrored
+      // row happened to be a plausible surface, so it passed); #81's lighting
+      // shift exposed the mirror as a false `doorways-read-open` fail at
+      // 800x500, where the stress harness runs.
+      const y = Math.round(((ndc.y + 1) / 2) * canvas.height);
       if (x < 5 || y < 5 || x > canvas.width - 6 || y > canvas.height - 6) return null;
       const buf = new Uint8Array(4 * 9 * 9);
       gl.readPixels(x - 4, y - 4, 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
@@ -1370,7 +1376,13 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     };
     const readPatch = (ndc) => {
       const x = Math.round(((ndc.x + 1) / 2) * canvas.width);
-      const y = Math.round(((1 - ndc.y) / 2) * canvas.height);
+      // gl.readPixels counts rows from the BOTTOM of the framebuffer, so NDC
+      // y maps straight onto it — the old `(1 - ndc.y) / 2` read the vertically
+      // mirrored pixel. Latent since issue #65 wrote this helper (the mirrored
+      // row happened to be a plausible surface, so it passed); #81's lighting
+      // shift exposed the mirror as a false `doorways-read-open` fail at
+      // 800x500, where the stress harness runs.
+      const y = Math.round(((ndc.y + 1) / 2) * canvas.height);
       if (x < 5 || y < 5 || x > canvas.width - 6 || y > canvas.height - 6) return null;
       const buf = new Uint8Array(4 * 9 * 9);
       gl.readPixels(x - 4, y - 4, 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
