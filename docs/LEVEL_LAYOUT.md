@@ -457,7 +457,7 @@ on-patch, paws-on-support and the head+body aim ray):
 | `d-chair-s` | dining | (4.06, 2.83) | diningSeatS (0.45) | sit | `sink-sit.chair-s` (same patch, 0.00 m) — and all four `sink-sit.chair-*` seats sit ≤ 1.10 m off it |
 | `d-bed-foot` | bedroom | (−0.755, 7.45) | blanketTop (0.58) | loaf | `blanket-biscuits.blanket` (0.41 m) |
 | `d-desk-chair` | bedroom | (−2.0, 6.28) | deskChair (0.47) | sit | `laundry-nap.desk-chair` (0.02 m) |
-| `d-bar-loaf` | kitchen | (4.0, 0.4) | barTop (1.05) | loaf | `sink-sit.bar` (0.55 m) |
+| `d-bar-loaf` | kitchen | (4.25, 0.4) | barTop (1.05) | loaf | `sink-sit.bar` (0.30 m) |
 | `d-toilet` | bathroom | (−1.825, 2.705) | toiletLid (0.425) | sit | nobody — the support #49 kept honest finally has a cat |
 | `d-tv-stand` | living | (2.19, −1.2) | tvTop (0.45) | side | nobody — clear of the panel's base stem |
 | `d-coffee` | living | (−1.6, −0.75) | coffeeTop (0.45) | side | nobody — the pot and the books lie south |
