@@ -2440,3 +2440,18 @@ toggles, Esc-on-card resumes (no longer leaves the run), M still menus; a
 stubbed **pointerlockerror** page still pauses and keeps a usable overlay;
 a page with **no lock API** resumes without one; `?touch=on` sees none of
 the new chrome; and the card fits a 740×360 window clear of the gear.
+
+**Suites at this HEAD (all twenty-four runs, none skipped).**
+`capture:full` PASS — 585 frames, 116/116 every frame, worst 152 draws
+/ 100 676 triangles / 1 pass, console clean.
+`capture:full:determinism` 8/8 byte-identical. `weak` PASS worst 94.
+`spots` 20 frames, `patriot` 6, `style` 72, `slice` 144, `demo` 48,
+`testscene` 36 — all PASS; slice and demo determinism 8/8 byte-identical
+(they never saw a #99 file). Planted capture exits 1 catching exactly
+`ending-text-exact`. `gate` PASS. Bots full 10/10, patriot 5/5, slice
+green, console clean. `stress:full` 77 PASS / 0 FAIL at `--checks 116`,
+`stress` slice green. Audio 23/23, music 29/29 + 28/28.
+`seed:coverage` PASS (rarest `sink-sit.bar` 8.8 %). `build` PASS — 73
+files, 3.17 MB. `check:mobile` PASS twice — 147 rows pre-build and 151
+after (the four dist-stamp rows join), 0 FAIL, scenario 15 (#99) green
+both times.
