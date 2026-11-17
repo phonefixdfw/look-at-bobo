@@ -153,16 +153,27 @@ export function paintHumanAtlas(ctx, closed) {
  *  {cx,cy,cz,w,h,d}; `cyl` runs p0→p1 with radii r0/r1; `sph` sits at p with
  *  r and an optional per-axis scale; `rx` leans the part about the pivot. */
 export const HUMAN_PARTS = [
-  // torso: a solid athletic-heavy frame leaning easy into the back cushion
-  { id: 'chest', mat: 'shirt', kind: 'box', box: { cx: 0, cy: 0.8, cz: -0.04, w: 0.44, h: 0.3, d: 0.26 }, rx: 0.16, rxAt: [0, 0.65, 0.02] },
+  // torso: a solid athletic-heavy frame, eased a hair toward the telly
+  // (#86 fix: a 0.16 rad backward lean slid the chest's top edge away from
+  // the head's column and the head read as a blob floating off-body)
+  { id: 'chest', mat: 'shirt', kind: 'box', box: { cx: 0, cy: 0.8, cz: -0.04, w: 0.44, h: 0.3, d: 0.26 }, rx: -0.06, rxAt: [0, 0.65, 0.02] },
   { id: 'belly', mat: 'shirt', kind: 'box', box: { cx: 0, cy: 0.565, cz: -0.05, w: 0.36, h: 0.27, d: 0.27 } },
-  // neck + head (the head's face band gets the atlas; see remapFaceUVs)
-  { id: 'neck', mat: 'skin', kind: 'cyl', p0: [0, 1.04, 0.03], p1: [0, 1.16, 0.03], r0: 0.052, r1: 0.048 },
+  // neck + head (the head's face band gets the atlas; see remapFaceUVs).
+  // #86 fix: the neck used to START 9 cm above the chest's top edge and the
+  // head bottom sat 15 cm clear of it — a thin column over open air, which
+  // reads as a detached floating head. The neck now sinks deep into the
+  // chest and a trapezius slab ties neck, shoulders and chest into ONE
+  // continuous torso-to-chin column.
+  { id: 'neck', mat: 'skin', kind: 'cyl', p0: [0, 0.86, 0.025], p1: [0, 1.165, 0.025], r0: 0.066, r1: 0.05 },
+  { id: 'traps', mat: 'shirt', kind: 'box', box: { cx: 0, cy: 0.955, cz: -0.005, w: 0.4, h: 0.12, d: 0.17 } },
   { id: 'head', mat: 'skin', kind: 'sph', p: [0, 1.215, 0.015], r: 0.112, scale: [0.92, 1, 0.96] },
-  { id: 'hair-nape', mat: 'hair', kind: 'box', box: { cx: 0, cy: 1.132, cz: 0.097, w: 0.17, h: 0.115, d: 0.045 } },
-  // the backwards cap: dome + button up top, brim facing the +z BACK
+  { id: 'hair-nape', mat: 'hair', kind: 'box', box: { cx: 0, cy: 1.15, cz: 0.108, w: 0.13, h: 0.09, d: 0.05 } },
+  // the backwards cap: dome + button up top, brim facing the +z BACK.
+  // #86 fix: the brim used to be a 20 cm-wide plate reaching 8 cm past the
+  // dome into open air — a second dark shard beside the head. It now hugs
+  // the dome: half buried, ~4 cm of edge showing, the way a flipped brim sits.
   { id: 'cap-dome', mat: 'cap', kind: 'sph', p: [0, 1.235, 0.015], r: 0.122, scale: [0.93, 0.78, 0.95], dome: true },
-  { id: 'cap-brim', mat: 'capDeep', kind: 'disc', p: [0, 1.243, 0.108], r: 0.1, t: 0.014 },
+  { id: 'cap-brim', mat: 'capDeep', kind: 'disc', p: [0, 1.238, 0.092], r: 0.078, t: 0.014 },
   { id: 'cap-button', mat: 'capDeep', kind: 'disc', p: [0, 1.332, 0.015], r: 0.014, t: 0.012 },
   // shoulders + arms, elbows relaxed in, hands closed on the controller
   { id: 'shoulderL', mat: 'shirt', kind: 'sph', p: [-0.185, 0.9, -0.005], r: 0.075 },
