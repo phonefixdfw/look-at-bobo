@@ -106,10 +106,31 @@ try {
   check('hud-target-from-param', hud.max.replace(/\s/g, '') === '/03' && hud.num === '00', `HUD reads ${hud.num} ${hud.max} (win at 3 via ?win=3)`);
 
   // --- the aim path, headlessly: where does the CENTRE RAY land? ----------
-  const aimBobo = await page.evaluate(() => window.LC.aimAt('bobo'));
-  check('aim-ray-hits-bobo', aimBobo.hits === 'cat-bobo', `stood at (${aimBobo.x}, ${aimBobo.z}) → ray hits ${aimBobo.hits}`);
-  const aimDecoy = await page.evaluate(() => window.LC.aimAt('decoy'));
-  check('aim-ray-hits-decoy', aimDecoy.hits === 'cat-decoy', `stood at (${aimDecoy.x}, ${aimDecoy.z}) → ray hits ${aimDecoy.hits}`);
+  // Issue #70's split applies here too: this boots LIVE (?win=3, no gate=off),
+  // so the seed — and the drawn spots — roll every run, and a `hide` spot
+  // (six now, incl. the in-tub nap no visual ray reaches from anywhere)
+  // legitimately reads wall/prop on the props-visible centre ray. Open spots
+  // keep the visual rule; hidden ones are proven through the engine's own
+  // crosshair find-ray (cat meshes only — exactly what a shout uses).
+  const aimRule = (which) =>
+    page.evaluate((w) => {
+      const a = window.LC.aimAt(w);
+      const st = window.LC.state();
+      const rec = window.LC.spot(w === 'decoy' ? st.decoyId : st.spotId); // null on the slice (no pool)
+      return { x: a.x, z: a.z, hits: a.hits, probe: window.LC.aimProbe(), hide: rec && rec.hide ? String(rec.hide) : null };
+    }, which);
+  const aimBobo = await aimRule('bobo');
+  check(
+    'aim-ray-hits-bobo',
+    (aimBobo.hide ? aimBobo.probe : aimBobo.hits) === 'cat-bobo',
+    `stood at (${aimBobo.x}, ${aimBobo.z}) → ${aimBobo.hide ? `${aimBobo.hide}: find-ray ${aimBobo.probe} (visual ${aimBobo.hits})` : `ray hits ${aimBobo.hits}`}`,
+  );
+  const aimDecoy = await aimRule('decoy');
+  check(
+    'aim-ray-hits-decoy',
+    (aimDecoy.hide ? aimDecoy.probe : aimDecoy.hits) === 'cat-decoy',
+    `stood at (${aimDecoy.x}, ${aimDecoy.z}) → ${aimDecoy.hide ? `${aimDecoy.hide}: find-ray ${aimDecoy.probe} (visual ${aimDecoy.hits})` : `ray hits ${aimDecoy.hits}`}`,
+  );
 
   // --- the catch: yell take 1 plays to the end -----------------------------
   await page.evaluate(() => window.LC.aimAt('bobo'));
