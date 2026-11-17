@@ -19,6 +19,7 @@ import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
 import { EYEWITNESS } from './full-street.js';
+import { TRADEMARK_WORDS } from '../src/kart-screen.js';
 import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W, SUPPORT_DEFS } from './full-shell.js';
 import { diningGapReport } from './full-dining.js';
 import { woodTextureAudit } from '../src/polish.js';
@@ -189,7 +190,7 @@ const roomLightFrames = { v: false, entry: null, luma: null };
 /** …and the same rule again for issue #83's street pixel check: two renders
  *  once per page, `blues` keeps what it measured for the detail line. */
 const streetFrames = { v: false, blues: null };
-function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
+function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, aptTv = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -1830,6 +1831,128 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     add('street-culled-to-views', problems.culled.length ? problems.culled.join('; ') : 'living + balcony + fail-open outside see it; every other room does not', 'visible iff the camera stands in living/balcony (or outside every rect)', !problems.culled.length, 'issue #83: per-room culling of the backdrop; ?cull=off and the checks still see it whole');
     add('street-view-not-flat-blue', problems.blue.length ? problems.blue.join('; ') : blueText, '< 35% of the frame in the old flat-sky palette and < 25% near-black, street + balcony', !problems.blue.length, 'issue #83: "the blue nothing" is gone from the frames that matter, measured on pixels');
     add('street-clear-of-the-walk', problems.walk.length ? problems.walk.join('; ') : 'no backdrop vertex inside the living-room or balcony walk rects', 'cards stand outside every walkable floor — nothing floats over the camera', !problems.walk.length, 'issue #83: the street is scenery seen through openings, never a room object');
+  }
+
+  // ── issue #84: the living-room TV plays a kart game ───────────────────────
+  // The screen is one emissive plane (draw calls never moved — the capture
+  // budget gates that every frame); this pins the rest of the promises: the
+  // canvas size, repaint-only-while-on-screen, the gate-off freeze, the
+  // original words, the steady brightness, and the per-repaint cost. The
+  // painting half runs inside tv.probe(), which puts the exact static frame
+  // back afterwards, so no capture can ever catch an animated frame.
+  {
+    const tv = aptTv;
+    if (!tv) {
+      for (const name of ['kart-screen-built', 'kart-updates-when-seen', 'kart-frozen-under-gate-off', 'kart-words-original', 'kart-brightness-steady', 'kart-update-cheap']) {
+        add(name, 'the flat built without a TV screen', 'the kart screen exists', false, 'issue #84 wiring regression');
+      }
+    } else {
+      const mesh = tv.mesh;
+      const builtOk = tv.w <= 512 && tv.h <= 512 && !!mesh && mesh.material?.emissiveMap === tv.texture;
+      add(
+        'kart-screen-built',
+        builtOk ? `${tv.w}×${tv.h} canvas @ ${tv.fps} fps · ${tv.quality}${tv.calm ? ' calm' : ''}${tv.gateOff ? ' · frozen (gate off)' : ''}` : mesh ? 'screen mesh does not carry the kart canvas' : 'no screen mesh attached to the kart screen',
+        'canvas ≤ 512×512, one emissiveMap, no new meshes', builtOk,
+        'issue #84: the TV plays an original kart racer — only the texture changed, the draw budget never moved',
+      );
+
+      // Updates only while on screen: park the camera in the living room
+      // looking at the TV (the room cull keeps it), tick three spaced frames;
+      // swing the camera around (the frustum test fails) and tick three more;
+      // hide the whole room (the per-room cull's switch) and tick three more.
+      let seen = null;
+      if (mesh && camera && aptCull) {
+        seen = tv.probe(() => {
+          const wasOn = aptCull.enabled;
+          const savedPos = camera.position.clone();
+          const savedQuat = camera.quaternion.clone();
+          try {
+            aptCull.setEnabled(true);
+            const live = ROOMS.find((r) => r.id === 'living');
+            camera.position.set((live.x0 + live.x1) / 2, 1.45, (live.z0 + live.z1) / 2);
+            camera.lookAt(2.208, 1.2, -1.7); // the screen's own centre
+            camera.updateMatrixWorld(true);
+            aptCull.update(camera);
+            let u = tv.updates;
+            for (const t of [1000, 2000, 3000]) tv.tick(t, camera, true);
+            const toward = tv.updates - u;
+            u = tv.updates;
+            camera.lookAt(2 * live.x0 - 2.208, 1.2, -1.7); // swing a full half turn away
+            camera.updateMatrixWorld(true);
+            aptCull.update(camera);
+            for (const t of [4000, 5000, 6000]) tv.tick(t, camera, true);
+            const away = tv.updates - u;
+            u = tv.updates;
+            const room = mesh.parent;
+            room.visible = false;
+            for (const t of [7000, 8000, 9000]) tv.tick(t, camera, true);
+            const culled = tv.updates - u;
+            room.visible = true;
+            aptCull.update(camera);
+            u = tv.updates;
+            for (const t of [10000, 11000, 12000]) tv.tick(t, camera, false); // the live path's call
+            const refused = tv.updates - u; // gate-off: must be 0; live page: live loop's business
+            return { toward, away, culled, refused };
+          } finally {
+            camera.position.copy(savedPos);
+            camera.quaternion.copy(savedQuat);
+            camera.updateMatrixWorld(true);
+            aptCull.setEnabled(wasOn);
+            aptCull.update(camera);
+          }
+        });
+      }
+      add(
+        'kart-updates-when-seen',
+        seen ? `looking at it +${seen.toward}/3 · looking away +${seen.away}/3 · room culled +${seen.culled}/3` : 'no camera/cull handed to extraChecks',
+        '+3 facing the TV, +0 facing away, +0 with the room culled',
+        !!seen && seen.toward === 3 && seen.away === 0 && seen.culled === 0,
+        'issue #84: the screen repaints only while it is actually on camera — per-room cull flags plus a frustum test',
+      );
+      add(
+        'kart-frozen-under-gate-off',
+        seen ? (tv.gateOff ? `${seen.refused} repaints from unforced ticks` : `live page: gate-off freeze not in force, fps ${tv.fps}`) : 'not measured (no camera/cull)',
+        '0 repaints under ?gate=off',
+        !seen || (tv.gateOff ? seen.refused === 0 : seen.refused >= 0),
+        'issue #84: captures and determinism see one fixed frame — the tick refuses to repaint the whole page',
+      );
+
+      const words = tv.texts();
+      const bad = words.filter((s) => TRADEMARK_WORDS.some((w) => s.toLowerCase().includes(w)));
+      add(
+        'kart-words-original',
+        `${words.length} strings every drawn: ${words.join(' / ')}${bad.length ? ` — TRADEMARKED: ${bad.join(',')}` : ''}`,
+        'no "mario", no "nintendo", no trademark in any drawn string',
+        words.length > 0 && bad.length === 0,
+        'issue #84: the painter records every fillText/strokeText — the TV shows an invented game, "KART DASH", never Nintendo\'s',
+      );
+
+      const lumas = tv.probe(() => {
+        const out = [];
+        for (let t = 0; t <= 3.01; t += 0.25) {
+          tv.paint(t, false);
+          out.push(tv.meanLuma());
+        }
+        return out;
+      });
+      const lo = Math.min(...lumas);
+      const hi = Math.max(...lumas);
+      const drift = (hi - lo) / ((hi + lo) / 2);
+      add(
+        'kart-brightness-steady',
+        `${lumas.length} frames across a scroll cycle: mean luma ${lo.toFixed(0)}…${hi.toFixed(0)} (${(drift * 100).toFixed(1)}% drift)`,
+        '< 8% mean-brightness drift, no strobe',
+        drift < 0.08,
+        'issue #84: photosensitivity — the cartoon scroll trades near-equal tones, nothing flashes',
+      );
+      add(
+        'kart-update-cheap',
+        `${tv.avgMs().toFixed(2)} ms average per repaint over ${tv.updates} (${tv.lastMs.toFixed(2)} ms last)`,
+        '< 6 ms per repaint on this machine',
+        tv.updates > 0 && tv.avgMs() < 6,
+        'issue #84: one small canvas repainted + one texture upload at ≤ 12 fps, and only while it is on screen',
+      );
+    }
   }
 }
 

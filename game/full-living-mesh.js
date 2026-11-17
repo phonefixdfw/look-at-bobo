@@ -32,13 +32,16 @@ import * as THREE from 'three';
 import {
   SURFACES, surface, fabric, tvScreenMaterial, glowMaterial, broadLeafGeo,
 } from '../src/polish.js';
+import { createKartScreen } from '../src/kart-screen.js';
 import { TOKENS } from '../src/tokens.js';
 import { mergedMesh } from './full-apartment.js';
 import { PIECES, DETAILS, PLANTS, plantLeaves } from './full-living.js';
 
 /** The living room's material slots (src/polish.js names — nothing custom-drawn
- *  except the two lit surfaces, which are `surface()` with emissive keys). */
-function livingMaterials() {
+ *  except the two lit surfaces, which are `surface()` with emissive keys).
+ *  `tvScreen` (issue #84) is the animated kart-screen texture; without it the
+ *  material keeps the old still standby frame. */
+function livingMaterials(tvScreen) {
   return {
     cloth: fabric(TOKENS.couch), // the sofa's frame: the flat's couch blue-grey
     clothSeat: fabric(0x464e58), // cushions a tone lighter than the frame, as fabric ages
@@ -65,7 +68,7 @@ function livingMaterials() {
     leaf: SURFACES.leaf(), // DoubleSide: leaves you can walk behind
     sky: surface(0x7e8a92, { uvTile: 0.4, roughness: 0.92 }), // the print, upper band
     sand: surface(TOKENS.pillow, { uvTile: 0.4, roughness: 0.92 }), // the print, lower band
-    screen: tvScreenMaterial(), // the TV's glow, standby-bright
+    screen: tvScreenMaterial(tvScreen?.texture), // the TV's glow: the kart game's canvas, once per upload
   };
 }
 
@@ -158,14 +161,17 @@ function buildDetails(living, mats) {
   }
 
   // the TV's face: the panel is a body with a screen glued to it, like every
-  // real set. Same material the placeholder used, and the same soft halo
+  // real set. Issue #84 swapped the standby glow for the KART DASH canvas
+  // (mats.screen carries it); keepUV keeps the texture mapped exactly once
+  // across the panel — a game screen is not a wallpaper tile. Same soft halo
   // decal — a light on the telly was never in the rig, and row 39's glow is
   // emissive anyway.
-  mergedMesh(
+  const [tvScreen] = mergedMesh(
     living,
-    [{ geo: new THREE.PlaneGeometry(LIV_TV_FACE[0], LIV_TV_FACE[1]).rotateY(-Math.PI / 2), at: [2.208, 1.2, -1.7], mat: mats.screen }],
+    [{ geo: new THREE.PlaneGeometry(LIV_TV_FACE[0], LIV_TV_FACE[1]).rotateY(-Math.PI / 2), at: [2.208, 1.2, -1.7], mat: mats.screen, keepUV: true }],
     { cast: false },
   );
+  tvScreen.name = 'living-tv-screen'; // the checks of issue #84 find it by name
   const halo = new THREE.Mesh(
     new THREE.PlaneGeometry(LIV_TV_FACE[0] + 0.5, LIV_TV_FACE[1] + 0.5).rotateY(-Math.PI / 2),
     glowMaterial(0x9ecbe8, 0.22),
@@ -179,15 +185,25 @@ function buildDetails(living, mats) {
 // own numbers are the ruler's (row 39), this is bezel arithmetic.
 const LIV_TV_FACE = [1.22 - 0.06, 0.71 - 0.06];
 
-/** Everything the data describes, hung under one group. */
-export function buildFullLiving(parent) {
-  const mats = livingMaterials();
+/** Everything the data describes, hung under one group.
+ *  `boot` (issue #84) carries the engine's resolved SETTINGS and gateOff so
+ *  the TV screen can pick its quality/calm/frozen modes; the built screen
+ *  rides back out on `living.userData.tv` for the apartment and the checks. */
+export function buildFullLiving(parent, boot = {}) {
+  const tv = createKartScreen({
+    quality: boot.SETTINGS?.quality ?? 'full',
+    calm: !!boot.SETTINGS?.reducedMotion,
+    gateOff: !!boot.gateOff,
+  });
+  const mats = livingMaterials(tv);
   const living = new THREE.Group();
   living.name = 'living-room';
   parent.add(living);
 
   buildPieces(living, mats);
   buildDetails(living, mats);
+  tv.attach(living.getObjectByName('living-tv-screen'));
+  living.userData.tv = tv;
 
   // the lamp: the shade is emissive, and the bulb behind it is real — the
   // sixth punctual light of the rig's six, warm, decay 2, a reach no wider
