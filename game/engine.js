@@ -170,6 +170,27 @@ export function bootGame(cfg) {
     forceFind: /^\d+$/.test(PATRIOT_RAW ?? '') ? Number(PATRIOT_RAW) : null,
   };
 
+  /** Issue #85: the robot vacuum's passenger. The appliance itself belongs to
+   *  the level (apt.roomba: game/full-roomba-{route,mesh}.js); the ENGINE
+   *  only owns the dice and the seat:
+   *    plan  one seeded dice per RUN — ~1 run in 6 has a find where Bobo
+   *          rides the vacuum. The roll rides its own stream (apt.roomba
+   *          .seedTag), derived exactly like PATRIOT's, so checks re-derive
+   *          it and cannot drift.
+   *    ride  a find never starts with him on board: it takes find ≥2 AND a
+   *          whole completed loop of the route first (odometer ≥ length),
+   *          and it happens at most once per run.
+   *    speed the vacuum is the route module's aimable 0.18 m/s cat-tempo,
+   *          so a riding Bobo stays exactly as catchable as a moving one has
+   *          ever been.
+   *  `?roomba=off` deletes the appliance, its route, its draw call AND the
+   *  ride. `?roomba=on` plans every run to ride (the checks' knob; the rules
+   *  above still bind — never first, never before the first loop).
+   *  Under `?gate=off` the odometer is pure seek time, which never reaches a
+   *  full loop — so captures and determinism runs can never meet a ride. */
+  const ROOMBA_PARAM = params.get('roomba');
+  const ROOMBA_MODE = ROOMBA_PARAM === 'off' ? 'off' : ROOMBA_PARAM === 'on' ? 'force' : 'default';
+
   // Step 9 comfort/accessibility (issue #19). Every default keeps the game
   // exactly as the suites captured it. The settings panel writes these same
   // params into the URL, so a choice survives refresh and shares as a link:
@@ -356,7 +377,7 @@ export function bootGame(cfg) {
   // ---------------------------------------------------------------------------
   // 2. The apartment, the cast, the celebration, the hand, the world
   // ---------------------------------------------------------------------------
-  const apt = cfg.buildApartment(scene, { SETTINGS, gateOff: GATE_OFF });
+  const apt = cfg.buildApartment(scene, { SETTINGS, gateOff: GATE_OFF, seed: SEED });
   const { living, supports } = apt;
   const { sun, WALL_Z } = living;
 
@@ -656,8 +677,7 @@ export function bootGame(cfg) {
     if (canon) placeDecoyAt(decoyById(canon.canonicalDecoy));
     else placeDecoyAt(pickDecoySpot(s.spot, mulberry32(hashId(spotId)), s.room));
   }
-  /** Issue #58: the live Patriot roll for the round about to be drawn. Same
-   *  rules as runPatriotPlan (never first, never back-to-back, at most two),
+  /** Issue #58: the live Patriot roll for the round about to be drawn. Same   *  rules as runPatriotPlan (never first, never back-to-back, at most two),
    *  plus the two explicit overrides: ?patriot=N forces live find N, and
    *  LC.patriot(true) forces the next round where a roll would be legal at
    *  all — a request the rules refuse (first find, cap) waits, it never
@@ -685,6 +705,10 @@ export function bootGame(cfg) {
   }
   function startLiveRound() {
     rollPatriot();
+    // Issue #85: this run's ride find, if the dice planned one and the
+    // vacuum has done its whole loop — a find never starts with Bobo on
+    // board before that (rollRoombaRide), and never on the first find.
+    if (rollRoombaRide()) { startRoombaRide(); return; }
     const rec0 = nextRoundRecord();
     const rec = game.patriot ? { ...rec0, pose: PATRIOT.pose } : rec0; // the costume's nearest allowed pose (see PATRIOT.pose)
     game.momentId = POOL ? rec0.type : rec0.id;
@@ -693,6 +717,103 @@ export function bootGame(cfg) {
     setBoboCostume(game.patriot);
     placeDecoyAt(chooseDecoySpot(rec, rng));
   }
+  // ---------------------------------------------------------------------------
+  // 5c. The robot vacuum's passenger (issue #85). The appliance and its loop
+  //     are the level's (apt.roomba); these lines are the whole engine side:
+  //     one seeded dice per run, the ride-find rules (never first, never
+  //     before the route has done a whole loop, at most one per run), the
+  //     odometer, and Bobo following the vacuum while he rides it.
+  // ---------------------------------------------------------------------------
+  const ROOMBA_LVL = apt.roomba ?? null;
+  let roombaOdo = 0; // metres the vacuum has driven this run (live odometer)
+  let roombaForced = null; // checks only: seek the odometer on gate-off pages
+  let roombaPlanned = false; // this run's dice says a ride find exists
+  let roombaActive = false; // Bobo is on the vacuum right now
+  let roombaUsed = false; // the run's one ride find has fired
+
+  /** The synthetic spot Bobo occupies while he rides. It lives outside the
+   *  spot pool on purpose — a moving place cannot join the static pool's
+   *  cycle, spread or contact tables — but it speaks the same shape, so
+   *  anything that reads a spot record still reads him. The engine's POOL
+   *  lookups fall back through `rideSpot` to this record. */
+  const RIDE_SPOT = {
+    id: ROOMBA_LVL?.spotId ?? 'roomba-ride',
+    type: 'cat', room: 'living', pose: 'sit',
+    spot: [0, 0, 0], // x/z track the vacuum; y is the lid height below
+    faceYaw: 0, hide: null, rideY: 0.105,
+  };
+  function rideSpot(id) {
+    return ROOMBA_LVL && id === ROOMBA_LVL.spotId ? RIDE_SPOT : null;
+  }
+
+  /** Metres travelled, as of this frame: the live odometer, or under
+   *  `?gate=off` pure seek time — which never reaches a whole loop, so the
+   *  tools can never ride (see the ROOMBA_PARAM block by the params). The
+   *  checks' `teleport` overrides both (roombaForced); every run start
+   *  clears it, and the check rows put it back to null before they end. */
+  function roombaMetres() {
+    if (!ROOMBA_LVL) return 0;
+    if (roombaForced != null) return roombaForced;
+    return GATE_OFF ? ROOMBA_LVL.speed * game.time : roombaOdo;
+  }
+
+  /** New run: reroll the dice off this run's seed and re-plan the circuit.
+   *  Called wherever resetPatriotRunState is — the run-start chokepoints. */
+  function resetRoombaRunState() {
+    if (!ROOMBA_LVL) return;
+    roombaOdo = 0;
+    roombaForced = null;
+    roombaPlanned = ROOMBA_MODE === 'force'
+      || mulberry32(hashId(`${ROOMBA_LVL.seedTag} ${SEED}`))() < ROOMBA_LVL.chance;
+    roombaActive = false;
+    roombaUsed = false;
+    ROOMBA_LVL.reroute(SEED);
+    updateRoombaPose();
+  }
+
+  /** The ride-find rule, same shape as the Patriot roll one function up:
+   *  planned for this run, never the first find, never before the route has
+   *  completed a whole loop, once per run. */
+  function rollRoombaRide() {
+    if (!ROOMBA_LVL || ROOMBA_MODE === 'off' || !roombaPlanned || roombaUsed || roombaActive) return false;
+    if (game.findNum < 2) return false;
+    if (roombaMetres() < ROOMBA_LVL.route.length) return false;
+    return true;
+  }
+
+  /** Send Bobo for a ride: sit pose on the lid, plain Bobo (the costume is
+   *  a static-spot affair), a normal decoy somewhere sensible — drawn off
+   *  his CURRENT pose like any find's, since there is no fixed spot to
+   *  measure from. */
+  function startRoombaRide() {
+    roombaActive = true;
+    roombaUsed = true;
+    game.momentId = 'box-sit'; // the upright-sit moment: what riding IS, in moment terms
+    game.spotId = ROOMBA_LVL.spotId;
+    game.patriot = false;
+    setBoboCostume(false);
+    setCatPose(bobo, 'sit');
+    placeDecoyAt(chooseDecoySpot(RIDE_SPOT, rng));
+    updateRoombaPose();
+  }
+
+  /** One place where the vacuum (and riding Bobo) are put where the
+   *  odometer says they are. renderNow calls it every frame, live and
+   *  staged alike — the pose is a pure function of metres. */
+  function updateRoombaPose() {
+    if (!ROOMBA_LVL) return;
+    if (roombaActive && game.spotId !== ROOMBA_LVL.spotId) roombaActive = false; // the next find put him back on his feet
+    const p = ROOMBA_LVL.place(roombaMetres());
+    if (p.room) RIDE_SPOT.room = p.room;
+    RIDE_SPOT.spot[0] = p.x;
+    RIDE_SPOT.spot[2] = p.z;
+    RIDE_SPOT.faceYaw = p.heading;
+    if (roombaActive) {
+      bobo.root.position.set(p.x, RIDE_SPOT.rideY, p.z);
+      bobo.root.rotation.y = catRootYaw(p.heading); // he faces the direction of travel
+    }
+  }
+
   function spawnPlayerAt(spawn) {
     player.x = spawn.pos[0];
     player.z = spawn.pos[1];
@@ -765,7 +886,9 @@ export function bootGame(cfg) {
    *  0.07 m from d-hall), and standClearOfCats is the backstop either way. */
   function afterCatch() {
     startLiveRound();
-    const boboRoom = POOL ? POOL.get(game.spotId).room : momentById(game.momentId).room;
+    const boboRoom = POOL
+      ? (POOL.get(game.spotId) ?? rideSpot(game.spotId)).room // issue #85: a riding Bobo answers from RIDE_SPOT
+      : momentById(game.momentId).room;
     const avoid = [
       { x: bobo.root.position.x, z: bobo.root.position.z },
       { x: decoy.root.position.x, z: decoy.root.position.z },
@@ -788,6 +911,7 @@ export function bootGame(cfg) {
     refills = 0;
     queue = [];
     resetPatriotRunState();
+    resetRoombaRunState(); // issue #85: new run, new circuit, new dice
     game.score = 0;
     game.phase = 'find';
     game.time = 0;
@@ -1160,6 +1284,10 @@ export function bootGame(cfg) {
     if (game.phase === 'find') stepPlayer(dt);
     if (game.phase === 'win') game.winElapsed += dt;
     game.time += dt;
+    // Issue #85: the vacuum is on duty the whole run — find, celebration,
+    // the lot. The odometer is the live clock; `?gate=off` reads metres off
+    // game.time instead (roombaMetres), so seeks stay byte-perfect.
+    if (ROOMBA_LVL && ROOMBA_MODE !== 'off' && !GATE_OFF) roombaOdo += ROOMBA_LVL.speed * dt;
 
     if (!hintDone && cfg.hintFade && started && game.phase === 'find') {
       hintT = Math.min(60, hintT + dt);
@@ -2078,7 +2206,7 @@ export function bootGame(cfg) {
     // moment's contact band, room coverage). The slice adds none. Issue #58
     // hands the Patriot pieces (rule, reward, costume, pop) down the same way.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, aptTv: apt.tv ?? null, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
+      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, aptTv: apt.tv ?? null, aptRoomba: apt.roomba ?? null, roombaCtl: { get planned() { return roombaPlanned; }, set planned(v) { roombaPlanned = !!v; }, get active() { return roombaActive; }, get used() { return roombaUsed; }, metres: roombaMetres, advance: (m) => { roombaOdo += Number(m) || 0; }, teleport: (m) => { roombaForced = Number(m); updateRoombaPose(); }, sync: () => updateRoombaPose(), ride: () => { if (ROOMBA_LVL) startRoombaRide(); }, roll: () => rollRoombaRide(), reset: () => resetRoombaRunState(), clearRide: () => { roombaActive = false; roombaUsed = false; roombaForced = null; game.momentId = MOMENTS[0].id; game.spotId = POOL ? MOMENTS[0].canonical : null; setBoboCostume(false); game.patriot = false; }, rideSpot: (id) => rideSpot(id) }, boboPos: () => ({ x: bobo.root.position.x, y: bobo.root.position.y, z: bobo.root.position.z }), boboYaw: () => bobo.root.rotation.y, boboRoot: bobo.root, GATE_OFF, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, afterCatchFn: afterCatch, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
     }
 
     game.score = savedScore;
@@ -2158,6 +2286,7 @@ export function bootGame(cfg) {
         // draws exactly what it always drew.
         apt.cull?.update(camera);
         apt.onRender?.(camera); // issue #84: the level's once-per-frame nudge (TV screen)
+        updateRoombaPose(); // issue #85: the vacuum (and a riding Bobo) to metre-now
         setRendering(true);
         try {
           renderer.render(scene, camera);
@@ -2241,7 +2370,7 @@ export function bootGame(cfg) {
       spots: POOL ? SPOT_IDS.slice() : [],
       spot(id = game.spotId) {
         if (!POOL || id == null) return null;
-        const s = POOL.get(id) ?? decoyById(id);
+        const s = POOL.get(id) ?? decoyById(id) ?? rideSpot(id); // issue #85: RIDE_SPOT answers for the vacuum
         if (!s) throw new Error(`Unknown spot "${id}". Declared: ${SPOT_IDS.join(', ')}`);
         // `hide` rides along (issue #70's row, null for open spots) so harnesses
         // can tell a findable-hidden round from an open one without re-typing
@@ -2274,7 +2403,7 @@ export function bootGame(cfg) {
           px: round(player.x), pz: round(player.z), yaw: round(player.yaw), pitch: round(player.pitch),
           decoyId: game.decoyId, seed: SEED, gateOpen, plant: PLANT,
           spotId: game.spotId ?? null,
-          room: POOL && game.spotId ? POOL.get(game.spotId).room : null,
+          room: POOL && game.spotId ? (POOL.get(game.spotId) ?? rideSpot(game.spotId)).room : null,
           patriot: game.patriot, patriotCount: game.patriotCount, findNum: game.findNum, // issue #58
         };
       },
@@ -2340,6 +2469,34 @@ export function bootGame(cfg) {
        *  tools compare runs against this without touching the game. */
       patriotPlan(seed = SEED, finds = MOMENT_IDS.length) {
         return runPatriotPlan(Number(seed), Number(finds), { enabled: PATRIOT.enabled });
+      },
+      /** Issue #85: the robot vacuum from the tools side.
+       *  LC.roomba() → the whole picture: mode (from ?roomba=), the run's
+       *                plan, odometer metres, loop length, whether Bobo is
+       *                aboard right now, and the vacuum's live pose.
+       *  LC.roomba({ advance: 40 })  → drive the odometer 40 m (the checks
+       *                give the vacuum its first loop on test time).
+       *  LC.roomba({ plan: true })   → set this run's ride plan (the dice,
+       *                forced — the ride RULES still bind).
+       *  LC.roomba({ reset: true })  → back to a fresh-run state.
+       *  A level with no vacuum answers { off: true }. */
+      roomba(cmd) {
+        if (!ROOMBA_LVL) return { off: true };
+        if (cmd && typeof cmd === 'object') {
+          if (cmd.advance != null) roombaOdo += Number(cmd.advance) || 0;
+          if (cmd.plan != null) roombaPlanned = !!cmd.plan;
+          if (cmd.reset) resetRoombaRunState();
+        }
+        const s = roombaMetres();
+        const p = ROOMBA_LVL.poseAt(s);
+        return {
+          off: false, mode: ROOMBA_MODE, seed: SEED, spotId: ROOMBA_LVL.spotId,
+          chance: ROOMBA_LVL.chance, speed: ROOMBA_LVL.speed, gateOff: GATE_OFF,
+          metres: round(s), length: ROOMBA_LVL.route.length,
+          planned: roombaPlanned, riding: roombaActive, used: roombaUsed,
+          pose: p, drawCalls: ROOMBA_LVL.stats.drawCalls, tris: ROOMBA_LVL.stats.triangles,
+          stations: ROOMBA_LVL.route.stationsVisited.join(','),
+        };
       },
       /** The seed the current run plays (issue #66) — the number the gear
        *  panel and the ?stamp=on line show, and what `?seed=N` must carry to
@@ -2668,6 +2825,7 @@ export function bootGame(cfg) {
     refills = 0;
     queue = [];
     resetPatriotRunState();
+    resetRoombaRunState(); // issue #85: new run, new circuit, new dice
     startLiveRound();
     spawnPlayerAt(SPAWNS[0]);
     standClearOfCats();

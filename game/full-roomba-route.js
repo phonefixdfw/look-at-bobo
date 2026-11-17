@@ -324,7 +324,7 @@ export function roombaAt(route, s) {
   const prevSeg = segs[(k - 1 + segs.length) % segs.length];
   const cross = prevSeg.ux * seg.uz - prevSeg.uz * seg.ux;
   const dot = prevSeg.ux * seg.ux + prevSeg.uz * seg.uz;
-  return { x, z, heading: seg.hdg, seg: k, turn: round3(Math.atan2(cross, dot)) };
+  return { x, z, heading: seg.hdg, seg: k, along: round3(along), turn: round3(Math.atan2(cross, dot)), L };
 }
 
 /** The room id the vacuum occupies at metre `s` (its doorway-crossings are

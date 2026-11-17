@@ -19,6 +19,7 @@ import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
 import { EYEWITNESS } from './full-street.js';
+import { buildRoombaRoute, roombaAt, ROOMBA } from './full-roomba-route.js';
 import { TRADEMARK_WORDS } from '../src/kart-screen.js';
 import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W, SUPPORT_DEFS } from './full-shell.js';
 import { diningGapReport } from './full-dining.js';
@@ -190,7 +191,7 @@ const roomLightFrames = { v: false, entry: null, luma: null };
 /** …and the same rule again for issue #83's street pixel check: two renders
  *  once per page, `blues` keeps what it measured for the detail line. */
 const streetFrames = { v: false, blues: null };
-function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, aptTv = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
+function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, aptTv = null, aptRoomba = null, roombaCtl = null, GATE_OFF = false, afterCatchFn = null, boboPos = null, boboYaw = null, boboRoot = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -1953,6 +1954,240 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
         'issue #84: one small canvas repainted + one texture upload at ≤ 12 fps, and only while it is on screen',
       );
     }
+  }
+
+  // ── issue #85: the robot vacuum and Bobo's ride ──────────────────────────
+  // The route is pure seeded data (game/full-roomba-route.js): most of this
+  // measures the module itself, the way the pool checks measure the tables.
+  // The ride mechanism runs live against the engine's real state (ctl), and
+  // cleans up after itself exactly like the Patriot rows do.
+  {
+    const OFF_DOORS = new Set(['door-hall-bedroom', 'open-hall-bath', 'open-hall-entry', 'slider-balcony']);
+    const SERVED = new Set(['living', 'hall', 'kitchen', 'dining']);
+    const DOOR = new Set(['door-living-hall', 'door-living-kitchen', 'door-kitchen-dining', 'door-living-dining']);
+    const rectAt = (x, z) => LEVEL.WALK_RECTS.find((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) ?? null;
+
+    // 1. The circuit itself, over 40 seeds: legal rooms only, collider
+    //    margin honoured, closed loops of a sane length.
+    const rbBad = [];
+    let dwellWorst = 0; let dwellRunWorst = 0; let dwellRunId = '';
+    {
+      let dwellTotal = 0; let dwellRun = 0;
+      for (const s of Array.from({ length: 40 }, (_, i) => i * 7 + 3)) {
+        const route = buildRoombaRoute(s);
+        if (!(route.length > 20 && route.length < 90)) rbBad.push(`seed ${s}: loop ${route.length} m`);
+        const sum = route.segs.reduce((t, g) => t + g.d, 0);
+        if (Math.abs(sum - route.length) > 0.05) rbBad.push(`seed ${s}: segs sum ${sum.toFixed(2)} ≠ ${route.length}`);
+        dwellTotal = 0; dwellRun = 0;
+        for (let d = 0; d < route.length; d += 0.15) {
+          const p = roombaAt(route, d);
+          const r = rectAt(p.x, p.z);
+          if (!r || (!SERVED.has(r.room) && !DOOR.has(r.id))) { rbBad.push(`seed ${s} @${d.toFixed(1)}: ${r?.id ?? 'void'} (${p.x}, ${p.z})`); break; }
+          if (OFF_DOORS.has(r.id)) { rbBad.push(`seed ${s} @${d.toFixed(1)}: sleeps in ${r.id}`); break; }
+          for (const c of LEVEL.COLLIDERS) {
+            if (p.x > c.x0 - ROOMBA.collMargin && p.x < c.x1 + ROOMBA.collMargin && p.z > c.z0 - ROOMBA.collMargin && p.z < c.z1 + ROOMBA.collMargin) { rbBad.push(`seed ${s} @${d.toFixed(1)}: in ${c.id}'s margin`); break; }
+          }
+          if (DOOR.has(r.id)) { dwellTotal += 0.15; dwellRun += 0.15; if (dwellRun > dwellRunWorst) { dwellRunWorst = dwellRun; dwellRunId = r.id; } } else dwellRun = 0;
+        }
+        dwellWorst = Math.max(dwellWorst, dwellTotal / route.length);
+      }
+    }
+    add(
+      'roomba-route-legal',
+      rbBad.length ? rbBad.slice(0, 3).join(', ') : `40 seeds: served rooms only, ≥ ${ROOMBA.collMargin} m off furniture, closed loops`,
+      'loop crosses living/hall/kitchen/dining only — never bedroom/bath/entry/balcony',
+      rbBad.length === 0,
+      'issue #85: the circuit is planned on the robot grid (walk rects minus the forbidden doors, 0.25 m off furniture)',
+    );
+
+    // 2. Doorways are crossed, not lived in: a bounded share of the loop
+    //    and a bounded single stay in any one door.
+    add(
+      'roomba-doorway-dwell',
+      `worst ${(dwellWorst * 100).toFixed(0)}% of a loop inside doors, longest single stay ${dwellRunWorst.toFixed(1)} m (${dwellRunId || '—'})`,
+      '≤ 18% of the loop and ≤ 8 m in any one doorway',
+      dwellWorst <= 0.18 && dwellRunWorst <= 8,
+      'issue #85: the route passes through doorways to change rooms; no waypoint, no turning, no parking in one',
+    );
+
+    // 3. Same seed, same loop — twice, and against the route the live page
+      //    actually built for its own seed.
+    const detOk = (() => {
+      const a = JSON.stringify(buildRoombaRoute(11));
+      const b = JSON.stringify(buildRoombaRoute(11));
+      const c = JSON.stringify(buildRoombaRoute(12));
+      if (a !== b || a === c) return false;
+      if (aptRoomba && aptRoomba.route.length !== buildRoombaRoute(SEED).length) return false;
+      return true;
+    })();
+    add(
+      'roomba-route-deterministic',
+      detOk ? `seed ${SEED}: the live loop = the derived loop (${aptRoomba ? `${aptRoomba.route.length.toFixed(1)} m` : 'no appliance'})` : 'a seed does not re-derive its loop',
+      'pure function of the seed; the page and the check agree',
+      detOk,
+      'issue #85: the route is data — no Math.random anywhere near it',
+    );
+
+    // 4. The ride dice ≈ 1 run in 6, and the engine's knob is absolute.
+    const rate = (() => {
+      let hits = 0;
+      const N = 600;
+      for (let s = 1; s <= N; s++) if (mulberry32(hashId(`${ROOMBA.seedTag} ${s}`))() < ROOMBA.chance) hits++;
+      return hits / N;
+    })();
+    add(
+      'roomba-ride-plan-rate',
+      ` ${(rate * 100).toFixed(1)}% of 600 seeds plan a ride (target ≈ 16.7%)`,
+      'one seeded dice per run, chance 1 in 6',
+      rate > 0.13 && rate < 0.21 && ROOMBA.chance === 1 / 6,
+      'issue #85: ~1 run in 6 has a find where Bobo rides — engine.js derives the same stream',
+    );
+
+    // 5. The ride rules, played through the engine's own functions: never
+    //    the first find, never before the vacuum has done a whole loop,
+    //    once per run. The odometer is moved with ctl.teleport (the checks'
+    //    seek knob — pure, cleared on every run start).
+    if (!aptRoomba || !roombaCtl || !boboPos || !boboRoot) {
+      add('roomba-ride-rules', 'no appliance on this page', 'ride rules hold', aptRoomba == null, 'issue #85: ?roomba=off leaves nothing to ride — nothing to ride, nothing to check');
+    } else {
+      const keep = { find: game.findNum, spot: game.spotId, moment: game.momentId, planned: roombaCtl.planned, phase: game.phase, score: game.score };
+      let ruleBad = '';
+      roombaCtl.reset();
+      roombaCtl.planned = true;
+      game.findNum = 1;
+      roombaCtl.teleport(aptRoomba.route.length + 2);
+      if (roombaCtl.roll()) ruleBad = 'rode on the first find';
+      game.findNum = 2;
+      roombaCtl.teleport(aptRoomba.route.length * 0.9);
+      if (roombaCtl.roll()) ruleBad = ruleBad || 'rode before a whole loop';
+      roombaCtl.teleport(aptRoomba.route.length + 0.5);
+      if (!roombaCtl.roll()) ruleBad = ruleBad || 'refused a legal ride';
+      roombaCtl.ride();
+      if (!roombaCtl.active || roombaCtl.roll()) ruleBad = ruleBad || 'rode twice';
+      add('roomba-ride-rules', ruleBad || 'never first · never before loop 1 · once per run', 'the three ride rules', !ruleBad, 'issue #85: a find never starts with him aboard, and the route always finishes a loop first');
+
+      // 6. Aboard: the engine parked Bobo on the vacuum's lid, facing the
+      //    way of travel, and the synthetic spot answers spot-shaped —
+      //    including the room the vacuum is standing in right now, and LC.spot
+      //    (the tools' door into the pool) answers for the ride id too.
+      const pose = aptRoomba.poseAt(roombaCtl.metres());
+      const aboardBad = [];
+      if (game.spotId !== aptRoomba.spotId) aboardBad.push(`spotId ${game.spotId}`);
+      const bp = boboPos();
+      if (!bp || Math.hypot(bp.x - pose.x, bp.z - pose.z) > 0.02) aboardBad.push('bobo off the lid');
+      if (!bp || Math.abs(bp.y - 0.105) > 0.01) aboardBad.push(`lid height ${bp?.y}`);
+      const rec = roombaCtl.rideSpot(aptRoomba.spotId);
+      if (!rec || rec.type !== 'cat' || rec.pose !== 'sit') aboardBad.push('spot record');
+      if (!rec || !SERVED.has(rec.room)) aboardBad.push(`room ${rec?.room}`);
+      if (window.LC.spot(aptRoomba.spotId)?.id !== aptRoomba.spotId) aboardBad.push('LC.spot refuses the ride id');
+      const yaw = boboYaw();
+      if (yaw == null || Math.abs(((yaw - catRootYaw(pose.heading)) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI) > 0.01) aboardBad.push('not facing travel');
+      add('roomba-ride-rides-the-route', aboardBad.length ? aboardBad.join(', ') : `aboard at (${pose.x}, ${pose.z}) in ${pose.room}, facing travel, sit pose`, 'position/lid/facing/record all follow the route', aboardBad.length === 0, 'issue #85: while he rides, Bobo is exactly where the vacuum is');
+
+      // 7. A riding Bobo is catchable: at 17 samples around the loop, the
+      //    engine seeks the vacuum (and him) to that metre, the standing
+      //    scan finds a place a player can stand and see the lid from, and
+      //    the aim ray from there hits his actual meshes — the same
+      //    root-wide raycast a click walks. (Slow target: ROOMBA.speed is
+      //    the aimable-cat tempo the docs fix at 0.18 m/s.)
+      const hitBad = [];
+      {
+        const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: LEVEL.MOVE.playerRadius });
+        const los = [
+          ...wallBoxes,
+          ...LEVEL.COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: 1.05 })),
+        ];
+        const rc = new THREE.Raycaster();
+        const eye = LEVEL.MOVE.eye;
+        const route = aptRoomba.route;
+        const step = route.length / 17;
+        for (let k = 0; k < 17; k++) {
+          const m = k * step;
+          roombaCtl.teleport(m);
+          const p = aptRoomba.poseAt(m);
+          const near = nearestStandable(grid, p.x, p.z);
+          if (!near) { hitBad.push(`${m.toFixed(1)} m: no standable cell near the vacuum`); continue; }
+          const a = bestApproach(grid, grid.flood(near.idx), { x: p.x, z: p.z, y: 0.105, los, eye });
+          if (!a) { hitBad.push(`${m.toFixed(1)} m: no clear approach`); continue; }
+          rc.set(new THREE.Vector3(a.x, eye, a.z), new THREE.Vector3(p.x - a.x, 0.3 - eye, p.z - a.z).normalize());
+          boboRoot.updateMatrixWorld(true); // the teleport moved the root; the ray reads world matrices
+          if (!rc.intersectObjects([boboRoot], true).length) hitBad.push(`${m.toFixed(1)} m: aim ray missed riding Bobo`);
+        }
+      }
+      add('roomba-ride-findable', hitBad.length ? `blind route metres: ${hitBad.slice(0, 3).join(', ')}` : '17 route samples: the aim ray hits him at every one', 'every route metre findable from somewhere a player can stand', hitBad.length === 0, 'issue #85: the ride is a find, not a ghost — measured on the same grid and raycast the live game uses');
+
+      // 8. Catching him aboard and moving on: afterCatch survives the
+      //    synthetic spot (the room lookups answer), the next find is a
+      //    normal pool spot again, and the render hook puts him back on
+      //    his feet at that spot — no lid, no straddling state.
+      let acBad = '';
+      try {
+        game.phase = 'find';
+        game.score = Math.min(game.score, 2); // keep the run alive past this catch
+        afterCatchFn();
+        window.LC.renderNow(); // the per-frame hook ends the ride for real
+        if (SPOT_IDS && !SPOT_IDS.includes(game.spotId)) acBad = `next find ${game.spotId} is not a pool spot`;
+        if (roombaCtl.active) acBad = acBad || 'still riding after the next find';
+        const spot2 = window.LC.spot(game.spotId);
+        const bp2 = boboPos();
+        if (spot2 && bp2) {
+          const y2 = supports[spot2.spot[1]] ?? 0;
+          if (Math.hypot(bp2.x - spot2.spot[0], bp2.z - spot2.spot[2]) > 0.03 || Math.abs(bp2.y - y2) > 0.03) acBad = acBad || 'not standing on the new spot after the catch';
+        }
+      } catch (e) {
+        acBad = `afterCatch threw: ${e.message}`;
+      }
+      add('roomba-ride-after-catch', acBad || `caught aboard → next find ${game.spotId} (${window.LC.state().room}), Bobo back on his feet`, 'a ride catch respawns like any catch', !acBad, 'issue #85: the synthetic spot answers the room lookups and the render hook ends the ride cleanly');
+      roombaCtl.reset(); // un-forget the odometer before the gate row reads it
+
+      // 9. The appliance is ONE draw call, small, lit, and culled with the
+      //    rooms it serves — the budget promise the issue is built around.
+      const st = aptRoomba.stats;
+      const grp = aptRoomba.group;
+      const matCount = new Set();
+      grp.traverse((o) => { if (o.isMesh) matCount.add(o.material); });
+      const budgetOk = st.drawCalls === 1 && st.triangles <= 600 && matCount.size === 1 && grp.userData?.cullRooms?.length === 4
+        && SERVED.has(grp.userData.cullRooms[0]) && grp.visible !== false;
+      add(
+        'roomba-one-draw',
+        budgetOk ? `${st.tier} tier: 1 draw · ${st.triangles} tris · 1 material · cullRooms ${grp.userData.cullRooms.join('/')}` : `${st.drawCalls} draws · ${st.triangles} tris · ${matCount.size} materials`,
+        'one merged mesh (≤ 600 tris, one material) shown with the four served rooms',
+        budgetOk,
+        'issue #85: +1 draw call, max — merged like the street mesh, culled by the same system',
+      );
+
+      // 10. Under `?gate=off` the odometer is pure seek time — metres are a
+      //     function of game.time and a full loop is unreachable, so the
+      //     tools and captures never meet a ride; live, metres are the
+      //     run's own odometer.
+      const gateOk = GATE_OFF
+        ? Math.abs(roombaCtl.metres() - aptRoomba.speed * game.time) < 1e-6
+        : (() => { roombaCtl.reset(); roombaCtl.advance(5); return Math.abs(roombaCtl.metres() - 5) < 1e-6; })();
+      add(
+        'roomba-gate-off-determinism',
+        GATE_OFF ? `gate off: metres = ${aptRoomba.speed} × game.time exactly` : 'gate on: the odometer owns the metres',
+        'staged metres are pure seek time; a staged ride is arithmetically impossible',
+        gateOk,
+        'issue #85: capture determinism holds because the vacuum only ever moves on the clocks the tools control',
+      );
+
+      // restore the live state the Patriot rows also restore
+      roombaCtl.clearRide();
+      roombaCtl.reset();
+      roombaCtl.planned = keep.planned;
+      game.findNum = keep.find;
+      game.spotId = keep.spot;
+      game.momentId = keep.moment;
+      game.phase = keep.phase;
+      game.score = keep.score;
+    }
+
+    // 11. Nobody added a box: the vacuum is a soft obstacle. The player's
+    //     grid is the issue-#27 table, untouched — the vacuum yields to
+    //     feet, not the other way round.
+    const softOk = !LEVEL.COLLIDERS.some((c) => /roomba|vacuum|robot/i.test(c.id))
+      && !LEVEL.WALK_RECTS.some((r) => /roomba|vacuum|robot/i.test(r.id));
+    add('roomba-soft-obstacle', softOk ? 'no vacuum box in COLLIDERS or WALK_RECTS' : 'the appliance edited the player grid', 'the route adds nothing to the walk grid', softOk, 'issue #85: the robot is scenery-with-manners — a player walks over it, the checks stay the game of #27');
   }
 }
 

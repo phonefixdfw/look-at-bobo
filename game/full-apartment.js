@@ -54,6 +54,8 @@ import { buildFullDining } from './full-dining-mesh.js';
 import { buildFullDecor } from './full-decor-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
 import { buildFullStreet } from './full-street-mesh.js';
+import { buildFullRoomba } from './full-roomba-mesh.js';
+import { buildRoombaRoute, roombaAt, roombaRoomAt, ROOMBA } from './full-roomba-route.js';
 import { autoLowQuality } from '../src/touch.js';
 import { createRoomCull } from './full-cull.js';
 
@@ -652,6 +654,55 @@ export function buildFullApartment(scene, boot = {}) {
   flat.add(street.group);
   console.info(`[look-at-bobo] issue #83 street: ${street.tier} tier · ${street.stats.triangles} tris in ${street.stats.drawCalls} draw · atlas ${street.stats.atlasWidth}px`);
 
+  // ── issue #85: the robot vacuum and its loop ──────────────────────────────
+  // The vacuum trundles a seeded circuit through the open rooms. Its route is
+  // pure data (game/full-roomba-route.js) rebuilt at every run start from
+  // that run's seed; its body is ONE merged mesh (+1 draw, ~330 tris, the
+  // same trick as the street above), filed on the flat BEFORE the cull so
+  // the cull's `cullRooms` invite list shows it from the four rooms the
+  // route serves and hides it (costing nothing) from the other four. The
+  // engine owns the odometer: it calls place(metres) once per render and
+  // reroute(seed) at each run start. `?roomba=off` deletes the appliance
+  // AND Bobo's ride with it — the route, the mesh and the moving find.
+  const roombaParam = new URLSearchParams(location.search).get('roomba');
+  let roomba = null;
+  if (roombaParam !== 'off') {
+    let route = buildRoombaRoute(boot.seed ?? 11); // the engine hands its run seed through boot
+    const art = buildFullRoomba({ THREE, quality: street.tier });
+    flat.add(art.group);
+    roomba = {
+      spotId: ROOMBA.spotId,
+      chance: ROOMBA.chance,
+      speed: ROOMBA.speed,
+      seedTag: ROOMBA.seedTag,
+      stats: art.stats,
+      group: art.group,
+      get route() {
+        return route;
+      },
+      /** Re-plan the circuit for a new run; the vacuum starts at metre 0. */
+      reroute(seed) {
+        route = buildRoombaRoute(seed);
+        roomba.place(0);
+      },
+      poseAt(s) {
+        const p = roombaAt(route, s);
+        return { ...p, room: roombaRoomAt(route, s) };
+      },
+      /** Put the appliance at metre s of its loop; leans into the corner it
+       *  has just turned, the way a feeler bar sweeps. */
+      place(s) {
+        const p = roomba.poseAt(s);
+        art.group.position.set(p.x, 0, p.z);
+        art.group.rotation.y = p.heading;
+        art.mesh.rotation.z = -p.turn * 0.22 * Math.max(0, 1 - p.along / 0.5);
+        return p;
+      },
+    };
+    roomba.place(0);
+    console.info(`[look-at-bobo] issue #85 vacuum: loop ${route.length.toFixed(1)} m · ${roomba.stats.triangles} tris in ${roomba.stats.drawCalls} draw · seed ${boot.seed ?? 11}`);
+  }
+
   // ── issue #61: stop submitting rooms the camera cannot see ────────────────
   // Filed now, before game/full.js adds the cast: everything in this list is
   // flat, and anything added afterwards is nobody's room to hide.
@@ -733,6 +784,10 @@ export function buildFullApartment(scene, boot = {}) {
     // issue #83: the street backdrop — { group, stats, tier } — so the
     // checks can count it, measure the atlas and park the camera per room
     street: { group: street.group, stats: street.stats, tier: street.tier, mesh: street.mesh },
+    // issue #85: the robot vacuum — route data, the one-draw mesh, and the
+    // place/reroute/poseAt interface the engine's odometer drives (null
+    // under `?roomba=off`, which is also the engine's cue to never ride).
+    roomba,
     // issue #84: the TV's kart screen and the engine's once-a-frame nudge.
     // tick() repaints and re-uploads the one texture only while the screen
     // is on camera (per-room cull's visible flags + a frustum test) and the
