@@ -2375,3 +2375,83 @@ console clean. `playtest:stress:full` **77 PASS / 0 FAIL** at
 (rarest `sink-sit.bar` 8.8 %). `build` PASS — 73 files, 3.17 MB. Docs:
 `docs/LEVEL_LAYOUT.md` (route data), `docs/CHARACTERS.md` (the vacuum),
 `docs/STORY.md` (the ride rule).
+
+## 38. Issue #99 — the gear is reachable: a real paused state for mouse players (2026-11-17)
+
+Brandon (2026-11-17, desktop playtest, no touch): "on desktop with no
+touch, theres no way to access settings. you're either moving the view or
+you're paused and cant click it either." He was right twice, and the two
+halves had different owners.
+
+- **While playing** the pointer is captured by the browser — no click can
+  reach the gear; that part is physics, and the fix is not a new way to
+  click mid-run but a pause that actually works.
+- **While paused** the gear *looked* clickable and was not. The culprit is
+  a stacking rule: `#hud` is `position: fixed`, and Chrome makes every
+  fixed element a stacking context even at `z-index: auto` — the gear's
+  `z-index: 55` only counted INSIDE `#hud`, and `#hud` sits earlier in the
+  DOM than `#pause` (45) and `#gate` (50). Both overlays painted over the
+  gear and swallowed every click aimed at it — the "click" landed on the
+  card and re-grabbed the pointer, which reads exactly as "can't click
+  it". `elementFromPoint` at the gear's centre returned `pause`, not
+  `settings-btn`.
+
+**The fix.** `#settings-btn` and `#settings-panel` now live OUTSIDE `#hud`
+(after it, before the gate) so their z 55/56 really does beat the pause
+(45) and gate (50) overlays — with a comment in the markup saying why, so
+nobody "tidies" them back. On top of that the paused state became a real
+menu:
+
+- **Esc (and now P) release the mouse and open the pause card**, which
+  gained a **settings** button, a **resume** button and a one-line desktop
+  controls help including the issue's wording **"Esc or P: pause and
+  settings"**. The gear is clickable in this state with a normal cursor
+  (`elementFromPoint` proves it: the gear is the top element).
+- **Resume, clicking the card, Esc again or P re-lock and continue**; the
+  panel opens above the card and closes (X, Esc, O again) back onto the
+  card — never a dead state. **O** opens settings straight from play,
+  releasing the pointer first. **M** is still the way back to the title
+  screen; #99 took Esc off that job (the old "#57 Esc = menu" shortcut
+  made the same key mean two opposite things two keys apart).
+- **Pointer lock denied or missing** (hardened browsers, iframes, Chrome's
+  instant-re-lock refusal after a quick Esc double-press): the game runs
+  with a free cursor, **P/Esc/O still pause** with a normal cursor
+  (`pauseHere`), a refused re-lock keeps the card up instead of eating the
+  click, and where `requestPointerLock` does not exist at all
+  (`input.canLock()`) Resume simply continues with a normal cursor.
+- **Timer/run state:** `game.paused` stays THE single flag — `stepGame`
+  returns early while it is set (the run clock and every world step sleep,
+  and the stamp path already zeroes `lastStamp` so paused time is never
+  game time). The later leaderboard can distrust a run by reading that
+  one boolean off `LC.state()`.
+- **Touch is unchanged**: the new card buttons and the help line carry
+  `.only-desktop`, the card keeps its "tap anywhere to keep looking"
+  wording, and the always-visible gear stays always-visible — out of
+  `#hud` it now also sits *above* the title card, where the copy has
+  always told players to find it.
+
+**Checks.** `tools/mobile-check.mjs` scenario 15 (15 desktop + fallback
+rows, the whole suite now 147 PASS): the locked gear takes no click
+(documented browser rule), Esc pauses with the gear as the TOP element,
+gear click opens the panel over the card, Esc closes it back onto the
+card, a changed sensitivity survives the URL reload, the card's Settings
+and Resume buttons work, O opens from play and closes with O again, P
+toggles, Esc-on-card resumes (no longer leaves the run), M still menus; a
+stubbed **pointerlockerror** page still pauses and keeps a usable overlay;
+a page with **no lock API** resumes without one; `?touch=on` sees none of
+the new chrome; and the card fits a 740×360 window clear of the gear.
+
+**Suites at this HEAD (all twenty-four runs, none skipped).**
+`capture:full` PASS — 585 frames, 116/116 every frame, worst 152 draws
+/ 100 676 triangles / 1 pass, console clean.
+`capture:full:determinism` 8/8 byte-identical. `weak` PASS worst 94.
+`spots` 20 frames, `patriot` 6, `style` 72, `slice` 144, `demo` 48,
+`testscene` 36 — all PASS; slice and demo determinism 8/8 byte-identical
+(they never saw a #99 file). Planted capture exits 1 catching exactly
+`ending-text-exact`. `gate` PASS. Bots full 10/10, patriot 5/5, slice
+green, console clean. `stress:full` 77 PASS / 0 FAIL at `--checks 116`,
+`stress` slice green. Audio 23/23, music 29/29 + 28/28.
+`seed:coverage` PASS (rarest `sink-sit.bar` 8.8 %). `build` PASS — 73
+files, 3.17 MB. `check:mobile` PASS twice — 147 rows pre-build and 151
+after (the four dist-stamp rows join), 0 FAIL, scenario 15 (#99) green
+both times.

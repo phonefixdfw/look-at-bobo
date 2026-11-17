@@ -308,7 +308,10 @@
       }
 
       /* Step 9 comfort: the settings panel (gear, top-left). Same card
-         vocabulary as the pause card; every control is wired in engine.js. */
+         vocabulary as the pause card; every control is wired in engine.js.
+         Issue #99: the markup lives after #hud (see the note there) so this
+         z 55 really beats the pause (45) and gate (50) overlays — the gear
+         is clickable in the paused state with a normal cursor. */
       #settings-btn {
         position: fixed;
         top: 16px;
@@ -536,6 +539,19 @@
       .pause-sub {
         margin-top: 8px;
         color: rgba(247, 244, 238, 0.75);
+      }
+      /* Issue #99: the controls help on the pause card (desktop only, one
+         compact block in the card's own vocabulary — the .only-desktop rule
+         retires it on phones, where the card keeps its tap-anywhere line). */
+      .pause-help {
+        margin-top: 12px;
+        color: rgba(247, 244, 238, 0.66);
+        font-size: 12.5px;
+        line-height: 1.8;
+      }
+      .pause-help b {
+        color: var(--ui-mustard);
+        font-weight: 800;
       }
 
       #pause-restart {
@@ -1094,26 +1110,36 @@
         </svg>
         <div id="dag-label">DAG!</div>
       </div>
-      <button id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
-      <div id="settings-panel" role="dialog" aria-label="Comfort settings">
-        <button id="settings-close" aria-label="Close settings">×</button>
-        <h2>Comfort</h2>
-        <label>Mouse speed <input id="set-sens" type="range" min="0.2" max="3" step="0.05" /></label>
-        <label>Invert up/down <input id="set-invertY" type="checkbox" /></label>
-        <label>Calm motion <input id="set-motion" type="checkbox" title="No confetti, rain, fireworks or screen flashes. The cats still breathe." /></label>
-        <label>High contrast <input id="set-contrast" type="checkbox" /></label>
-        <label>Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
-        <label>Mute <input id="set-mute" type="checkbox" /></label>
-        <!-- issue #71: the music has its own knobs under the master pair -->
-        <label>Music volume <input id="set-musicvol" type="range" min="0" max="1" step="0.05" /></label>
-        <label>Mute music <input id="set-musicmute" type="checkbox" /></label>
-        <!-- issue #29: which build, which control mode, which quality -->
-        <div class="lc-stamp" id="settings-build"></div>
-      </div>
       <div id="wrong-flash"></div>
       <div id="ending-veil"></div>
       <div id="ending">your did it! you wind</div>
       <div id="ending-again">click or press space to go back to the menu</div>
+    </div>
+
+    <!-- Issue #99: the gear and its panel live OUTSIDE #hud, on purpose.
+         #hud is position:fixed, and Chrome makes every fixed element a
+         stacking context even at z-index:auto — so a z-index INSIDE it can
+         never out-rank a later sibling like #pause (45) or #gate (50). The
+         overlays painted over the gear and swallowed every click aimed at
+         it: locked in play the pointer cannot reach it at all, and paused a
+         click at the gear actually hit the overlay and re-grabbed the
+         pointer (Brandon's desktop playtest). Out here, z 55/56 sits above
+         both overlays and below #boot-error (60) and #rotate-hint (62). -->
+    <button id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+    <div id="settings-panel" role="dialog" aria-label="Comfort settings">
+      <button id="settings-close" aria-label="Close settings">×</button>
+      <h2>Comfort</h2>
+      <label>Mouse speed <input id="set-sens" type="range" min="0.2" max="3" step="0.05" /></label>
+      <label>Invert up/down <input id="set-invertY" type="checkbox" /></label>
+      <label>Calm motion <input id="set-motion" type="checkbox" title="No confetti, rain, fireworks or screen flashes. The cats still breathe." /></label>
+      <label>High contrast <input id="set-contrast" type="checkbox" /></label>
+      <label>Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
+      <label>Mute <input id="set-mute" type="checkbox" /></label>
+      <!-- issue #71: the music has its own knobs under the master pair -->
+      <label>Music volume <input id="set-musicvol" type="range" min="0" max="1" step="0.05" /></label>
+      <label>Mute music <input id="set-musicmute" type="checkbox" /></label>
+      <!-- issue #29: which build, which control mode, which quality -->
+      <div class="lc-stamp" id="settings-build"></div>
     </div>
 
     <div id="gate">
@@ -1160,7 +1186,7 @@
           <span class="title-comfort">the gear at the corner holds the cozy switches — motion, sound, contrast</span>
         </div>
         <div id="gate-howto-panel">
-          <span class="only-desktop"><b>WASD</b> walk · <b>mouse</b> look · <b>Shift</b> run · <b>click / Space</b> shout · <b>Esc</b> pause · <b>M</b> from the pause card back to this screen<br /></span>
+          <span class="only-desktop"><b>WASD</b> walk · <b>mouse</b> look · <b>Shift</b> run · <b>click / Space</b> shout · <b>Esc or P</b>: pause and settings · <b>O</b> settings · <b>M</b> from the pause card back to this screen<br /></span>
           <span class="only-touch"><b>left thumb</b> stick · <b>right side</b> drag to look · <b>yellow button</b> shout · turn your phone sideways for the best view<br /></span>
           ten moments, living room to bathroom — find Bobo (forehead dash, chest bib),
           put the dot on him, shout. ten finds wins it; the wrong cat earns a DAG! and a point off.
@@ -1178,7 +1204,13 @@
       <div class="pause-card">
         <div class="pause-title">paused</div>
         <div class="pause-sub">click anywhere to grab the pointer back</div>
+        <div class="pause-help only-desktop">
+          <b>WASD</b> walk · <b>mouse</b> look · <b>Shift</b> run · <b>click / Space</b> shout<br />
+          <b>Esc or P</b>: pause and settings · <b>O</b> settings · <b>M</b> menu
+        </div>
         <div class="pause-actions">
+          <button id="pause-resume" type="button" class="only-desktop">resume</button>
+          <button id="pause-settings" type="button" class="only-desktop">settings</button>
           <button id="pause-restart" type="button">restart</button>
           <button id="pause-menu" type="button">back to menu</button>
         </div>

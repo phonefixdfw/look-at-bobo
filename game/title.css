@@ -232,7 +232,9 @@ body.howto-open #gate-howto-panel {
   flex-wrap: wrap;
   justify-content: center;
 }
-#pause-menu {
+#pause-menu,
+#pause-resume,
+#pause-settings {
   pointer-events: auto;
   cursor: pointer;
   border: 1px solid rgba(247, 244, 238, 0.28);
@@ -245,7 +247,9 @@ body.howto-open #gate-howto-panel {
   background: rgba(247, 244, 238, 0.06);
   color: var(--ui-paper);
 }
-#pause-menu:hover {
+#pause-menu:hover,
+#pause-resume:hover,
+#pause-settings:hover {
   border-color: var(--ui-mustard);
   color: var(--ui-mustard);
 }
