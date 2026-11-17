@@ -69,6 +69,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Look at Bobo" />
     <link rel="apple-touch-icon" href="../assets/icons/apple-touch-icon.png" />
+    <script>
+      /* Issue #77 (tests only): ?safe=notch swaps the real safe-area insets
+         for a fixed iPhone-landscape-notch simulation (html.safe-notch in the
+         page CSS), so the headless phone check can exercise the notch layout
+         with no iPhone in the room. Players never set it, and no capture
+         passes it. */
+      if (new URLSearchParams(location.search).get('safe') === 'notch') {
+        document.documentElement.classList.add('safe-notch');
+      }
+    </script>
     <script type="importmap">
       { "imports": { "three": "/vendor/three/three.module.js" } }
     </script>
@@ -87,6 +97,21 @@
         --ui-paper: #f7f4ee;
         --ui-mustard: #e8b04a;
         --ui-coral: #ff8f7d;
+        /* Issue #77: every safe-area pad goes through these four variables —
+           the real device insets by default, with `html.safe-notch` (test
+           only: ?safe=notch, see the little script in <head>) standing in
+           for an iPhone landscape notch so npm run check:mobile can verify
+           the layout without a real iPhone. */
+        --safe-t: env(safe-area-inset-top, 0px);
+        --safe-r: env(safe-area-inset-right, 0px);
+        --safe-b: env(safe-area-inset-bottom, 0px);
+        --safe-l: env(safe-area-inset-left, 0px);
+      }
+      html.safe-notch {
+        --safe-t: 0px;
+        --safe-r: 44px;
+        --safe-b: 21px;
+        --safe-l: 59px;
       }
       html,
       body {
@@ -100,6 +125,12 @@
         display: block;
         width: 100vw;
         height: 100vh;
+        /* Issue #77: with viewport-fit=cover the canvas must reach every
+           screen edge — 100svh is the visible viewport while the browser
+           bars are up (iOS 15.0+), the 100vh line above stays for engines
+           that lack it, and body.touch below upgrades to the dynamic
+           viewport once the bars are gone. */
+        height: 100svh;
       }
       #moment-label {
         position: fixed;
@@ -176,7 +207,7 @@
       }
       body.touch #score-bonus {
         left: calc(100% - 64px);
-        top: calc(64px + env(safe-area-inset-top, 0px));
+        top: calc(64px + var(--safe-t, 0px));
         font-size: 27px;
       }
 
@@ -603,8 +634,8 @@
         display: block;
         opacity: 0.72;
         /* rest centre: comfortably thumb-reachable, clear of the shout button */
-        left: calc(80px + env(safe-area-inset-left, 0px));
-        top: calc(100dvh - 80px - env(safe-area-inset-bottom, 0px));
+        left: calc(80px + var(--safe-l, 0px));
+        top: calc(100dvh - 80px - var(--safe-b, 0px));
         transition:
           opacity 0.3s ease,
           left 0.25s ease-out,
@@ -697,8 +728,8 @@
         display: none;
         align-items: center;
         justify-content: center;
-        right: calc(18px + env(safe-area-inset-right, 0px));
-        bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+        right: calc(18px + var(--safe-r, 0px));
+        bottom: calc(22px + var(--safe-b, 0px));
         width: min(40vw, 190px);
         height: min(40vw, 190px);
         border: 0;
@@ -734,7 +765,7 @@
         position: fixed;
         z-index: 20;
         left: 50%;
-        bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(86px + var(--safe-b, 0px));
         transform: translateX(-50%);
         display: none;
         align-items: center;
@@ -777,8 +808,8 @@
       #look-hint {
         position: fixed;
         z-index: 20;
-        top: calc(13% + env(safe-area-inset-top, 0px));
-        right: calc(11% + env(safe-area-inset-right, 0px));
+        top: calc(13% + var(--safe-t, 0px));
+        right: calc(11% + var(--safe-r, 0px));
         width: 84px;
         display: none;
         text-align: center;
@@ -893,24 +924,24 @@
       /* Thumb-sized, notch-safe HUD on a phone (landscape): safe-area insets
          so nothing hides under a notch or the home bar, roomier targets. */
       body.touch #hud-score {
-        top: calc(14px + env(safe-area-inset-top, 0px));
-        right: calc(14px + env(safe-area-inset-right, 0px));
+        top: calc(14px + var(--safe-t, 0px));
+        right: calc(14px + var(--safe-r, 0px));
         font-size: 22px;
         padding: 8px 15px;
       }
       body.touch #settings-btn {
-        top: calc(14px + env(safe-area-inset-top, 0px));
-        left: calc(14px + env(safe-area-inset-left, 0px));
+        top: calc(14px + var(--safe-t, 0px));
+        left: calc(14px + var(--safe-l, 0px));
         width: 46px;
         height: 46px;
         font-size: 23px;
       }
       body.touch #settings-panel {
-        top: calc(68px + env(safe-area-inset-top, 0px));
-        left: calc(14px + env(safe-area-inset-left, 0px));
+        top: calc(68px + var(--safe-t, 0px));
+        left: calc(14px + var(--safe-l, 0px));
       }
       body.touch #prompt {
-        bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(44px + var(--safe-b, 0px));
       }
       body.touch #hint {
         display: none; /* #38: the low faint text line is retired on phones —
