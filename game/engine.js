@@ -2217,9 +2217,12 @@ export function bootGame(cfg) {
       spots: POOL ? SPOT_IDS.slice() : [],
       spot(id = game.spotId) {
         if (!POOL || id == null) return null;
-        const s = POOL.get(id);
+        const s = POOL.get(id) ?? decoyById(id);
         if (!s) throw new Error(`Unknown spot "${id}". Declared: ${SPOT_IDS.join(', ')}`);
-        return { id: s.id, type: s.type, room: s.room, pose: s.pose, spot: s.spot.slice(), faceYaw: s.faceYaw };
+        // `hide` rides along (issue #70's row, null for open spots) so harnesses
+        // can tell a findable-hidden round from an open one without re-typing
+        // the level table — the mistake class docs/LEVEL_LAYOUT.md warns about.
+        return { id: s.id, type: s.type, room: s.room, pose: s.pose, spot: (s.spot ?? s.pos).slice(), faceYaw: s.faceYaw, hide: s.hide ?? null };
       },
       setSpot(id) {
         if (!POOL) throw new Error('This level has no spot pool.');
