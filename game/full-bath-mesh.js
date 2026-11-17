@@ -117,7 +117,12 @@ function buildPieces(bath, mats) {
  *  being enamel, hangs in the fittings chunk. */
 function buildCurtain(bath, mats) {
   const C = CURTAIN;
-  const step = (C.x1 - C.x0) / C.folds;
+  // Issue #70: the cloth is GATHERED to C.clothX1 — the same 15 folds, packed
+  // into the shorter run (denser bellows read as pushed-aside cloth), and the
+  // rod keeps its full span. Same boxes in the same merged mesh: the gathering
+  // costs no draw call, and what it hides is exactly the box full-level.js's
+  // HIDE_PROPS hands to the `findable` check.
+  const step = (C.clothX1 - C.x0) / C.folds;
   const folds = [];
   for (let i = 0; i < C.folds; i++) {
     const back = i % 2 === 0;

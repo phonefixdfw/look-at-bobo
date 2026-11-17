@@ -518,7 +518,12 @@ export const PLANTS = [
     name: 'big-plant',
     x: -0.65, z: -2.52, y0: 0, // under the east end of the north window
     pot: { r0: 0.12, r1: 0.17, h: 0.3 },
-    leaf: { n: 26, len: 0.36, wid: 0.15, bend: 0.14 },
+    // issue #70: the fronds grew (0.36 → 0.50 blades, same 26 leaves on the
+    // same spiral, same merged mesh) until the plant stands taller than the
+    // waist-high sight line — a cat bedded down at its window-side foot now
+    // shows through the leaves only from about two vantages in five, and the
+    // `findable` check carries the exact box this draws (HIDE_PROPS).
+    leaf: { n: 26, len: 0.5, wid: 0.15, bend: 0.14 },
   },
   {
     name: 'small-plant',

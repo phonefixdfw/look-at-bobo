@@ -235,26 +235,28 @@ no same-spot respawn (`DECOY_MIN_DIST` 1.2, ≥0.30 m spawn clearance),
 `winAt: 10`. The full flat draws each run from the spot pool instead —
 see "The spot pool" below (issue #53).
 
-## The spot pool (`SPOTS`, 28 — wired up by issue #53)
+## The spot pool (`SPOTS`, 30 — wired up by issue #53)
 
-`full-level.js` exports `SPOTS`: 28 authored places Bobo can actually be,
+`full-level.js` exports `SPOTS`: 30 authored places Bobo can actually be,
 each with the moment `type` it belongs to, its `room`, `pose`, `spot`
 [x, y, z] and `faceYaw`. Every moment's canonical capture spot is one of
 them, named by `MOMENTS[i].canonical` (★ below); the rest are alternates
-drawn into play by issue #53's run draw. Ids are `<type>.<place>`.
+drawn into play by issue #53's run draw. Ids are `<type>.<place>`. A spot
+marked ‡ hides its cat behind a prop (issue #70 — see "Partial hiding"
+below the table).
 
 | id | room | pose | Bobo's spot | faceYaw |
 |---|---|---|---|---|
 | `couch-loaf.couch` ★ | living | side | (−2.75, cushion, −0.1) | −0.73 |
 | `couch-loaf.sofa-back` | living | loaf | (−3.16, sofaBackTop, 0.35) | −1.6 |
-| `window-bird.n-window` ★ | living | sit | (−1.35, floor, −2.5) | 1.71 |
+| `window-bird.n-window` ★ ‡ | living | sit | (−1.35, floor, −2.5) | 1.71 |
 | `window-bird.e-window` | living | sit | (1.72, floor, 0.55) | 1.51 |
 | `window-bird.balcony-door` | living | sit | (1.5, floor, −2.45) | 3.04 |
 | `box-sit.box` ★ | living | sit | (−2.075, boxFloor, 1.575) | −1.57 |
 | `window-bird.balcony-rail` | balcony | sit | (1.35, floor, −3.85) | −2.9 |
 | `couch-loaf.balcony-chair` | balcony | loaf | (2.15, chairSeat, −3.6) | 1.77 |
 | `sink-sit.sink` ★ | kitchen | sit | (4.15, counterTop, −2.6) | −2.92 |
-| `sink-sit.counter-return` | kitchen | loaf | (2.82, counterTopW, −1.5) | 3.02 |
+| `sink-sit.counter-return` ‡ | kitchen | loaf | (2.82, counterTopW, −1.5) | 3.02 |
 | `sink-sit.fridge` | kitchen | sit | (5.2, floor, −1.75) | 1.4 |
 | `sink-sit.bar` | kitchen | side | (4.1, barTop, 0.4) | −0.14 |
 | `hall-chase.kitchen` | kitchen | loaf | (4.3, floor, −1.3) | 1.58 |
@@ -262,8 +264,9 @@ drawn into play by issue #53's run draw. Ids are `<type>.<place>`.
 | `hall-chase.hall-door` | hall | sit | (0.3, floor, 4.85) | 1.55 |
 | `hall-chase.entry` | entry | loaf | (1.45, floor, 3.4) | 1.81 |
 | `hall-chase.entry-door` | entry | loaf | (1.5, floor, 3.0) | 1.57 |
-| `hall-chase.bath-mat` | bathroom | side | (−2.2, floor, 3.1) | 1.9 |
-| `hall-chase.vanity` | bathroom | sit | (−2.65, vanityTop, 2.46) | 3.06 |
+| `hall-chase.bath-mat` ‡ | bathroom | side | (−2.2, floor, 4.12) | 1.22 |
+| `hall-chase.vanity` | bathroom | sit | (−2.65, vanityTop, 2.46) | 3.14 |
+| `laundry-nap.bath-tub` ‡ | bathroom | side | (−2.55, tubWell, 4.85) | −0.44 |
 | `desk-pen.desk` ★ | bedroom | sit | (−1.85, deskTop, 5.7) | 2.89 |
 | `desk-pen.desk-end` | bedroom | loaf | (−2.3, deskTop, 5.85) | 3.01 |
 | `keyboard-sit.keyboard` ★ | bedroom | sit | (−1.85, kbTop, 5.82) | 3.13 |
@@ -273,14 +276,65 @@ drawn into play by issue #53's run draw. Ids are `<type>.<place>`.
 | `bed-stretch.bed-foot` | bedroom | side | (−0.4, bedTop, 8.25) | 1.43 |
 | `blanket-biscuits.blanket` ★ | bedroom | sit | (0.2, blanketTop, 7.15) | 0 |
 | `blanket-biscuits.wardrobe` | bedroom | loaf | (−1.55, floor, 8) | 0.03 |
+| `blanket-biscuits.dresser-gap` ‡ | bedroom | loaf | (0.95, floor, 6.85) | 2.62 |
 
-Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 9 · living 6 ·
-kitchen 5 · hall 2 · entry 2 · bathroom 2 · balcony 2. Two data moves got
+Room coverage (≥ 2 each — `spot-pool-covers-rooms`): bedroom 10 · living 6 ·
+kitchen 5 · hall 2 · entry 2 · bathroom 3 · balcony 2. Two data moves got
 there (issue #53): `hall-chase.living` (2.6, 0.2) **moved** to
 `hall-chase.entry-door` — living had 6 spots, entry only 1, and (2.6, 0.2)
 sat on the rug beside the style-test box anyway — and `window-bird.balcony-door`
 had its faceYaw corrected −0.1 → 3.04 (the pool sweep found it 96° off its
 approach; it's not a canonical capture spot, so no baseline moved).
+
+### Partial hiding (issue #70)
+
+A spot may carry `hide: '<prop>'`: a named prop **partly covers the cat at
+that spot** — it blocks the *view*, never the aim ray, never the walk. The
+aim exemption is structural, not a special case: `catUnderCrosshair()` in
+`game/engine.js` raycasts only the two cat root groups, so no prop mesh can
+ever stand between a shout and a cat. Walking is likewise untouched:
+hiding added **zero colliders** (`collider-set-stable` still holds) and zero
+draw calls (worst full-flat frame still **149 / 150**).
+
+Six spots hide today — five of Bobo's, one decoy's (★ = hidden):
+
+| id | hides behind | visible ring | nearest vantage |
+|---|---|---|---|
+| `laundry-nap.bath-tub` ★ | `shower-curtain` | **5 %** | 1.14 m |
+| `window-bird.n-window` ★ | `big-plant` | 42 % (was 59 %) | 0.90 m |
+| `hall-chase.bath-mat` ★ | `tub` | 29 % | 0.90 m |
+| `blanket-biscuits.dresser-gap` ★ | `dresser` | 28 % | 0.90 m |
+| `sink-sit.counter-return` ★ | `counter-w` | 26 % | 0.90 m |
+| `d-kitchen` (decoy) ★ | `counter-w` | 24 % | 0.90 m |
+
+The centrepiece is new: `laundry-nap.bath-tub` naps **in the tub** for once,
+on the well floor (support `tubWell`, same precedent as `vanityTop`) behind
+the shower curtain gathered across the north half of the rim — the curtain's
+15 folds now bunch within `CURTAIN.clothX1` (−2.15) instead of spreading to
+the rod's full 0.94 m, the bellows denser, the rod unchanged. 38 % of the
+ring around an unhidden tub cat can see him; behind the gathered cloth only
+5 % can, and the gap at the curtain's east end is where he's found. The
+other geometry change is `big-plant`'s fronds (0.36 → 0.50 m, same 26
+leaves): bedded at the plant's foot, the bird watches the window through
+42 % of its ring instead of 59 %. Everything else on the list hides behind
+furniture that was always there — the `hide` field *documents* the cover the
+piece already gives and lets the build check guarantee it.
+
+What "hides" means is data, not vibes: `HIDE_PROPS` in `full-level.js` gives
+each named prop an axis-aligned box at its **true drawn height**
+(`SIGHT_HEIGHTS` carries a row for every one of the 38 `COLLIDERS`; the
+curtain box comes from the `CURTAIN` constants and is deliberately *not* a
+collider — cloth is walk-through). The new `findable` selfTest check then
+walks a 24-point ring 2.2 m out (clipped to the flat's walkable rects) and
+raycasts each vantage to the cat's aim point through the flat's *own*
+sight model at true heights — walls + colliders at real tops (not the
+engine's eye-level 1.05 m LOS clip) + the hide box — and fails the build
+naming the spot if any hiding cat has **no** vantage that sees it
+("partly hidden, never unfindable"). It also fails a `hide` that hides
+nothing (≥ 50 % of the ring sees the cat), enforces ≤ 25 % of the pool
+hiding (5/30 = 17 % today), and requires ≥ 6 hiding spots overall so the
+feature can't silently rot away. Full check count 81 → **82**, and
+`playtest:stress:full` passes `--checks 82` to match.
 
 **Run draw** (`pickSpotCycle`, engine's queue slot): every run draws TEN
 spots — one per moment type, all ten types exactly once — and the round

@@ -9,7 +9,7 @@
 // plays with (LC.spotCycle → pickSpotCycle, LC.patriotPlan → runPatriotPlan)
 // and reporting:
 //
-//   * the share of runs each of the 28 spots appears in, by room and by type
+//   * the share of runs each of the 30 spots appears in, by room and by type
 //   * the share of runs with at least one Patriot Bobo, and the average number
 //     of Patriot finds per run
 //   * the run seed 11 gave everybody, for contrast
