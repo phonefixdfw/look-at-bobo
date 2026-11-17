@@ -390,9 +390,14 @@ function emitQuad(parts, plane, spec, quad, atlas) {
   const u1 = (cell.x + cell.w - pad) / atlas.w;
   const vTop = 1 - (cell.y + vb0 * cell.h + (vb0 === 0 ? pad : 0)) / atlas.h;
   const vBot = 1 - (cell.y + vb1 * cell.h - (vb1 === 1 ? pad : 0)) / atlas.h;
-  const [yTop, yBot] = quad.y;
+  const [yTop, yBot] = quad.y ?? [0, 0];
   let bl; let br; let tl; let tr;
-  if (plane === 'north') {
+  if (plane === 'ground') {
+    // flat on the street floor: the cell's top edge is the FAR curb (it tucks
+    // under the storefront card) and its bottom edge the near one
+    bl = [spec.x0, spec.y, spec.z1]; br = [spec.x1, spec.y, spec.z1];
+    tr = [spec.x1, spec.y, spec.z0]; tl = [spec.x0, spec.y, spec.z0];
+  } else if (plane === 'north') {
     bl = [spec.x1, yBot, spec.z]; br = [spec.x0, yBot, spec.z];
     tr = [spec.x0, yTop, spec.z]; tl = [spec.x1, yTop, spec.z];
   } else if (plane === 'west') {

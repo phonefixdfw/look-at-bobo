@@ -117,11 +117,26 @@ export const CARDS_FULL = [
     ],
   },
   {
+    // the street FLOOR itself at y −9.28: catches every steep sight-line that
+    // passes under the vertical cards' bottom edges (leaning on the railing
+    // and looking down must be asphalt, not the empty scene background). Its
+    // far edge tucks under the storefront card, which occludes everything
+    // behind it from any eye above street level.
+    id: 'ground',
+    plane: 'ground',
+    y: STREET_GROUND_Y,
+    x0: -43,
+    x1: 49,
+    z0: -20.5,
+    z1: -4.6,
+    quads: [{ cell: 'road', tint: 1.04 }],
+  },
+  {
     id: 'west',
     plane: 'west',
     x: -8,
-    z0: -4.6,
-    z1: -36,
+    z0: -36,
+    z1: -3.15,
     quads: [
       { cell: 'sky', y: [46, 26] },
       { cell: 'far', y: [26, 1.2], tint: 0.94 },
@@ -132,8 +147,8 @@ export const CARDS_FULL = [
     id: 'east',
     plane: 'east',
     x: 9.5,
-    z0: -4.6,
-    z1: -36,
+    z0: -36,
+    z1: -3.15,
     quads: [
       { cell: 'sky', y: [46, 26] },
       { cell: 'far', y: [26, 1.2], tint: 0.94 },
@@ -170,11 +185,21 @@ export const CARDS_LOW = [
     ],
   },
   {
+    id: 'ground',
+    plane: 'ground',
+    y: STREET_GROUND_Y,
+    x0: -43,
+    x1: 49,
+    z0: -20.5,
+    z1: -4.6,
+    quads: [{ cell: 'city', tint: 1.04 }],
+  },
+  {
     id: 'west',
     plane: 'west',
     x: -8,
-    z0: -4.6,
-    z1: -36,
+    z0: -36,
+    z1: -3.15,
     quads: [
       { cell: 'sky', y: [46, 16] },
       { cell: 'city', y: [16, -9.28] },
@@ -184,8 +209,8 @@ export const CARDS_LOW = [
     id: 'east',
     plane: 'east',
     x: 9.5,
-    z0: -4.6,
-    z1: -36,
+    z0: -36,
+    z1: -3.15,
     quads: [
       { cell: 'sky', y: [46, 16] },
       { cell: 'city', y: [16, -9.28] },
@@ -197,10 +222,10 @@ export const CARDS_LOW = [
 // the backdrop must stay clear of (the balcony + living-room walkable floors —
 // geometry there would read as floating cards, issue #83).
 export const EYEWITNESS = {
-  view: { pos: [1.5, 1.62, -3.6], yaw: 0, pitch: -0.5, fov: 55 },
+  view: { pos: [1.5, 1.62, -3.6], yaw: 0, pitch: -0.34, fov: 55 },
   windowCard: CARDS_FULL[0],
   clearRects: [
-    { x0: -4.0, x1: 4.2, z0: -5.0, z1: 2.4 }, // living room floor
+    { x0: -3.3, x1: 2.4, z0: -2.9, z1: 2.1 }, // living room floor
     { x0: 0.55, x1: 2.45, z0: -4.4, z1: -3.1 }, // balcony floor
   ],
 };
