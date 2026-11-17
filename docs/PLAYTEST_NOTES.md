@@ -2549,34 +2549,40 @@ the body out from under them.
 Second bug, same scene: the man **was missing from the scene's very first
 frame** — the lap gate raised *after* the cull pass had already classified
 him, so the staged t=0 capture (and a real first frame) showed an empty
-sofa. `renderNow()` raises the gate **before** culling now; `lap-visible-
-from-frame-one` pins it.
+sofa. `renderNow()` raises the gate **before** culling now; the t=0 frames
+of `capture:full:lap` are the frame-one proof, and `lap-gate-shows-hides`
+asks the *culler* who is visible, not just the flag.
 
-**The scene, measured.** `LAP_RULE` fires on **19.8% of 600 seeds**
-(target 1/5), never as find #1 (`firstFind: 2`); seed 11 rolls **0.821** —
-off, so every baseline capture still sees no man. The man is **ONE merged
+**The scene, measured.** `lap-seeded-roll` measures the dice at **1/5 of
+600 probe seeds** (its own `lap-scene` stream, ±4 points); the scene never
+fires as find #1 (`firstFind: 2`, pinned live by `lap-first-find`); seed 11
+rolls **0.821** — off (`lap-seed11-off`), so every baseline capture still
+sees no man. The man is **ONE merged
 mesh + one 256 px painted atlas** (no text, no image ops — `lap-atlas-ops`)
 that **never casts a shadow**: the lap-scene frames draw **79 calls, 62 356
 tris**, and the worst baseline frame is untouched at **152 of 250** (seed
 11 never builds him). Clearance against his conservative world box
-(x [−2.783, −1.952], z [−0.888, −0.22]): coffee table ≥ 0.052 m, nothing
-crosses the back cushion, **south walkway 1.07 m** against the 0.90 m
-standing gap, north lane 1.67 m. The aim ray tests Bobo and the decoy
-only — he cannot block a find **by construction**, and `lap-no-aim-block`
-keeps it that way. The lap spot `couch-loaf.lap` is **`sceneOnly`**: it
+(x [−2.783, −1.952], z [−0.888, −0.22]): coffee table **0.052 m** clear of
+his knees with zero AABB overlap anywhere, **0.30 m** left to the heat-pad
+lane, nothing crosses the back cushion, lean ≤ 4 cm of cushion. The aim ray
+tests Bobo and the decoy only — he cannot block a find **by construction**
+(the engine's ray list has no third entry). The lap spot `couch-loaf.lap`
+is **`sceneOnly`**: it
 lives in `SPOTS` (49) for tools, but the seeded cycle can never draw it —
 `pool-coverage`, `spot-pool-spread` and `npm run seed:coverage` all
 measure the 48 drawn spots and say why.
 
-**Nineteen new live selfTests (100 → 119, `--checks 119`):** the anatomy
-column (`lap-head-column`, `lap-neck-solid`, `lap-traps-tie-shoulders`,
-`lap-seated-pose`, `lap-cap-hugs-head`, `lap-nape-tuft`), the furniture
-book (`lap-clearance`, `lap-walkway`, `lap-sinks-in` — pelvis 0.035 m
-into the cushion), the dice (`lap-seeded-roll`, `lap-seed11-off`,
-`lap-first-find`), the stage (`lap-visible-from-frame-one`, `lap-hidden-
-when-off`, `lap-swap-return`, `lap-no-aim-block`) and the budget
-(`lap-one-draw`, `lap-atlas-ops`, `lap-hair-color`). Standalone
-`node game/full.js` now runs **137 checks, 0 failures**.
+**Fifteen new live selfTests (119 → 134, `--checks 134`):** the anatomy
+column (`lap-head-column`, `lap-traps-tie-shoulders`, `lap-cap-hugs-head`,
+`lap-nape-tuft`, `lap-seated-pose`), the furniture book (`lap-sinks-in` —
+pelvis 0.035 m into the cushion, `lap-clearance`, `lap-leaves-room`), the
+dice (`lap-seeded-roll`, `lap-seed11-off`, `lap-first-find`), the stage
+(`lap-gate-shows-hides`, `lap-swap-into-lap`) and the budget
+(`lap-one-draw`, `lap-atlas-ops`). A page that **forces** the scene
+(`?lap=on`) has no "off" to measure and a page that **deletes** it
+(`?lap=off`) has no "on" — those rows stand down honestly there, and all
+three page modes pass **134/134**: the stress page (dice default), the
+`capture:full:lap` selftest (`?lap=on`), and a one-off `?lap=off` probe.
 
 Suites at this HEAD: `capture:full` 585 frames **119/119**, worst frame
 152/250, console clean · `capture:full:determinism` **8/8 byte-identical**

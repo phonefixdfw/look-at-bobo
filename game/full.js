@@ -11,7 +11,9 @@
  *   Capture it:  npm run capture:full
  */
 import * as LEVEL from './full-level.js';
-import { livingGapReport } from './full-living.js';
+import { livingGapReport, LIV, FOOT as FOOT_LIV } from './full-living.js';
+import { LAP, LAP_RULE, HUMAN_BANDS, HUMAN_CLEAR } from './full-human-scene.js';
+import { HUMAN_PARTS, partLocalBox, humanLocalBox, humanWorldBox, ATLAS_SIZE, ATLAS_OPS } from './full-human-mesh.js';
 import { bathGapReport, FOOT } from './full-bath.js';
 import { DECOR, DECOR_CELLS, DECOR_ART_COUNT, DECOR_TEXTURES, SPOT_CLEAR, decorPlan, faceCells } from './full-decor.js';
 import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/reach.js';
@@ -192,7 +194,7 @@ const roomLightFrames = { v: false, entry: null, luma: null };
 /** …and the same rule again for issue #83's street pixel check: two renders
  *  once per page, `blues` keeps what it measured for the detail line. */
 const streetFrames = { v: false, blues: null };
-function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, aptTv = null, aptRoomba = null, roombaCtl = null, GATE_OFF = false, afterCatchFn = null, boboPos = null, boboYaw = null, boboRoot = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
+function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, SPAWNS, wallBoxes, doorLeaves = [], aptStreet = null, aptCull = null, aptTv = null, aptRoomba = null, roombaCtl = null, aptHuman = null, lapCtl = null, GATE_OFF = false, afterCatchFn = null, boboPos = null, boboYaw = null, boboRoot = null, SPOTS = null, SPOT_IDS = null, pickSpotCycle = null, DECOY_MIN_DIST, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSeek, bonusPopEl, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached }) {
   add('moments-count', MOMENTS.length, '10', MOMENTS.length === 10, "docs/STORY.md's generic ten");
 
   // Every place Bobo can stand must be findable AND shoutable: measured paw
@@ -2335,6 +2337,291 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const softOk = !LEVEL.COLLIDERS.some((c) => /roomba|vacuum|robot/i.test(c.id))
       && !LEVEL.WALK_RECTS.some((r) => /roomba|vacuum|robot/i.test(r.id));
     add('roomba-soft-obstacle', softOk ? 'no vacuum box in COLLIDERS or WALK_RECTS' : 'the appliance edited the player grid', 'the route adds nothing to the walk grid', softOk, 'issue #85: the robot is scenery-with-manners — a player walks over it, the checks stay the game of #27');
+  }
+
+  // ── issue #86: Brandon on the sofa, Bobo on his lap ───────────────────────
+  // The man is the owner, in his own flat at his own request
+  // (docs/CHARACTERS.md). The anatomy rows measure `HUMAN_PARTS` directly —
+  // the same list the builder draws from — because the bug they pin (a head
+  // reading as a dark blob floating off the shoulders) was a geometry bug
+  // no render can testify about. The furniture rows measure his conservative
+  // world AABB; the dice and stage rows ride `lapCtl`, the engine's handle,
+  // and clean up after themselves exactly like the Patriot and roomba rows.
+  {
+    const P = (id) => HUMAN_PARTS.find((p) => p.id === id);
+    const lb = (id) => partLocalBox(P(id));
+    // 1. the column: chin-to-chest must be SOLID. The first build started
+    //    the neck 0.09 m above the chest and left the head 0.15 m clear of
+    //    the neck — a thin post over open air. Every joint must overlap.
+    const neck = lb('neck');
+    const chest = lb('chest');
+    const head = lb('head');
+    const headIntoNeck = neck.y1 - head.y0;
+    const neckIntoChest = chest.y1 - neck.y0;
+    add(
+      'lap-head-column',
+      `head sinks ${(headIntoNeck).toFixed(3)} m into the neck; neck sinks ${(neckIntoChest).toFixed(3)} m into the chest`,
+      'both overlaps positive — no air gap anywhere chin-to-chest',
+      headIntoNeck > 0 && neckIntoChest > 0 && Math.abs(head.x0 + head.x1) < 0.02 && Math.abs(neck.x0 + neck.x1) < 0.02,
+      'issue #86: "a dark blob floating above his head" — fixed anatomically (the parts meet), not by hiding the seam; measure it, do not admire it',
+    );
+    // 2. the trapezius ties the column to the shoulders: it must overlap
+    //    BOTH neck and chest and span to the outer deltoids.
+    const traps = lb('traps');
+    const shoulderOut = lb('shoulderR').x1;
+    add(
+      'lap-traps-tie-shoulders',
+      `traps x ±${traps.x1.toFixed(3)} vs shoulders ±${shoulderOut.toFixed(3)}; neck overlap ${traps.y0 < neck.y1 && traps.y1 > neck.y0}, chest overlap ${traps.y0 < chest.y1 && traps.y1 > chest.y0}`,
+      'spans the shoulder line (±0.025 m) and overlaps neck AND chest',
+      traps.y0 < neck.y1 && traps.y1 > neck.y0 && traps.y0 < chest.y1 && traps.y1 > chest.y0 && Math.abs(traps.x1 - shoulderOut) <= 0.025,
+      'issue #86: without the slab the neck reads as a separate post; the fix widened it from a narrow strip to the full 0.50 m shoulder span',
+    );
+    // 3. the backwards cap: the brim is HALF buried in the skull. It used
+    //    to be a wide plate reaching 0.08 m of open air — a second dark
+    //    shard beside the head that read as a floating object.
+    const brim = lb('cap-brim');
+    const btn = lb('cap-button');
+    const brimBuried = head.z1 - brim.z0;
+    const brimShows = brim.z1 - head.z1;
+    add(
+      'lap-cap-hugs-head',
+      `brim buried ${brimBuried.toFixed(3)} m into the head box, ${brimShows.toFixed(3)} m of edge showing, crown at ${btn.y1.toFixed(3)}`,
+      'buried ≥ 0.03 m, showing ≤ 0.06 m, brim under the button',
+      brimBuried >= 0.03 && brimShows <= 0.06 && brim.y1 <= btn.y1,
+      'issue #86: a flipped brim sits against the skull, not hovering off it; the button is his seated crown',
+    );
+    // 4. the nape hair is a tuft at the cap edge — behind the head, under
+    //    the crown, narrower than the skull. Not a slab.
+    const hair = lb('hair-nape');
+    add(
+      'lap-nape-tuft',
+      `z ${hair.z0.toFixed(3)}…${hair.z1.toFixed(3)} behind centre, top ${hair.y1.toFixed(3)} vs crown ${btn.y1.toFixed(3)}, half-width ${hair.x1.toFixed(3)} vs head ${head.x1.toFixed(3)}`,
+      'behind the head centre, under the crown, narrower than the skull',
+      hair.z0 > 0 && hair.y1 < btn.y1 && hair.x1 < head.x1,
+      'issue #86: the boxy nape plate was the second dark blob; a soft tuft under the cap edge is not',
+    );
+    // 5. seated proportions against the real-world bands (6\'3" / 1.91 m
+    //    declared; the crown is the cap button at 1.338 m).
+    const hb = HUMAN_BANDS;
+    const box = humanLocalBox();
+    const ratio = box.y1 / hb.standingHeight;
+    const kneeTop = lb('kneeL').y1;
+    const reach = -lb('footL').z0; // seat point → toe, horizontal (feet face -z)
+    add(
+      'lap-seated-pose',
+      `seated top ${box.y1.toFixed(3)} m (${(ratio * 100).toFixed(1)}% of ${hb.standingHeight} standing), knee top ${kneeTop.toFixed(3)} m, seat→toe ${reach.toFixed(3)} m`,
+      `bands: top ${hb.seatedTop[0]}…${hb.seatedTop[1]} m and ${(hb.seatedVsStanding[0] * 100).toFixed(1)}…${(hb.seatedVsStanding[1] * 100).toFixed(1)}%, knee ${hb.kneeTop[0]}…${hb.kneeTop[1]} m, reach ${hb.reachDepth[0]}…${hb.reachDepth[1]} m`,
+      box.y1 >= hb.seatedTop[0] && box.y1 <= hb.seatedTop[1]
+        && ratio >= hb.seatedVsStanding[0] && ratio <= hb.seatedVsStanding[1]
+        && kneeTop >= hb.kneeTop[0] && kneeTop <= hb.kneeTop[1]
+        && reach >= hb.reachDepth[0] && reach <= hb.reachDepth[1],
+      'issue #86: a real 6\'3" man seated reads 1.27…1.43 m to the cap — the anatomy fix kept the crown exactly where these bands were signed off',
+    );
+    // 6. he SITS: the pelvis presses into the soft cushion (measured sink)
+    //    without ever dropping to the seat deck under it.
+    const pel = lb('pelvis');
+    const sink = LIV.seatH - pel.y0;
+    add(
+      'lap-sinks-in',
+      `pelvis bottom ${pel.y0.toFixed(3)} m on the ${LIV.seatH} m cushion — ${sink.toFixed(3)} m of sink`,
+      `sinks 0.005…${HUMAN_CLEAR.sofa} m into the cushion, stays above the ${LIV.deckH} m deck`,
+      sink >= 0.005 && sink <= HUMAN_CLEAR.sofa && pel.y0 >= LIV.deckH,
+      'issue #86: perched-vs-sat is the difference between a man and a crate; the 4 cm of lean the seat note promises is cushion-soft, not plaster',
+    );
+    // 7. furniture clearance, measured against his CONSERVATIVE world AABB
+    //    (boxes of every part, leaned and turned — errs bigger than he is).
+    const wb = humanWorldBox();
+    const pad = { x0: LIV.padX[0], z0: LIV.padZ[0], x1: LIV.padX[1], z1: LIV.padZ[1] };
+    const overlap = (f) => {
+      const ox = Math.min(wb.x1, f.x1) - Math.max(wb.x0, f.x0);
+      const oz = Math.min(wb.z1, f.z1) - Math.max(wb.z0, f.z0);
+      return ox > 0 && oz > 0 ? Math.min(ox, oz) : 0;
+    };
+    const hardRows = [
+      ['coffee-table', FOOT_LIV.coffee],
+      ['heat-pad', pad],
+      ['side-table', FOOT_LIV.side],
+      ['floor-lamp', FOOT_LIV.lamp],
+    ];
+    const intrusions = hardRows.filter(([name]) => overlap(hardRow(name)) > HUMAN_CLEAR[name] + 1e-6);
+    function hardRow(name) { return name === 'heat-pad' ? pad : name === 'coffee-table' ? FOOT_LIV.coffee : name === 'side-table' ? FOOT_LIV.side : FOOT_LIV.lamp; }
+    // and the lean into the back cushion: the slab's east face is x -2.80
+    // (game/full-living.js — the back cushions own the seat patch's west
+    // 0.22 m); he may press into softness, measured against the allowance.
+    const backFace = -2.80;
+    const lean = Math.max(0, backFace - wb.x0);
+    add(
+      'lap-clearance',
+      `coffee ${overlap(FOOT_LIV.coffee).toFixed(3)} m · pad ${overlap(pad).toFixed(3)} m · side ${overlap(FOOT_LIV.side).toFixed(3)} m · lamp ${overlap(FOOT_LIV.lamp).toFixed(3)} m (all must be 0) · lean into the back cushion ${lean.toFixed(3)} m`,
+      `zero overlap with hard furniture; lean ≤ ${HUMAN_CLEAR.sofa} m`,
+      intrusions.length === 0 && lean <= HUMAN_CLEAR.sofa,
+      'issue #86: his box is deliberately bigger than the mesh (AABBs of every part) — if THIS fits, he fits',
+    );
+    // 8. the floor he leaves alone: the pad's cat and the coffee table's
+    //    front both keep their room (the walkway rule of the issue).
+    const padGap = pad.z0 - wb.z1;
+    const coffeeGap = FOOT_LIV.coffee.x0 - wb.x1;
+    add(
+      'lap-leaves-room',
+      `${padGap.toFixed(3)} m of floor between him and the heat pad · ${coffeeGap.toFixed(3)} m between his knees and the coffee table`,
+      '≥ 0.20 m to the pad lane, ≥ 0.05 m off the table',
+      padGap >= 0.2 && coffeeGap >= 0.05,
+      'issue #86: the south cushion still holds a cat, and the table still gets walked around — the scene is a guest in the living room, not a renovation',
+    );
+    // 9. the dice: ~1 run in 5, seed 11 OFF, never the first find — measured
+    //    off the shipped stream, and the live stage state restored after.
+    if (!lapCtl) {
+      add('lap-seeded-roll', 'no lapCtl', 'the dice rolls off its own stream', true, 'issue #86: a page without the engine handle (none exists today) — the dice rows stand down honestly');
+      add('lap-seed11-off', 'no lapCtl', 'seed 11 plans NO scene', true, 'issue #86: stands down with the row above');
+      add('lap-first-find', 'no lapCtl', 'the scene never takes find 1', true, 'issue #86: stands down with the rows above');
+      add('lap-gate-shows-hides', 'no lapCtl', 'hidden until the scene runs', true, 'issue #86: stands down with the rows above');
+      add('lap-swap-into-lap', 'no lapCtl', 'a living couch-loaf find moves to the lap', true, 'issue #86: stands down with the rows above');
+    } else {
+      const N = 600;
+      let plannedRuns = 0;
+      for (let s = 1; s <= N; s++) if (lapCtl.roll(s * 7919 + 13) < LAP_RULE.chance) plannedRuns++;
+      const rate = plannedRuns / N;
+      add(
+        'lap-seeded-roll',
+        `${(rate * 100).toFixed(1)}% of ${N} seeds plan the scene`,
+        `≈ ${(LAP_RULE.chance * 100).toFixed(0)}% ± 4 points`,
+        Math.abs(rate - LAP_RULE.chance) <= 0.04,
+        `issue #86: one dice per run on its own '${LAP_RULE.seedTag}' stream — the same determinism contract as Patriot (#58) and the ride (#85)`,
+      );
+      const r11 = lapCtl.roll(11);
+      add(
+        'lap-seed11-off',
+        `seed 11 rolls ${r11.toFixed(4)}`,
+        `≥ ${LAP_RULE.chance} — off (module says ${LAP_RULE.seed11roll})`,
+        r11 >= LAP_RULE.chance && Math.abs(r11 - LAP_RULE.seed11roll) < 5e-4,
+        'issue #86: seed 11 IS every baseline capture — the man does not exist in that flat, so capture:full and its determinism twin stand untouched',
+      );
+      // Mode probes. With the dice OFF the scene must be OFF — if it is
+      // still on, the URL forces it (?lap=on / ?lap=N: a staging page with
+      // no "off" to measure). If even forcing cannot turn it on, the URL
+      // kills it (?lap=off). Both pages get honest stand-down rows instead
+      // of failing a page that exists precisely to show or remove the scene.
+      const wasPlanned = lapCtl.planned;
+      const wasFind = game.findNum;
+      const restore = () => { lapCtl.planned = wasPlanned; game.findNum = wasFind; lapCtl.force(null); };
+      lapCtl.planned = false;
+      game.findNum = LAP_RULE.firstFind;
+      lapCtl.force(null);
+      const forcedPage = lapCtl.activeNow();
+      lapCtl.force(true);
+      const canForce = lapCtl.activeNow();
+      restore();
+      const probe = !forcedPage && canForce;
+      // The live rule probe: park the run at each find boundary and ask the
+      // engine who is on the sofa.
+      let firstFindDetail;
+      let firstFindOk;
+      if (!probe) {
+        firstFindDetail = forcedPage ? 'staged page: on at every find here' : 'disabled page: off at every find here';
+        firstFindOk = true;
+      } else {
+        lapCtl.planned = true;
+        game.findNum = 1;
+        const atFirst = lapCtl.activeNow();
+        game.findNum = LAP_RULE.firstFind;
+        const atSecond = lapCtl.activeNow();
+        restore();
+        firstFindDetail = `find 1: ${atFirst ? 'ON' : 'off'} · find ${LAP_RULE.firstFind}: ${atSecond ? 'ON' : 'off'}`;
+        firstFindOk = !atFirst && atSecond;
+      }
+      add(
+        'lap-first-find',
+        firstFindDetail,
+        'off at find 1, on from find 2',
+        firstFindOk,
+        'issue #86: the first find stays the ordinary couch — the scene arrives as a surprise, never as the tutorial (firstFind data AND live engine state)',
+      );
+      // 10. the gate: he is the living room's named cull group and `cullGate`
+      //     is the only door he has. Park the camera in his room (the street
+      //     cull row does exactly this dance), flip the scene off and on, and
+      //     hand back the camera, the cull and the run state. This asks the
+      //     culler, not just the flag — the first frame-ordering bug (gate
+      //     ran BEFORE culling) hid a man the flag said was on.
+      if (!probe || !aptHuman) {
+        add('lap-gate-shows-hides', forcedPage ? 'staged page: he is on all run here' : !canForce ? 'disabled page: no man to gate' : 'no man (?lap=off)', 'hidden while the scene is off, visible while it runs', true, 'issue #86: stands down on the pages that force the scene on or delete it — the probe rows above carry that half');
+      } else {
+        const wasOn = aptCull ? aptCull.enabled : false;
+        const savedPos = camera ? camera.position.clone() : null;
+        let hiddenNow;
+        let shownNow;
+        try {
+          if (aptCull) aptCull.setEnabled(true);
+          if (camera) {
+            const liv = ROOMS.find((r) => r.id === 'living') ?? ROOMS[0];
+            camera.position.set((liv.x0 + liv.x1) / 2, 1.62, (liv.z0 + liv.z1) / 2);
+          }
+          lapCtl.planned = false;
+          game.findNum = LAP_RULE.firstFind;
+          lapCtl.force(null); // dice off ⇒ scene off
+          if (aptCull) aptCull.update(camera);
+          hiddenNow = !aptHuman.group.visible && !lapCtl.activeNow();
+          lapCtl.force(true); // scene on
+          if (aptCull) aptCull.update(camera);
+          shownNow = aptHuman.group.visible && lapCtl.activeNow();
+        } finally {
+          if (camera && savedPos) camera.position.copy(savedPos);
+          if (aptCull) aptCull.setEnabled(wasOn);
+          restore();
+          if (aptCull && camera) aptCull.update(camera);
+        }
+        add(
+          'lap-gate-shows-hides',
+          `off: group ${hiddenNow ? 'hidden' : 'VISIBLE?!'} · on: group ${shownNow ? 'visible' : 'HIDDEN?!'}`,
+          'hidden while the scene is off, visible while it runs',
+          hiddenNow && shownNow,
+          'issue #86: the cull gate is the only door he has (the first frame ordering bug — gate AFTER culling — is why this asks the culler, not just the flag)',
+        );
+      }
+      // 11. the swap: a living-room couch-loaf find replays on the lap;
+      //     everything else finds exactly what it always found. A disabled
+      //     page has nothing to swap onto — stands down like the rows above.
+      if (!canForce) {
+        add('lap-swap-into-lap', 'disabled page: nothing to swap into', `only the living couch-loaf moves, to '${LAP.spotId}'`, true, 'issue #86: ?lap=off deletes the scene outright — the honest stand-down row');
+      } else {
+        lapCtl.force(true);
+        const swapped = lapCtl.swap({ id: 'couch-loaf.couch', type: 'couch-loaf', room: 'living' });
+        const other = lapCtl.swap({ id: 'box-sit.box', type: 'box-sit', room: 'living' });
+        const away = lapCtl.swap({ id: 'couch-loaf.balcony-chair', type: 'couch-loaf', room: 'balcony' });
+        lapCtl.force(null);
+        add(
+          'lap-swap-into-lap',
+          `couch-loaf(living) → ${swapped.id} · box-sit → ${other.id} · couch-loaf(balcony) → ${away.id}`,
+          `only the living couch-loaf moves, to '${LAP.spotId}'`,
+          swapped.id === LAP.spotId && other.id === 'box-sit.box' && away.id === 'couch-loaf.balcony-chair',
+          'issue #86: the lap REPLACES the couch find (same moment, same +1) — the balcony keeps its own loaf, no other moment is touched, and the spot cycle never drew this spot anyway (sceneOnly)',
+        );
+      }
+    }
+    // 12. the budget: ONE merged mesh, one 256 px face atlas, no shadow.
+    if (!aptHuman) {
+      add('lap-one-draw', 'no man', 'the scene costs at most 1 draw call', true, 'issue #86: ?lap=off deleted him outright — the honest stand-down row');
+    } else {
+      const tex = aptHuman.mesh.material.map;
+      add(
+        'lap-one-draw',
+        `${aptHuman.stats.drawCalls} draw · ${aptHuman.stats.triangles} tris · castShadow ${aptHuman.mesh.castShadow} · map ${tex ? `${tex.name || 'unnamed'} ${tex.image ? tex.image.width : '?'} px` : 'none'}, emissiveMap ${aptHuman.mesh.material.emissiveMap ? 'yes' : 'no'}, normalMap ${aptHuman.mesh.material.normalMap ? 'yes' : 'no'}`,
+        `1 draw call, no shadow, one ${ATLAS_SIZE} px atlas, nothing else mapped`,
+        aptHuman.stats.drawCalls === 1 && aptHuman.mesh.castShadow === false
+          && !!tex && tex.image && tex.image.width === ATLAS_SIZE
+          && !aptHuman.mesh.material.emissiveMap && !aptHuman.mesh.material.normalMap,
+        'issue #86: the shared draw cap is the project\'s one hard budget (#87: 250) — the scene spends exactly 1 of it, and only on the ~20% of runs that show him (the #85 no-shadow lesson: invisible in the picture, not in the budget)',
+      );
+    }
+    // 13. the atlas ledger: every paint op is a blob or a stroke — the man
+    //     carries no text and no borrowed image, ever.
+    const ledgerOk = ATLAS_OPS.length > 0 && !ATLAS_OPS.some((o) => /text|image|font|bitmap/i.test(o.op));
+    add(
+      'lap-atlas-ops',
+      aptHuman ? `${ATLAS_OPS.length} ops · ${[...new Set(ATLAS_OPS.map((o) => o.op))].sort().join(', ')}` : 'no atlas built (?lap=off)',
+      'a face of strokes and shading — zero text, zero image ops',
+      aptHuman ? ledgerOk : true,
+      'issue #86: faces made of fillText drift into trademark and uncanny territory at once; this ledger is painted shading only, on one 256 px canvas, and it is the same ledger the builder filled',
+    );
   }
 }
 

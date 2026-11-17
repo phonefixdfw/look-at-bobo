@@ -436,7 +436,7 @@ draw budget:
   would eat the room's light budget for nothing).
 - **Anatomy is a style rule here.** The earlier build floated the head off
   the trunk — a dark blob above the shoulders — so `lap-head-column` and
-  `lap-neck-solid` now pin the column: neck overlaps chest top, head
+  `lap-traps-tie-shoulders` now pin the column: neck overlaps chest top, head
   overlaps neck top, trapezius spans the shoulders and overlaps both neck
   and chest. If a future edit moves a part, those checks fail with the
   measured gap in the note.
@@ -447,4 +447,5 @@ draw budget:
 - **Seated by construction:** his pelvis sits *in* the cushion (sink
   ≈ 0.035 m), feet on the floor inside the sofa's footprint, knees under the
   coffee-table's underside line. He never blocks a find (`lap-clearance`,
-  `lap-walkway`, `lap-no-aim-block`).
+  `lap-leaves-room`; the aim raycast only lists Bobo and the decoy, so it is
+  clear **by construction**).

@@ -974,11 +974,11 @@ conservative world AABB is x [−2.783, −1.952], z [−0.888, −0.22], y
 
 | rule | number | check |
 |---|---|---|
-| coffee table x ≥ −1.90 (west face) | ≥ 0.052 m clear, 0.091 m real | `lap-clearance` |
-| everything west of the back cushion (x ≤ −2.80) | his east edge −2.783 is cushion *front*; nothing crosses into the cushion slab x [−3.02, −2.80] above y 0.42 | `lap-clearance` |
-| north walkway (his box → sofa/couch-row north stand line) | 1.67 m | `lap-walkway` |
-| south walkway (his box → coffee-table north edge) | 1.07 m ≥ the 0.90 m standing gap | `lap-walkway` |
-| aim ray | the hit-test raycasts Bobo and the decoy only — a human cannot block a find **by construction** | `lap-no-aim-block` |
+| coffee table west face (x ≥ −1.90) | zero AABB overlap; 0.052 m between his knees and the table | `lap-clearance`, `lap-leaves-room` |
+| heat pad on the south cushion | zero overlap; 0.30 m of floor between him and the pad lane (≥ 0.20 m) | `lap-clearance`, `lap-leaves-room` |
+| side table / floor lamp | zero overlap | `lap-clearance` |
+| everything west of the back cushion (x ≤ −2.80) | his east edge −2.783 is cushion *front*; nothing crosses into the cushion slab x [−3.02, −2.80] above y 0.42; lean allowance ≤ 0.08 m | `lap-clearance` |
+| aim ray | the hit-test raycasts Bobo and the decoy only — a human cannot block a find **by construction** | engine (`game/engine.js`) |
 
 **Cost.** +1 draw call at most (one merged mesh, one atlas, no shadow), and
 only on the ~20 % of runs that plan it — see `docs/ART_STYLE.md` §14 and the
