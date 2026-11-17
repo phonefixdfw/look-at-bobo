@@ -196,7 +196,7 @@ Openings (2.05 tall unless noted; every walkable one stays open all game):
 | `door-living-kitchen` | kitchen W wall (x 2.40–2.52) | z ∈ [−0.68, 0.38] | z ∈ [−0.60, 0.30], x ∈ [2.30, 2.62] | 0.90 |
 | `pass-kitchen` | same wall, over the counter | z ∈ [−1.90, −1.00], y 0.95–1.55 | (not walkable) | 0.90 |
 | `door-hall-bedroom` | bedroom N wall (z 5.20–5.32) | x ∈ [−0.53, 0.53] | x ∈ [−0.45, 0.45], z ∈ [5.10, 5.42] | 0.90 |
-| `door-kitchen-dining` ★ | kitchen S wall (z 0.60–0.80) | x ∈ [2.68, 3.58] | x ∈ [2.68, 3.58], z ∈ [0.68, 1.00] | 0.90 (cased, no leaf — issue #81) |
+| `door-kitchen-dining` ★ | kitchen S wall (z 0.60–0.80) | x ∈ [2.68, 3.58] | x ∈ [2.68, 3.58], z ∈ [0.50, 1.00] (issue #100: it stopped at z 0.68, mid-band, and left a 0.16 m dead strip straight through the doorway — no body could walk kitchen→dining) | 0.90 (cased, no leaf — issue #81; issue #100 also rode the bar's west end 0.16 east so the body pad leaves the full 0.90 clear) |
 | `door-living-dining` ★ | living E wall (x 2.40–2.60) | z ∈ [0.80, 2.02] | x ∈ [2.22, 2.70], z ∈ [0.80, 2.02] | 1.22 (cased, no leaf — issue #81; its south jamb is `M-liv-s3`, the 0.12 stub the entry's east band left over) |
 | `open-hall-bath` | hall W wall (x −1.32–−1.20) | z ∈ [2.60, 3.45] | x ∈ [−1.50, −1.02], z ∈ [2.60, 3.45] | 0.85 (cased, no leaf; faces moved with the #81 hall) |
 | `open-hall-entry` | hall E wall (x 1.20–1.32) | z ∈ [2.60, 3.45] | x ∈ [1.02, 1.50], z ∈ [2.60, 3.45] | 0.85 (cased, no leaf; ditto) |

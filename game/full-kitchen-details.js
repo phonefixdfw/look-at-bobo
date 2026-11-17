@@ -15,13 +15,16 @@
  * four chairs are the LIVING ROOM's ("table SE" on the plan's map, chunk 3),
  * so they are deliberately absent — this is the bar, not the table. The bar
  * stands exactly where the merged level data says it does: support
- * `barTop` (game/full-shell.js — since issue #81 patch x 3.76–5.12,
- * z 0.22–0.58, top 1.05) and the placeholder footprints in COLLIDERS, which
- * KITCHEN_DETAILS_COLLIDERS below replaces value for value. Issue #81 rode
- * the whole run 0.44 m east and shortened it 0.20: the kitchen→dining
- * doorway's structural gap (x 2.60–3.66) took the old west end out from
- * under it, and the bar now stands 8 cm clear of the new casing, with the
- * stools, pendants and the `sink-sit.bar` spot riding along.
+ * `barTop` (game/full-shell.js — since issue #100 x 3.92–5.12, z 0.22–0.58,
+ * top 1.05; #100 kept this rect's 2 cm inset on the bar's new west end) and
+ * the placeholder footprints in COLLIDERS, which KITCHEN_DETAILS_COLLIDERS
+ * below replaces value for value. Issue #81 rode the whole run 0.44 m east
+ * and shortened it 0.20 when the hall was widened; issue #100 pulled the
+ * west end a further 0.16 — the body push pad on the old 3.74 edge reached
+ * 0.14 m into the kitchen→dining doorway's clear span and left 0.81 m,
+ * under the 0.90 a doorway must give. The bar now stands 24 cm clear of the
+ * structural gap (x 2.60–3.66), the stools, pendants and the `sink-sit.bar`
+ * spot riding along.
  *
  * The worktop props (rows 23 to 28) all stand on the 0.90 worktop INSIDE the
  * counters' existing padded footprints: a pad on top of a pad carves nothing
@@ -133,8 +136,8 @@ export const PIECES = [
   // ── the breakfast bar (row 31), where game/full-shell.js `barTop` says ──
   // Carcass 0.40 deep on the south wall; top 0.70 deep — the 0.30 overhang
   // runs north over the stools. Measured: the top's 1.05.
-  piece('bar-carcass', 'front', [3.74, 5.14], [0, KIT_D.barTopY - KIT_D.barTopT], [0.2, 0.6], null, 'the bar base; its collider is exactly this box (issue #81: rode 0.44 east of the kitchen→dining doorway)'),
-  piece('bar-top', 'worktop', [3.74, 5.14], [KIT_D.barTopY - KIT_D.barTopT, KIT_D.barTopY], [-0.1, 0.6], ['bar-height'], 'row 31: 1.05 with the 0.30 overhang north'),
+  piece('bar-carcass', 'front', [3.9, 5.14], [0, KIT_D.barTopY - KIT_D.barTopT], [0.2, 0.6], null, 'the bar base; its collider is exactly this box (issue #81: rode 0.44 east of the kitchen→dining doorway; issue #100: the west end rides a further 0.16 — the body pad on the old 3.74 edge bit 0.14 m into the opening and left 0.81 m of clear width, short of the 0.90 the issue asks for; the east end keeps its 3 cm berth off the bin, so the bar shortens to 1.24 m)'),
+  piece('bar-top', 'worktop', [3.9, 5.14], [KIT_D.barTopY - KIT_D.barTopT, KIT_D.barTopY], [-0.1, 0.6], ['bar-height'], 'row 31: 1.05 with the 0.30 overhang north'),
   // Two stools under the overhang, one on each pendant (issue #81 moved them
   // with the bar; the footprints kept their 0.36 × 0.36 size),
   // each side of the `sink-sit.bar` spot at x 4.1.
@@ -212,7 +215,7 @@ export const PENDANTS = [{ x: 4.17, z: 0.25 }, { x: 4.91, z: 0.25 }];
  *  existing pads); neither does the runner or the pendants (see above).
  * -------------------------------------------------------------------------- */
 export const KITCHEN_DETAILS_COLLIDERS = [
-  { id: 'kitchen-bar', x0: 3.74, z0: 0.2, x1: 5.14, z1: 0.6 },
+  { id: 'kitchen-bar', x0: 3.9, z0: 0.2, x1: 5.14, z1: 0.6 },
   { id: 'bar-stool-a', x0: 3.99, z0: -0.15, x1: 4.35, z1: 0.21 },
   { id: 'bar-stool-b', x0: 4.73, z0: -0.15, x1: 5.09, z1: 0.21 },
   { id: 'kitchen-bin', x0: 5.17, z0: 0.26, x1: 5.52, z1: 0.61 }, // issue #59: east run's south end corner (was x 2.7-3.0, z -1.1--0.8); issue #82: the wider body grew 2 cm each way in place

@@ -15,6 +15,7 @@ import { livingGapReport } from './full-living.js';
 import { bathGapReport, FOOT } from './full-bath.js';
 import { DECOR, DECOR_CELLS, DECOR_ART_COUNT, DECOR_TEXTURES, SPOT_CLEAR, decorPlan, faceCells } from './full-decor.js';
 import { buildGrid, nearestStandable, bestApproach, lineClear } from '../src/reach.js';
+import { createWorld } from '../src/collision.js';
 import { buildFullApartment } from './full-apartment.js';
 import { bootGame, catRootYaw } from './engine.js';
 import { FLUSH_PIECES, FLUSH_TOL, FACES } from './full-bedroom.js';
@@ -764,6 +765,145 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       bad.length === 0,
       'issue #81: the new room is a room you get to, not a diorama',
     );
+  }
+
+  /* Issue #100 — `dining-two-entrances`: the playtest found the kitchen→
+   * dining bridge rect floating in the wall band, so the one room the issue
+   * added had only ONE walkable way in. `walk-reachable` never noticed: the
+   * living-room detour still floods everywhere. This check floods the body
+   * grid twice, each time SEALING one dining opening (dropping its bridge
+   * rect), and asks that the table is still reached from the other side —
+   * the two ways in are genuinely independent. Then it measures each
+   * opening's clear width off the same grid, marching straight through the
+   * wall band at the player's collider size: both must hold the issue's
+   * 0.90 m. */
+  {
+    const R = LEVEL.MOVE.playerRadius;
+    const seal = (id) => LEVEL.WALK_RECTS.filter((r) => r.id !== id);
+    const bad = [];
+    for (const [sealedId, fromRoom] of [
+      ['door-living-dining', 'kitchen'], // only the kitchen way remains
+      ['door-kitchen-dining', 'kitchen'], // only the living way remains
+    ]) {
+      const grid = buildGrid({ rects: seal(sealedId), colliders: LEVEL.COLLIDERS, radius: R });
+      const sp = LEVEL.SPAWNS.find((s) => s.room === fromRoom);
+      const start = grid.cellAt(sp.pos[0], sp.pos[1]);
+      const seen = grid.flood(start);
+      const t = nearestStandable(grid, 4.06, 1.4); // standable cell beside the round table
+      if (start < 0 || !grid.free[start] || !seen[t.idx]) bad.push(`${fromRoom} ✗ table with ${sealedId} sealed`);
+    }
+    const widths = [];
+    const inside = (x, z) => LEVEL.WALK_RECTS.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+    const padFree = (x, z) => !LEVEL.COLLIDERS.some((c) => x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R);
+    for (const o of OPENINGS) {
+      if (o.id !== 'door-kitchen-dining' && o.id !== 'door-living-dining') continue;
+      // march perpendicular to the opening, mid-band: the longest run of
+      // points that are in the walk union AND outside every push pad — the
+      // width a body actually takes through the doorway
+      const mid = o.fixed + 0.1; // both dining bands are wall-ext (0.20 m)
+      const STEP = 0.005;
+      let run = 0;
+      let best = 0;
+      for (let p = o.lo; p <= o.hi + 1e-9; p += STEP) {
+        const x = o.axis === 'z' ? p : mid;
+        const z = o.axis === 'z' ? mid : p;
+        if (inside(x, z) && padFree(x, z)) {
+          run += 1;
+          best = Math.max(best, run);
+        } else run = 0;
+      }
+      const width = (best - 1) * STEP; // first-to-last free sample
+      widths.push(`${o.id.replace('door-', '')} ${width.toFixed(2)} m`);
+      if (width < 0.9 - 1e-6) bad.push(`${o.id} only ${width.toFixed(2)} m clear at r ${R}`);
+    }
+    add(
+      'dining-two-entrances',
+      bad.length ? bad.join(', ') : `each way in survives sealing the other · ${widths.join(', ')}`,
+      'dining reached from the kitchen with the living door sealed AND with the kitchen door sealed; both openings ≥ 0.90 m clear at body size',
+      bad.length === 0,
+      'issue #100: a rect-graph flood, not a point list — the bug #81 shipped with was invisible to every earlier check',
+    );
+  }
+
+  /* Issue #100 — `kitchen-dining-straight-walk`: the owner's words were
+   * "the pathway from kitchen to dining doesnt allow you to walk through",
+   * so the regression test IS the walk: drive the REAL collision world
+   * (src/collision.js — the same createWorld the engine steps the player
+   * through, union rects plus push-out pads) from the kitchen spawn,
+   * straight through the opening, to the dining table; then the same walk
+   * backwards. No waypoint inside either room may be reached by sliding
+   * along the living-room detour — the route runs through the doorway. */
+  {
+    const R = LEVEL.MOVE.playerRadius;
+    const world = createWorld({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: R });
+    const grid = buildGrid({ rects: LEVEL.WALK_RECTS, colliders: LEVEL.COLLIDERS, radius: R });
+    const byDoor = { x: 3.13, z: 0.7 }; // mid-opening (x [2.68,3.58] × band z [0.6,0.8])
+    const table = nearestStandable(grid, 4.06, 1.4); // beside the round table, north side
+    const sink = nearestStandable(grid, 4.15, -1.55); // in the kitchen, by the sink run
+    const walk = (from, route) => {
+      const pos = { x: from.x, z: from.z };
+      for (const wp of route) {
+        for (let i = 0; i < 4000; i++) {
+          const dx = wp.x - pos.x;
+          const dz = wp.z - pos.z;
+          const d = Math.hypot(dx, dz);
+          if (d < 0.06) break;
+          const step = 0.02;
+          world.move(pos, (dx / d) * step, (dz / d) * step);
+          world.resolve(pos);
+          if (i === 3999) return `stalled at ${pos.x.toFixed(2)}, ${pos.z.toFixed(2)} short of ${wp.x.toFixed(2)}, ${wp.z.toFixed(2)}`;
+        }
+      }
+      return null;
+    };
+    const bad = [];
+    const kit = SPAWNS.find((s) => s.room === 'kitchen' && s.pos[1] < -1); // the sink spawn
+    const fwd = walk({ x: kit.pos[0], z: kit.pos[1] }, [byDoor, table]);
+    if (fwd) bad.push(`kitchen→table ${fwd}`);
+    if (LEVEL.WALK_RECTS[grid.owner[table.idx]].room !== 'dining') bad.push('the beside-table cell is not in the dining room');
+    const back = walk(table, [byDoor, sink]);
+    if (back) bad.push(`table→kitchen ${back}`);
+    if (LEVEL.WALK_RECTS[grid.owner[sink.idx]].room !== 'kitchen') bad.push('the sink-side cell is not in the kitchen');
+    add(
+      'kitchen-dining-straight-walk',
+      bad.length ? bad.join(', ') : 'sink spawn → opening → table and back, driven by createWorld.move/resolve',
+      'a scripted straight walk through the kitchen→dining opening, both directions, with the real collision code',
+      bad.length === 0,
+      'issue #100: the walk the owner could not make, made in the harness',
+    );
+
+    /* Issue #100 — `dining-spots-from-both-sides`: the reach promise for
+     * the cat pool, split by side. Flood from a kitchen spawn with the
+     * living opening sealed, and from a living spawn with the kitchen
+     * opening sealed: EACH side's flood must contain a stand-and-see
+     * vantage for EVERY dining spot. A dining cat may never again be
+     * approchable from one door only. */
+    {
+      const los = [
+        ...wallBoxes,
+        ...LEVEL.COLLIDERS.map((c) => ({ id: c.id, x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: 0, y1: 1.05 })),
+      ];
+      const spots = (catRecords ?? []).filter((m) => m.room === 'dining');
+      const bad2 = [];
+      for (const [sealedId, side] of [
+        ['door-living-dining', 'kitchen'],
+        ['door-kitchen-dining', 'living'],
+      ]) {
+        const g = buildGrid({ rects: LEVEL.WALK_RECTS.filter((r) => r.id !== sealedId), colliders: LEVEL.COLLIDERS, radius: R });
+        const seen = g.flood(g.cellAt(...LEVEL.SPAWNS.find((s) => s.room === side).pos));
+        for (const m of spots) {
+          const y = supports[m.spot[1]] ?? 0;
+          if (!bestApproach(g, seen, { x: m.spot[0], z: m.spot[2], y, los, eye: LEVEL.MOVE.eye })) bad2.push(`${m.id} from ${side} side`);
+        }
+      }
+      add(
+        'dining-spots-from-both-sides',
+        bad2.length ? bad2.slice(0, 3).join(', ') : `${spots.length} dining spots approchable from the kitchen side AND the living side`,
+        'every dining cat has a stand-and-see vantage in each side\'s flood, with the other opening sealed',
+        bad2.length === 0,
+        'issue #100: both-sides reachability for the cat pool, not just the floor',
+      );
+    }
   }
 
   /* Issue #81 — `dining-walkways`: the table set through row 58, measured
