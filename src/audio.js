@@ -3,18 +3,20 @@
 // no network beyond the static mp3 files).
 //
 // The picks below are the "Shipped take" table in docs/VOICES.md (V5, resolved
-// by delegation on 2026-11-14 — Brandon: "You can pick which takes to use"):
-// yell take 1 · DAG take 2 · win take 2. Swapping is free: both takes of every
-// line are already paid for, so a page just points at one filename per line.
+// by delegation on 2026-11-14 — Brandon: "You can pick which takes to use";
+// re-picked on 2026-11-17 from the regenerated female (Jessica) takes, issue
+// #96, same measured-property rule): yell take 2 · DAG take 2 · win take 1.
+// Swapping is free: both takes of every line are already paid for, so a page
+// just points at one filename per line.
 // The durations are the measured numbers from docs/VOICES.md; the page's
 // selfTest compares them against what the browser decoder reports, so a wrong
 // or missing file shows up as a number, not a shrug.
 
 /** The three lines, byte-exact. Never "fix" the spellings (VISION.md). */
 export const VOICE_LINES = {
-  yell: { text: 'LOOK AT BOBO!', take: 1, file: 'assets/audio/yell-look-at-bobo.take1.mp3', dur: 1.44 },
-  dag: { text: 'DAG!', take: 2, file: 'assets/audio/dag-wrong-cat.take2.mp3', dur: 0.84 },
-  win: { text: 'your did it! you wind', take: 2, file: 'assets/audio/win-line.take2.mp3', dur: 1.86 },
+  yell: { text: 'LOOK AT BOBO!', take: 2, file: 'assets/audio/yell-look-at-bobo.take2.mp3', dur: 1.07 },
+  dag: { text: 'DAG!', take: 2, file: 'assets/audio/dag-wrong-cat.take2.mp3', dur: 0.74 },
+  win: { text: 'your did it! you wind', take: 1, file: 'assets/audio/win-line.take1.mp3', dur: 1.58 },
 };
 
 /** When each line plays, per moment, in seconds from the start of the moment.

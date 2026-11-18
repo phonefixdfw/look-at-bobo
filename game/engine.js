@@ -95,7 +95,7 @@ export function bootGame(cfg) {
    *  exists in the URL; the source files stay correct. */
   const PLANT = params.get('plant');
   let ENDING_TEXT = EXACT_ENDING;
-  const PLAN_OVERRIDES = PLANT === 'audio' ? { yell: 'assets/audio/yell-look-at-bobo.take2.mp3' } : {};
+  const PLAN_OVERRIDES = PLANT === 'audio' ? { yell: 'assets/audio/yell-look-at-bobo.take1.mp3' } : {};
 
   const GATE_OFF = params.get('gate') === 'off';
   const TARGET = clamp(Number.parseInt(params.get('win') ?? String(WIN_DEFAULT), 10) || WIN_DEFAULT, 1, 20);
@@ -1986,22 +1986,22 @@ export function bootGame(cfg) {
 
     // --- audio: the shipped picks, scheduled per the feel ----------------------
     const fmt = (plan) => plan.map((c) => `${c.line}@${c.at}=${c.file.split('/').pop()}`).join(', ') || 'silence';
-    add('audio-plan-catch', fmt(planFor('catch')), 'yell@0.25=yell-look-at-bobo.take1.mp3', fmt(planFor('catch')) === 'yell@0.25=yell-look-at-bobo.take1.mp3', 'docs/VOICES.md: yell take 1');
+    add('audio-plan-catch', fmt(planFor('catch')), 'yell@0.25=yell-look-at-bobo.take2.mp3', fmt(planFor('catch')) === 'yell@0.25=yell-look-at-bobo.take2.mp3', 'docs/VOICES.md: yell take 2 (issue #96 picks)');
     add(
       'audio-plan-wrong',
       fmt(planFor('wrong')),
-      'yell@0.25=yell-look-at-bobo.take1.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
-      fmt(planFor('wrong')) === 'yell@0.25=yell-look-at-bobo.take1.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
+      'yell@0.25=yell-look-at-bobo.take2.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
+      fmt(planFor('wrong')) === 'yell@0.25=yell-look-at-bobo.take2.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
       'the shout first (it thought it was Bobo), then the DAG! take 2',
     );
-    add('audio-plan-win', fmt(planFor('win')), 'win@0.35=win-line.take2.mp3', fmt(planFor('win')) === 'win@0.35=win-line.take2.mp3', 'docs/VOICES.md: win take 2');
+    add('audio-plan-win', fmt(planFor('win')), 'win@0.35=win-line.take1.mp3', fmt(planFor('win')) === 'win@0.35=win-line.take1.mp3', 'docs/VOICES.md: win take 1 (issue #96 picks)');
     add('audio-plan-find', fmt(planFor('find')), 'silence', fmt(planFor('find')) === 'silence', 'searching says nothing');
     const pickFiles = Object.values(VOICE_LINES).map((v) => v.file.split('/').pop()).join(', ');
     add(
       'audio-picks-match-docs',
       pickFiles,
-      'yell t1, dag t2, win t2',
-      pickFiles === 'yell-look-at-bobo.take1.mp3, dag-wrong-cat.take2.mp3, win-line.take2.mp3' && Object.values(VOICE_LINES).every((v) => v.dur > 0),
+      'yell t2, dag t2, win t1',
+      pickFiles === 'yell-look-at-bobo.take2.mp3, dag-wrong-cat.take2.mp3, win-line.take1.mp3' && Object.values(VOICE_LINES).every((v) => v.dur > 0),
       'the docs/VOICES.md shipped takes, referenced not copied',
     );
 

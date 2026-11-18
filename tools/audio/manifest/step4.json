@@ -6,6 +6,11 @@
     "Texts are byte-exact game strings: 'DAG!' and 'your did it! you wind' are spelled",
     "exactly this way ON PURPOSE (docs/DECOY_CAT.md, VISION.md). gen-audio.mjs refuses to",
     "generate anything whose text drifted from the strings in docs/VOICES.md.",
+    "ISSUE #96 (2026-11-17): casting moved Liam -> Jessica (female, 'Playful, Bright, Warm',",
+    "on this account's own GET /v1/voices list) for all three lines, and the win line gained",
+    "speakText: the SPOKEN 'wind' must sound like a breeze ('winned', rhymes with 'pinned').",
+    "multilingual_v2 has no phoneme-tag support, so the fix is ElevenLabs' documented respell",
+    "trick applied to the generation input ONLY — 'text' stays the byte-exact display string.",
     "Casting + settings rationale: docs/VOICES.md. Ids verified against ElevenLabs' public",
     "GET /v1/voices list on 2026-11-14; the tool resolves by NAME at buy time anyway."
   ],
@@ -28,9 +33,9 @@
       "model": "eleven_multilingual_v2",
       "outputFormat": "mp3_44100_128",
       "voice": {
-        "name": "Liam",
-        "idHint": "TX3LPaxmHKxFdv7VOQHJ",
-        "alternatives": ["Charlie (IKne3meq5aSn9XLyUdCD)", "Jessica (cgSgspJ2msm6clMCkdW9)"]
+        "name": "Jessica",
+        "idHint": "cgSgspJ2msm6clMCkdW9",
+        "alternatives": ["Liam (TX3LPaxmHKxFdv7VOQHJ)", "Charlie (IKne3meq5aSn9XLyUdCD)"]
       },
       "voiceSettings": { "stability": 0.3, "similarity_boost": 0.8, "style": 0.65, "use_speaker_boost": true }
     },
@@ -45,9 +50,9 @@
       "model": "eleven_multilingual_v2",
       "outputFormat": "mp3_44100_128",
       "voice": {
-        "name": "Liam",
-        "idHint": "TX3LPaxmHKxFdv7VOQHJ",
-        "alternatives": ["Charlie (IKne3meq5aSn9XLyUdCD)", "Jessica (cgSgspJ2msm6clMCkdW9)"]
+        "name": "Jessica",
+        "idHint": "cgSgspJ2msm6clMCkdW9",
+        "alternatives": ["Liam (TX3LPaxmHKxFdv7VOQHJ)", "Charlie (IKne3meq5aSn9XLyUdCD)"]
       },
       "voiceSettings": { "stability": 0.35, "similarity_boost": 0.8, "style": 0.5 },
       "context": {
@@ -61,15 +66,17 @@
       "title": "Win line — played when the score reaches 10",
       "speaker": "The player (first-person, unseen)",
       "text": "your did it! you wind",
-      "delivery": "Disbelieving, giddy celebration, a bit breathless and proud — like reading your own trophy plaque out loud. The mangled spelling is the joke; read it exactly as written ('wind' rhymes with 'win').",
+      "speakText": "your did it! you winned",
+      "$speakTextComment": "Issue #96: spoken 'wind' = a breeze (wihnd), not 'wind it up' (wynd). 'winned' rhymes with 'pinned/sinned'. Display/HUD text unchanged — respelling lives here, in the generation input, and nowhere else.",
+      "delivery": "Disbelieving, giddy celebration, a bit breathless and proud — like reading your own trophy plaque out loud. The mangled spelling is the joke; read 'wind' like the weather (see speakText).",
       "takes": 2,
       "seedBase": 303,
       "model": "eleven_multilingual_v2",
       "outputFormat": "mp3_44100_128",
       "voice": {
-        "name": "Liam",
-        "idHint": "TX3LPaxmHKxFdv7VOQHJ",
-        "alternatives": ["Charlie (IKne3meq5aSn9XLyUdCD)", "Jessica (cgSgspJ2msm6clMCkdW9)"]
+        "name": "Jessica",
+        "idHint": "cgSgspJ2msm6clMCkdW9",
+        "alternatives": ["Liam (TX3LPaxmHKxFdv7VOQHJ)", "Charlie (IKne3meq5aSn9XLyUdCD)"]
       },
       "voiceSettings": { "stability": 0.35, "similarity_boost": 0.8, "style": 0.55 }
     }

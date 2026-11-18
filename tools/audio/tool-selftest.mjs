@@ -40,7 +40,7 @@ function tinyMp3() {
 }
 
 // --- the stub ---------------------------------------------------------------
-const state = { posts: 0, charsUsed: 5000, mp3: tinyMp3(), voices: [{ voice_id: 'VOICE-STUB-LIAM', name: 'Liam - Stub Voice', category: 'premade' }] };
+const state = { posts: 0, charsUsed: 5000, mp3: tinyMp3(), tts: [], voices: [{ voice_id: 'VOICE-STUB-LIAM', name: 'Liam - Stub Voice', category: 'premade' }, { voice_id: 'VOICE-STUB-JESSICA', name: 'Jessica - Stub Voice', category: 'premade' }] };
 
 const stub = createServer((req, res) => {
   const url = new URL(req.url, 'http://stub');
@@ -60,6 +60,7 @@ const stub = createServer((req, res) => {
       }
       try {
         const b = JSON.parse(body);
+        state.tts.push({ text: b.text, prev: b.previous_text ?? null, next: b.next_text ?? null });
         state.charsUsed += (b.text?.length ?? 0) + (b.previous_text?.length ?? 0) + (b.next_text?.length ?? 0);
       } catch { /* ignore */ }
       res.writeHead(200, { 'content-type': 'audio/mpeg', 'request-id': `stub-${state.posts}` });
@@ -132,8 +133,15 @@ function freshManifest(mutate) {
   const lock = JSON.parse(readFileSync(join(out, 'lock.json'), 'utf8'));
   const entries = Object.values(lock.entries);
   check('lock-has-6-entries', entries.length === 6);
-  check('lock-resolved-voice-name', entries.every((e) => e.voiceId === 'VOICE-STUB-LIAM' && e.voiceName.includes('Liam')));
+  const manifestM = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+  const voiceWant = manifestM.assets[0].voice.name; // casting may move (Liam → Jessica, #96) — the stub serves both
+  check('lock-resolved-voice-name', entries.every((e) => e.voiceId === `VOICE-STUB-${voiceWant.toUpperCase()}` && e.voiceName.includes(voiceWant)));
   check('lock-kept-exact-text', lock.entries['dag-wrong-cat#take1'].text === 'DAG!' && lock.entries['win-line#take1'].text === 'your did it! you wind');
+  // issue #96: speakText is what gets SENT; the byte-exact game string stays in the lock untouched.
+  const speakPlan = manifestM.assets.map((a) => a.speakText ?? a.text);
+  check('sent-texts-equal-speak-plan', state.tts.length === 6 && state.tts.every((t) => speakPlan.includes(t.text)), state.tts.map((t) => JSON.stringify(t.text)).join(' '));
+  const winSpeak = manifestM.assets.find((a) => a.id === 'win-line').speakText ?? 'your did it! you wind';
+  check('lock-records-spoken', lock.entries['win-line#take1'].spoken === winSpeak, JSON.stringify(lock.entries['win-line#take1'].spoken));
   const ledgers = readdirSync(join(tmp, 'r2', 'ledger'));
   const led = JSON.parse(readFileSync(join(tmp, 'r2', 'ledger', ledgers.find((f) => f.endsWith('.json'))), 'utf8'));
   check('ledger-six-ok', led.requests.filter((q) => q.status === 'ok').length === 6);

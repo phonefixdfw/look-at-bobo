@@ -83,7 +83,7 @@ try {
   const after = await page.evaluate(() => ({ ...window.LC.audioStatus(), gateOpen: window.LC.gateUnlocked() }));
   check('click-opens-gate', after.unlocked === true && after.gateOpen === true, 'gate hidden, engine unlocked by the click');
 
-  // --- the catch event: yell take 1 plays to the end -----------------------
+  // --- the catch event: the shipped yell take plays to the end ------------
   await page.evaluate(() => {
     window.LC.setScore(0);
     window.LC.seek(0);
@@ -91,11 +91,11 @@ try {
     window.LC.trigger('catch');
   });
   await waitFor(
-    () => window.LC.audioStatus().lines.some((l) => l.file.includes('take1') && l.started > 0),
+    () => window.LC.audioStatus().lines.some((l) => l.file.includes('yell') && l.started > 0),
     'catch-yell-starts',
   );
   await waitFor(
-    () => window.LC.audioStatus().lines.some((l) => l.file.includes('take1') && l.ended > 0),
+    () => window.LC.audioStatus().lines.some((l) => l.file.includes('yell') && l.ended > 0),
     'catch-yell-ends',
   );
   const catchState = await page.evaluate(() => ({ status: window.LC.audioStatus(), score: window.LC.scoreValue(), moment: window.LC.moment().id }));

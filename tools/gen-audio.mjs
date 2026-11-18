@@ -160,6 +160,10 @@ function loadManifest(path) {
       );
     }
     if (!a.text?.trim()) fail(`asset "${a.id}" has no text`);
+    // speakText (issue #96): an optional respelling sent to the API INSTEAD of
+    // `text` — the ONLY way to steer a homograph ("wind" = breeze) on models
+    // without phoneme tags, while the game string above stays byte-exact.
+    if (a.speakText !== undefined && !a.speakText?.trim()) fail(`asset "${a.id}" has an empty speakText`);
     if (!a.voice?.name && !a.voice?.id) fail(`asset "${a.id}" needs voice.name or voice.id`);
     if (!a.model) fail(`asset "${a.id}" needs a model`);
   }
@@ -172,13 +176,15 @@ function requestsFor(manifest) {
   for (const a of manifest.assets) {
     for (let take = 1; take <= a.takes; take++) {
       const text = a.text;
+      const spoken = a.speakText ?? a.text; // what actually gets sent (issue #96)
       const prev = a.context?.previous_text ?? null;
       const next = a.context?.next_text ?? null;
       const seed = seedFor(a.id, take, a.seedBase ?? 0);
-      const billable = text.length + (prev?.length ?? 0) + (next?.length ?? 0); // worst case
+      const billable = spoken.length + (prev?.length ?? 0) + (next?.length ?? 0); // worst case — the API bills the sent text
       const hash = sha256({
         v: 1,
         text,
+        spoken,
         prev,
         next,
         model: a.model,
@@ -192,6 +198,7 @@ function requestsFor(manifest) {
         assetId: a.id,
         take,
         text,
+        spoken,
         prev,
         next,
         model: a.model,
@@ -322,7 +329,8 @@ function printBuyList(reqs, lock, { buy, key }) {
     const have = ready(lock, r);
     console.log(
       `  ${have === 'ready' ? '[have]' : have === 'stale' ? '[STALE — text changed since it was recorded]' : '[buy ]'} ` +
-        `${r.key.padEnd(24)} ${String(r.billableChars).padStart(3)} chars  ${r.model}  seed ${r.seed}`,
+        `${r.key.padEnd(24)} ${String(r.billableChars).padStart(3)} chars  ${r.model}  seed ${r.seed}` +
+        (r.spoken !== r.text ? `  (game text spoken as ${JSON.stringify(r.spoken)})` : ''),
     );
   }
   console.log(`\nestimate for the ${todo.length} to buy (published rates, 2026-11-14):`);
@@ -469,7 +477,7 @@ async function cmdBuy(manifest, { maxCredits, outDir, allowRebuy, overrideLimits
       fail(`${r.key}: ${e.message} — stopping before any further spend.`);
     }
     const body = {
-      text: r.text,
+      text: r.spoken, // the game text, or its spoken respelling when one is set (issue #96)
       model_id: r.model,
       seed: r.seed,
       ...(r.prev ? { previous_text: r.prev } : {}),
@@ -498,6 +506,7 @@ async function cmdBuy(manifest, { maxCredits, outDir, allowRebuy, overrideLimits
       hash: r.hash,
       file: r.file,
       text: r.text,
+      spoken: r.spoken,
       model: r.model,
       seed: r.seed,
       settings: r.settings,
