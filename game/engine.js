@@ -20,6 +20,11 @@
 //   cfg.hintFade       — { fadeStart, fadeEnd } seconds of find-phase time
 //                        over which #hint fades out once (live loop only —
 //                        captured frames never see it, staging never ticks)
+//   cfg.leaderboard    — issue #95: this page keeps local best times (full
+//                        game only). The run clock counts everywhere, but
+//                        storage writes and the board DOM exist only with
+//                        this flag AND without ?gate=off. ?timer=on shows a
+//                        live run timer if the page ships #hud-timer.
 //   optional DOM: #pause-restart (restart button in the pause card) and
 //                 #ending-again (play-again line under the win text) — wired
 //                 when present, absent on the slice page = zero behaviour diff.
@@ -44,6 +49,7 @@ import { createWorld } from '../src/collision.js';
 import { buildGrid, nearestStandable, bestApproach, wallFaceFailures } from '../src/reach.js';
 import { touchOverride, isTouchDevice, autoLowQuality, createTouchControls } from '../src/touch.js';
 import { liveSeedFromEnv, newRunSeed, pinnedSeed, FIXED_SEED } from '../src/run-seed.js';
+import * as LB from '../src/leaderboard.js'; // issue #95: the local best-times board (pure data)
 
 /**
  * Turn a level's `faceYaw` into the rotation that actually points Bobo's face
@@ -99,6 +105,16 @@ export function bootGame(cfg) {
 
   const GATE_OFF = params.get('gate') === 'off';
   const TARGET = clamp(Number.parseInt(params.get('win') ?? String(WIN_DEFAULT), 10) || WIN_DEFAULT, 1, 20);
+  /** Issue #95: the local best-times board. It lives ONLY on full-game pages
+   *  (`cfg.leaderboard`) and NEVER on `?gate=off` pages: a tool run writes
+   *  nothing and a capture page never paints board chrome (the DOM starts
+   *  hidden and stays hidden — baselines byte-identical). The run CLOCK
+   *  itself accumulates everywhere as a plain number (no pixels, no random):
+   *  that is what lets selfTest prove its maths from inside a capture run. */
+  const LB_ON = Boolean(cfg.leaderboard) && !GATE_OFF;
+  /** The optional HUD timer (`?timer=on`, default OFF so every baseline is
+   *  byte-identical): needs a page that ships #hud-timer and a live page. */
+  const TIMER_ON = !GATE_OFF && params.get('timer') === 'on' && Boolean(document.getElementById('hud-timer'));
   /** The run's seed (issue #66). The rules live in src/run-seed.js: `?seed=N`
    *  pins it (that is how a run is reproduced and how a bug report reads),
    *  `?gate=off` — every tool page, capture, determinism run, LC simulation —
@@ -500,6 +516,17 @@ export function bootGame(cfg) {
     bonusPop: document.getElementById('score-bonus'), // issue #58: the "+3!" pop (full game only)
     // Issue #57: "back to menu" in the pause card (only when cfg.splash is on).
     pauseMenu: document.getElementById('pause-menu'),
+    // Issue #95: the local leaderboard's DOM. All optional — pages without
+    // them (slice, demo, testscene) never see any of this code fire.
+    hudTimer: document.getElementById('hud-timer'),
+    lbWin: document.getElementById('lb-win'),
+    winTime: document.getElementById('win-time'),
+    winDags: document.getElementById('win-dags'),
+    winBest: document.getElementById('win-newbest'),
+    lbForm: document.getElementById('lb-form'),
+    lbName: document.getElementById('lb-name'),
+    lbSave: document.getElementById('lb-save'),
+    winBoard: document.getElementById('win-board'),
   };
 
   /** What is on screen in each phase. The score pill is live state — except
@@ -538,6 +565,10 @@ export function bootGame(cfg) {
     setText(el.dagLabel, EXACT_DAG);
     el.prompt.classList.toggle('show', spec.prompt && game.phase === 'find');
     if (el.endingAgain) el.endingAgain.classList.toggle('show', spec.ending); // full game: play-again line
+    // Issue #95: the board card rides the win — but only on pages where the
+    // leaderboard exists at all (CSS additionally demands body.lb-on, which
+    // only live full-game pages ever get, so captured frames never show it).
+    if (el.lbWin) el.lbWin.classList.toggle('show', spec.ending && LB_ON);
     // Comfort (Step 9): calm mode hides the weather-layer celebration — rain,
     // fireworks, confetti — and the wrong-cat flash; the page keeps everything
     // gentle (the cats still breathe, the veil still fades in).
@@ -571,6 +602,12 @@ export function bootGame(cfg) {
     spawnIdx: 0,
     prevSpawnRoom: SPAWNS[0].room,
     winElapsed: 0, // seconds since the win landed (survives the celebration loop)
+    // Issue #95: the run clock and the DAG counter. runTime steps ONLY inside
+    // stepGame — never behind `paused`, never before the first spawn — and
+    // finalTime (runTime + 5 s per DAG) freezes the moment the win lands.
+    runTime: 0,
+    dagCount: 0,
+    finalTime: null,
     // Patriot Bobo (issue #58): who the CURRENT find is, in run terms.
     patriot: false, // this find wears the costume (and pays PATRIOT.reward)
     patriotCount: 0, // Patriot finds so far this run (cap: PATRIOT.maxPerRun)
@@ -919,8 +956,15 @@ export function bootGame(cfg) {
         // ?plant=score lets the penalty run below zero (score-floors-at-zero fails)
         game.score = PLANT === 'score' ? game.score - 1 : Math.max(0, game.score - 1);
         game.phase = 'wrong';
+        game.dagCount++; // issue #95: every wrong-cat DAG! costs +5 s on the board
       }
-      if (game.phase === 'win') game.winElapsed = 0; // the restart cooldown starts here
+      if (game.phase === 'win') {
+        game.winElapsed = 0; // the restart cooldown starts here
+        // Issue #95: the run is over — freeze the final time (active seconds
+        // + 5 s per DAG) and, on a live full-game page, offer it to the board.
+        game.finalTime = LB.finalizeTime(game.runTime, game.dagCount);
+        if (LB_ON) lbOnWin();
+      }
       game.time = 0;
       firedCues = new Set();
       nudgeUntil = 0;
@@ -985,6 +1029,7 @@ export function bootGame(cfg) {
     game.phase = 'find';
     game.time = 0;
     game.winElapsed = 0;
+    resetRunClock(); // issue #95: a new run starts the clock and DAG counter over
     game.spawnIdx = 0;
     game.prevSpawnRoom = SPAWNS[0].room;
     firedCues = new Set();
@@ -994,6 +1039,118 @@ export function bootGame(cfg) {
     standClearOfCats();
     input.reset(); // no key or queued shout crosses a restart (Space-mashing included)
     applyStage();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6a. The local leaderboard (issue #95) — best times from first spawn to
+  //     the win, +5 s per DAG, kept in ONE versioned localStorage key on this
+  //     browser only. The run clock itself is the small part: it steps inside
+  //     stepGame only (never behind `game.paused`, the single pause flag from
+  //     #99/#102 — paused time simply never enters it, as that issue's note
+  //     promised). Everything here is the part that KEEPS and SHOWS a run:
+  //     the rules live in src/leaderboard.js (pure, node-checked), and this
+  //     block is the only place that touches localStorage or the board DOM.
+  //     `?gate=off` — every tool page — never writes, never renders: LB_ON
+  //     is false there and every element starts and stays hidden.
+  // ---------------------------------------------------------------------------
+  const lbStore = LB.resolveStore(); // localStorage, or a session box if blocked
+  let lbEntry = null; // { index } the just-won run sits at on the board, else null
+  /** selfTest FIRES catch/wrong/win events on purpose (that is how the rules
+   *  are proven) — on a LIVE tool page those test wins are not runs, so while
+   *  a selfTest is in flight the board takes nothing and paints nothing. */
+  let lbSelfTesting = false;
+  // Body classes gate ALL board CSS: `lb-on` means "this page keeps times"
+  // (live full game only — never ?gate=off), `lb-timer` means the player
+  // asked for the HUD clock. Both false on every tool page, so the board
+  // chrome is display:none there before and after any staging.
+  if (LB_ON) document.body.classList.add('lb-on');
+  if (TIMER_ON) document.body.classList.add('lb-timer');
+
+  /** One run's worth of clock state, zeroed at every run boundary
+   *  (startGame / restartRun — the same boundaries run-seed.js re-rolls at). */
+  function resetRunClock() {
+    game.runTime = 0;
+    game.dagCount = 0;
+    game.finalTime = null;
+    lbEntry = null;
+    if (el.hudTimer && TIMER_ON) setText(el.hudTimer, LB.formatTime(0));
+  }
+
+  /** One li per board row — built from nodes, never innerHTML, so a stored
+   *  name can only ever be TEXT. `highlight` marks the run just won. */
+  function renderLbList(ol, board, highlight) {
+    if (!ol) return;
+    while (ol.firstChild) ol.removeChild(ol.firstChild);
+    for (let i = 0; i < board.length; i++) {
+      const e = board[i];
+      const li = document.createElement('li');
+      if (i === highlight) li.className = 'lb-hi';
+      const rank = document.createElement('span');
+      rank.className = 'lb-rank';
+      rank.textContent = `${i + 1}.`;
+      const name = document.createElement('span');
+      name.className = 'lb-name';
+      name.textContent = e.name;
+      const time = document.createElement('span');
+      time.className = 'lb-time';
+      time.textContent = LB.formatTime(e.time);
+      const meta = document.createElement('span');
+      meta.className = 'lb-meta';
+      meta.textContent = `${e.dags > 0 ? `${e.dags} DAG${e.dags === 1 ? '' : 's'} · ` : ''}${e.date}${e.seed !== null ? ` · seed ${e.seed}` : ''}`;
+      li.append(rank, name, time, meta);
+      ol.appendChild(li);
+    }
+  }
+
+  /** The win moment on a live page: try the board, then dress the win card.
+   *  Called from triggerEvent BEFORE the stage applies, so the card is fully
+   *  written before its .show lands on the next line. */
+  function lbOnWin() {
+    if (lbSelfTesting) return; // a test win is not a run: no write, no card
+    const board = LB.loadBoard(lbStore);
+    const canRecord = LB.recordableRun({ gateOff: GATE_OFF, target: TARGET, plant: PLANT });
+    const entry = {
+      name: LB.NAME_DEFAULT,
+      time: game.finalTime,
+      dags: game.dagCount,
+      date: LB.entryDate(),
+      seed: pinnedSeed(location.search), // the run is reproducible if the player pinned it
+    };
+    const placed = canRecord ? LB.addEntry(board, entry) : { board, index: -1 };
+    lbEntry = placed.index >= 0 ? { index: placed.index } : null;
+    if (lbEntry) LB.saveBoard(lbStore, placed.board); // blocked storage: shown this session, kept nothing — the game still works
+    if (el.winTime) setText(el.winTime, LB.formatTime(game.finalTime));
+    if (el.winDags) {
+      const d = game.dagCount;
+      el.winDags.textContent = d > 0 ? `${d} DAG${d === 1 ? '' : 's'}: ${LB.formatPenalty(d * LB.DAG_PENALTY)}` : '';
+      el.winDags.style.display = d > 0 ? 'block' : 'none';
+    }
+    if (el.winBest) el.winBest.style.display = placed.index === 0 ? 'block' : 'none'; // rank 1 says it best
+    if (el.lbForm) {
+      el.lbForm.style.display = placed.index >= 0 ? 'flex' : 'none';
+      el.lbForm.classList.remove('lb-saved');
+      if (el.lbName) {
+        el.lbName.value = '';
+        el.lbName.placeholder = LB.NAME_DEFAULT;
+        el.lbName.disabled = false;
+      }
+      if (el.lbSave) el.lbSave.disabled = false;
+    }
+    renderLbList(el.winBoard, placed.board, placed.index);
+    if (el.hudTimer && TIMER_ON) setText(el.hudTimer, LB.formatTime(game.finalTime)); // the little clock freezes on the final, penalty included
+  }
+
+  /** The name box: Enter or the Save button renames the row the run just
+   *  earned. Skipping it costs nothing — the entry rests under the default
+   *  name. The box then goes quiet (disabled) so the keyboard folds away. */
+  function lbSaveName() {
+    if (!lbEntry) return;
+    const next = LB.renameEntry(LB.loadBoard(lbStore), lbEntry.index, el.lbName ? el.lbName.value : '');
+    LB.saveBoard(lbStore, next);
+    if (el.lbForm) el.lbForm.classList.add('lb-saved');
+    if (el.lbName) el.lbName.disabled = true;
+    if (el.lbSave) el.lbSave.disabled = true;
+    renderLbList(el.winBoard, next, lbEntry.index);
   }
 
   // ---------------------------------------------------------------------------
@@ -1350,6 +1507,14 @@ export function bootGame(cfg) {
     el.pause.classList.toggle('show', game.paused);
     if (game.paused) return;
 
+    // Issue #95: the run clock. It steps ONLY here — so the pause card, the
+    // hidden tab (rAF stops and the clamped frame gap is dropped, not banked)
+    // and the portrait hint all simply never add time, exactly as "paused
+    // time does not count" asks. The win moment is excluded: finalTime was
+    // frozen when it landed, and what follows is celebration, not running.
+    if (game.phase !== 'win') game.runTime += dt;
+    if (TIMER_ON && game.phase !== 'win') setText(el.hudTimer, LB.formatTime(game.runTime));
+
     if (game.phase === 'find') stepPlayer(dt);
     if (game.phase === 'win') game.winElapsed += dt;
     game.time += dt;
@@ -1528,6 +1693,11 @@ export function bootGame(cfg) {
     // reading the state back after mutating it would "restore" a test artefact.
     const entry = { phase: game.phase, momentId: game.momentId, spotId: game.spotId, time: game.time, view: game.view };
     const savedScore = game.score;
+    // Issue #95: the checks below FIRE wrong/win events, which touch the run
+    // clock too — snapshot it all and hand it back, or a selfTest run would
+    // quietly add +5 s penalties to a live player's board.
+    const savedClock = { runTime: game.runTime, dagCount: game.dagCount, finalTime: game.finalTime, paused: game.paused };
+    lbSelfTesting = true; // while these checks fire catch/wrong/win, the board is blind: no entry, no card
     game.patriot = false; // the +1 rules below are the PLAIN Bobo rules — Patriot checks (full.js) opt in per check; restoreAfterSelfTest re-stages the flag
 
     // --- the exact strings ----------------------------------------------------
@@ -2279,6 +2449,12 @@ export function bootGame(cfg) {
     }
 
     game.score = savedScore;
+    game.runTime = savedClock.runTime;
+    game.dagCount = savedClock.dagCount;
+    game.finalTime = savedClock.finalTime;
+    game.paused = savedClock.paused;
+    lbSelfTesting = false; // the tests are over: the board can see real wins again
+    if (LB_ON) lbEntry = null; // the checks never own a board row: forget any test win's placement
     restoreAfterSelfTest(entry);
     return { pass: checks.every((c) => c.pass), checks };
   }
@@ -2477,6 +2653,8 @@ export function bootGame(cfg) {
           spotId: game.spotId ?? null,
           room: POOL && game.spotId ? (POOL.get(game.spotId) ?? rideSpot(game.spotId)).room : null,
           patriot: game.patriot, patriotCount: game.patriotCount, findNum: game.findNum, // issue #58
+          runTime: round(game.runTime), dagCount: game.dagCount, // issue #95: the run clock, readable by the tools
+          finalTime: game.finalTime === null ? null : round(game.finalTime),
         };
       },
       camera(name = game.view) {
@@ -2508,6 +2686,23 @@ export function bootGame(cfg) {
         game.score = clamp(Number(n) || 0, 0, TARGET);
         updateHud();
         updateLabel();
+      },
+      /** Issue #95: the leaderboard from the tools side — the rules live in
+       *  src/leaderboard.js, this reads the same store the win screen writes.
+       *  On `?gate=off` pages `on` is false and `board` is whatever the
+       *  browser happens to hold (this reader never creates anything). */
+      leaderboard() {
+        return {
+          on: LB_ON,
+          timerOn: TIMER_ON,
+          key: LB.STORAGE_KEY,
+          board: LB.loadBoard(lbStore),
+          entry: lbEntry ? lbEntry.index : -1,
+          recordable: LB.recordableRun({ gateOff: GATE_OFF, target: TARGET, plant: PLANT }),
+          runTime: game.runTime,
+          dagCount: game.dagCount,
+          finalTime: game.finalTime,
+        };
       },
       /** Issue #58: Patriot Bobo from the tools side.
        *  LC.patriot()        → the whole picture: mode (from ?patriot=),
@@ -2914,6 +3109,7 @@ export function bootGame(cfg) {
 
   function startGame() {
     started = true;
+    resetRunClock(); // issue #95: the run clock starts at the FIRST spawn below
     rng = mulberry32(SEED);
     refills = 0;
     queue = [];
@@ -3070,6 +3266,26 @@ export function bootGame(cfg) {
       // grants one): never silently eat the click, keep the card up.
       el.pause.classList.toggle('show', game.paused && started && game.phase !== 'win');
     });
+    // Issue #95: the win card's name box. Enter or the Save button keeps the
+    // name; the box swallows its own keys (stopPropagation) so a typed Space
+    // is a space in a NAME, never the shout that closes the win screen. The
+    // panel is pointer-events:auto, so a click inside it never lands on the
+    // canvas — and a click on the canvas stays the one door out of the win.
+    if (LB_ON && el.lbSave) {
+      el.lbSave.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        lbSaveName();
+      });
+    }
+    if (LB_ON && el.lbName) {
+      el.lbName.addEventListener('keydown', (ev) => {
+        ev.stopPropagation(); // while the name box has the keys, the game has none
+        if (ev.code === 'Enter' || ev.code === 'NumpadEnter') {
+          ev.preventDefault();
+          lbSaveName();
+        }
+      });
+    }
     canvas.addEventListener('click', () => {
       if (!gateOpen) return;
       if (TOUCH) return; // issue #25: no pointer lock to grab — the drag zones

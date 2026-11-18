@@ -2631,3 +2631,76 @@ yell should feel like a delighted friend across the room, not an announcement
 the team can hear the files: a free local re-transcribe (faster-whisper)
 hears the old takes as "you wind" and the new as "you win" — the respelling
 working as intended, but stated plainly: transcript evidence, not a listen.
+
+## 42. Issue #95 — a run is timed, and the flat keeps a top-10 (2026-11-17)
+
+Brandon's issue: time each run from the first spawn to the winning 10th
+point, add **+5 s per wrong-cat "DAG!"**, and keep a **local top-10 board**
+the win screen and the title screen can show. No account, no server, no
+upload — the board is the browser's own `localStorage`
+(`lookatbobo.times.v1`), and it must never touch a capture baseline.
+
+**One pure module.** `src/leaderboard.js` holds every rule and nothing
+else: `formatTime` (1:15.0), `formatPenalty` (+1:00), `sanitizeName`
+(≤ 8 printable chars, `NAME_DEFAULT` "BOBO FAN" when nothing survives),
+`addEntry` (sort by time, keep 10, report the placed index), `loadBoard` /
+`clearBoard` behind `resolveStore()` (real `localStorage`, or an in-memory
+box when the browser blocks it — private mode still gets a working session
+board), `finalizeTime(runTime, dags)` and `recordableRun({ gateOff, target,
+plant })`. `npm run leaderboard:selftest` proves all of it in plain node:
+**30 PASS**. The engine, `title.js` and the checks all import THE SAME file,
+so the rules cannot drift between game and tools.
+
+**The clock is the loop.** `game.runTime` steps ONLY inside `stepGame`,
+behind the single `game.paused` flag #99/#102 established — so the pause
+card, a hidden tab (rAF stops; the clamped frame gap is dropped, not banked)
+and the portrait rotate hint all simply never add time. It starts at the
+first spawn (`startGame`/`restartRun` zero it; the title card earns 0 s)
+and the 10th point freezes `game.finalTime = runTime + 5 × dagCount` the
+moment the win fires. A live page may show the running clock as an opt-in
+HUD pill (`?timer=on`, top-centre, clear of the score pill, gear and the
+"+3!" pop); it hides behind the title card and freezes on the final time.
+
+**The board is written once, by the win.** `lbOnWin()` runs on the real win
+event only: `recordableRun` refuses `?gate=off` pages, tool targets
+(`?win≠10`) and `?plant=` fault pages before anything else, so a tool page
+writes nothing, ever. A made board places the run at its rank under
+"BOBO FAN" (auto-saved — closing the tab can't lose a run), the name box
+renames THAT row and folds; `NEW BEST!` reads only at rank 1. Rows are
+built from text nodes (never `innerHTML`) — a saved name is untrusted
+input, and the win card, the menu panel and the tool checks share the one
+row vocabulary. The menu's **best times** panel (title row, next to "how to
+play") re-reads the key on every open and clears in two deliberate taps.
+
+**Nothing of it is visible to the tools.** Every piece starts `display:none`
+and opens only under body classes the engine adds when the board is truly
+live: `lb-on` (board on), `lb-timer` (`?timer=on`), `lbg-open` (menu panel).
+A `?gate=off` page gets none of them, so capture pages, bots and stress
+runs see an empty, hidden DOM and write nothing — capture baselines stay
+byte-identical. Two selfTests enforce this from inside the page:
+`leaderboard-selftest-inert` (no page may leave a test win in the store or
+paint the card) and `run-clock-dag-penalty` (clock = the steps it took, 0 s
+paused, +10 s for two DAG!, the win freezes the final) — plus
+`leaderboard-rules` re-proves the module in-page. **Full selfTest 134 →
+137** (`--checks 137`; the slice stays 51 — the board is full-game only).
+One subtlety the checks forced: `selfTest` FIRES real catch/win events (the
+Patriot checks do it on every page, live ones included), so `lbSelfTesting`
+blinds the board while a self-test is in flight — a test win is not a run.
+A second trap, caught by `capture:full:determinism` while this shipped: the
+clock check *drives the loop* (`loopTick`), and its paused `loopTick` raises
+the pause card through the engine's own HUD sync — a capture page has no
+rAF left to lower it again, so the card sat raised into every later frame
+and re-rendering drifted against it. The check now puts the pause card back
+exactly as it found it, and `leaderboard-selftest-inert` proves it (pause
+card untouched, store untouched, board card hidden — on every page kind).
+
+**Phone layout.** The shout button owns the bottom-right (it doubles as the
+play-again door), so the win card sits **bottom-left** on touch — verified
+non-overlapping — and the desktop card is bottom-centre and scrollable so a
+full ten never spills. On a ~360 px-tall landscape pocket the menu panel is
+a scrolling window that never stretches the stepped-down title card.
+
+**Listen/look for these on a real phone:** a win should feel like the same
+celebration plus a small gold receipt under it — time, any DAG! penalty,
+one tap to put your name on it. The clock is OFF by default: if a run is
+never timed on screen the game is unchanged, and that is the point.

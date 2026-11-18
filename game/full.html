@@ -44,6 +44,10 @@
                  ?touch=on|off      force touch controls on / off (QA)
                  ?motion=off        calm: no logo blink/ear-flick/bob, no rain
                  ?contrast=high     high-contrast UI
+                 ?timer=on          live run clock in the HUD (issue #95; the
+                                    board itself needs no flag — it is on for
+                                    live full-game play and off for every
+                                    ?gate=off tool page)
     Faults to prove the checks bite (selfTest / budget must FAIL):
       ?plant=text | audio | score | repeats | decoy-share | over-budget |
       no-collision   (the same seven faults the slice proves)
@@ -462,6 +466,219 @@
       }
       #ending-again.show {
         display: block;
+      }
+
+      /* ---------- issue #95: the local best-times board ---------------------
+         Every piece starts hidden and stays that way unless TWO doors are
+         open: the element carries .show (only the engine puts it there, and
+         only when the leaderboard is on) AND <body> carries lb-on / lbg-open
+         / lb-timer (only ever added by a LIVE full-game page — ?gate=off
+         never adds them, so capture pages, bots and stress runs see an
+         empty, hidden DOM and write nothing). */
+      .lb-ui {
+        display: none;
+      }
+      /* The optional HUD clock (?timer=on): a small pill top-centre, away
+         from the score pill, the gear and the "+3!" pop. */
+      #hud-timer {
+        position: fixed;
+        top: calc(16px + var(--safe-t, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 5px 13px;
+        border-radius: 999px;
+        background: rgba(16, 21, 28, 0.78);
+        border: 1px solid rgba(247, 244, 238, 0.14);
+        color: var(--ui-paper);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.92;
+      }
+      body.lb-timer #hud-timer {
+        display: block;
+      }
+      /* No run, no clock: while the title card is up there is no run to
+         time, and the pill must not ghost behind the gate overlay. */
+      body.splash #hud-timer {
+        display: none;
+      }
+      /* The win card: the run's final time, the DAG! penalty, the name box,
+         and the top-10 under it. Desktop bottom-centre; scrollable so a
+         full board never spills. */
+      #lb-win {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(18px + var(--safe-b, 0px));
+        width: min(92vw, 420px);
+        max-height: min(46vh, 340px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        pointer-events: auto;
+        padding: 12px 18px 14px;
+        border-radius: 16px;
+        background: radial-gradient(130% 120% at 50% 0%, rgba(31, 26, 19, 0.94), rgba(13, 16, 22, 0.95));
+        border: 1px solid rgba(232, 176, 74, 0.28);
+        box-shadow:
+          0 24px 80px rgba(0, 0, 0, 0.55),
+          inset 0 1px 0 rgba(247, 244, 238, 0.08);
+        color: var(--ui-paper);
+      }
+      body.lb-on #lb-win.show {
+        display: block;
+      }
+      #win-time {
+        text-align: center;
+        font-size: 32px;
+        font-weight: 900;
+        color: var(--ui-mustard);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+      }
+      #win-dags {
+        display: none; /* the engine shows it only when the run earned some */
+        text-align: center;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #ff8f7d;
+        margin-top: 2px;
+      }
+      #win-newbest {
+        display: none; /* rank 1 only */
+        text-align: center;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        color: var(--ui-mustard);
+        margin-top: 4px;
+      }
+      #lb-form {
+        display: none; /* flex, when the run made the board */
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      #lb-form-label {
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: rgba(247, 244, 238, 0.72);
+      }
+      #lb-name {
+        width: min(150px, 36vw);
+        padding: 5px 9px;
+        border-radius: 8px;
+        border: 1px solid rgba(247, 244, 238, 0.28);
+        background: rgba(247, 244, 238, 0.08);
+        color: var(--ui-paper);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+      #lb-name:focus {
+        outline: 2px solid var(--ui-mustard);
+        outline-offset: 1px;
+      }
+      #lb-form.lb-saved {
+        opacity: 0.6;
+      }
+      #win-board-title {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 10.5px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: rgba(232, 176, 74, 0.85);
+      }
+      /* One row vocabulary for both boards (win card and the menu panel). */
+      #win-board,
+      #gate-board-list {
+        list-style: none;
+        margin: 6px 0 0;
+        padding: 0;
+      }
+      #win-board li,
+      #gate-board-list li {
+        display: grid;
+        grid-template-columns: 20px 1fr auto;
+        column-gap: 8px;
+        padding: 3px 7px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        line-height: 1.35;
+      }
+      #win-board li.lb-hi,
+      #gate-board-list li.lb-hi {
+        background: rgba(232, 176, 74, 0.15);
+        font-weight: 800;
+      }
+      .lb-rank {
+        opacity: 0.55;
+        font-variant-numeric: tabular-nums;
+      }
+      .lb-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lb-time {
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+      }
+      .lb-meta {
+        grid-column: 2 / -1;
+        font-size: 10px;
+        font-weight: 400;
+        opacity: 0.55;
+      }
+      /* The menu's best-times panel: same folded-card vocabulary as the
+         how-to panel, opened by the title row. */
+      body.lb-on #gate-board-btn {
+        display: inline-block;
+      }
+      #gate-board-panel {
+        width: 100%;
+        max-width: 44ch;
+        border: 1px dashed rgba(232, 176, 74, 0.4);
+        border-radius: 12px;
+        padding: 9px 14px;
+        color: rgba(247, 244, 238, 0.88);
+        font-size: 13px;
+      }
+      body.lbg-open #gate-board-panel {
+        display: block;
+      }
+      #gate-board-empty {
+        text-align: center;
+        font-size: 12px;
+        opacity: 0.65;
+        padding: 4px 0;
+      }
+      #lb-clear {
+        display: block;
+        margin: 8px auto 0;
+      }
+      #lb-clear.armed {
+        color: #ff8f7d;
+        border-color: #ff8f7d;
+      }
+      /* A landscape pocket ~360 px tall (issue #57's stepped-down card): the
+         board panel is a window with its own scroll, never a card-stretcher. */
+      @media (max-height: 420px) {
+        #gate-board-panel {
+          max-height: 104px;
+          overflow-y: auto;
+        }
+      }
+      body.hc #lb-win,
+      body.hc #gate-board-panel {
+        border-color: var(--ui-paper);
       }
 
       /* Click-to-begin: the user gesture that unlocks audio (autoplay rules)
@@ -978,6 +1195,34 @@
         top: calc(40% + 76px);
         padding: 16px 10px 40px;
       }
+      /* Issue #95 on a phone: the clock pill stays top-centre, just smaller
+         (top-right belongs to the score pill, bottom-right to the shout),
+         and the win card sits bottom-LEFT — the shout button owns the
+         bottom-right corner (it doubles as "play again"), and the card
+         must never land under a thumb. */
+      body.touch #hud-timer {
+        font-size: 13px;
+        padding: 4px 10px;
+      }
+      body.touch #lb-win {
+        left: calc(12px + var(--safe-l, 0px));
+        right: auto;
+        transform: none;
+        bottom: calc(12px + var(--safe-b, 0px));
+        width: min(52vw, 360px);
+        max-height: min(64vh, 210px);
+        padding: 9px 12px 10px;
+      }
+      body.touch #win-time {
+        font-size: 24px;
+      }
+      body.touch #win-board li,
+      body.touch #gate-board-list li {
+        font-size: 12px;
+      }
+      body.touch:has(#lb-win.show) #ending-again {
+        top: calc(40% + 62px); /* lift the line clear of the card's top edge */
+      }
 
       /* Step 9: loading screen. Static from the first byte, retired the moment
          the game is actually ready (no fake progress bars). The gentle bob is
@@ -1098,6 +1343,9 @@
 
     <div id="hud">
       <div id="hud-score"><span class="num">00</span><span class="max">/ 10</span></div>
+      <!-- issue #95: the optional run clock (?timer=on, live only — CSS
+           shows it only under body.lb-timer). Empty until the first spawn. -->
+      <div id="hud-timer" class="lb-ui" aria-hidden="true"></div>
       <div id="score-bonus" aria-hidden="true">+3!</div>
       <div id="reticle"></div>
       <div id="prompt">find Bobo, point, and shout!</div>
@@ -1114,6 +1362,23 @@
       <div id="ending-veil"></div>
       <div id="ending">your did it! you wind</div>
       <div id="ending-again">click or press space to go back to the menu</div>
+      <!-- issue #95: the win-time card and the top-10 board. Hidden by CSS
+           on every page (?gate=off never gets body.lb-on, and .show only
+           lands on a live win) and written only by the engine — rows are
+           built from text nodes, never innerHTML. The name box saves the
+           run under a ≤ 8-character name; skipping it costs nothing. -->
+      <div id="lb-win" class="lb-ui" role="dialog" aria-label="Best times">
+        <div id="win-time"></div>
+        <div id="win-dags"></div>
+        <div id="win-newbest">NEW BEST!</div>
+        <div id="lb-form">
+          <label id="lb-form-label" for="lb-name">name your run</label>
+          <input id="lb-name" maxlength="8" enterkeyhint="done" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BOBO FAN" />
+          <button id="lb-save" class="title-mini" type="button">save</button>
+        </div>
+        <div id="win-board-title">best times</div>
+        <ol id="win-board"></ol>
+      </div>
     </div>
 
     <!-- Issue #99: the gear and its panel live OUTSIDE #hud, on purpose.
@@ -1183,6 +1448,7 @@
         <button id="gate-btn" type="button">START</button>
         <div class="title-row">
           <button id="gate-howto" class="title-mini" type="button" aria-expanded="false">how to play</button>
+          <button id="gate-board-btn" class="title-mini lb-ui" type="button" aria-expanded="false">best times</button>
           <span class="title-comfort">the gear at the corner holds the cozy switches — motion, sound, contrast</span>
         </div>
         <div id="gate-howto-panel">
@@ -1190,6 +1456,14 @@
           <span class="only-touch"><b>left thumb</b> stick · <b>right side</b> drag to look · <b>yellow button</b> shout · turn your phone sideways for the best view<br /></span>
           ten moments, living room to bathroom — find Bobo (forehead dash, chest bib),
           put the dot on him, shout. ten finds wins it; the wrong cat earns a DAG! and a point off.
+        </div>
+        <!-- issue #95: the local board, readable from the menu. Opened by
+             game/title.js (best times ⇄), rows re-read from localStorage on
+             every open, so a rename from the win screen is always fresh. -->
+        <div id="gate-board-panel" class="lb-ui">
+          <ol id="gate-board-list"></ol>
+          <div id="gate-board-empty">no times yet — win a run and one lands here</div>
+          <button id="lb-clear" class="title-mini" type="button">clear times</button>
         </div>
         <div class="gate-note">
           sound on — real takes and an original bardcore tune · <span class="only-desktop">desktop (keyboard + mouse) — phones too</span><span class="only-touch">phones: turn your phone sideways for the best view</span>

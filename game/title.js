@@ -20,7 +20,15 @@
  *   3. the how-to-play toggle: a class flip on <body> and one ARIA state.
  *      (The card's click still starts the game — the button stops
  *      propagation; the engine owns every other click on #gate.)
+ *
+ * Issue #95 adds a fourth, the same size and shape: the best-times panel —
+ * one more folded door on the card, reading the board straight from the one
+ * storage key src/leaderboard.js owns, so a rename from the win screen is
+ * fresh the next time it opens. `?gate=off` skips it outright (the engine
+ * never adds its body.lb-on class there, and the button's CSS stays off).
  */
+
+import * as LB from '../src/leaderboard.js'; // issue #95: the menu board reads the same one key src/leaderboard.js owns
 
 const body = document.body;
 
@@ -91,4 +99,82 @@ if (!gateOff && !isStandalone && isIosTouch && !hintDismissed) {
       /* blocked storage: dismissed for this session only */
     }
   });
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. the best-times panel (issue #95) — the menu's door to the local board.
+ *    The engine owns the rules, the win card and the body.lb-on class that
+ *    makes the button visible at all; this panel only RENDERS what is
+ *    already in storage (rows built from text nodes, never innerHTML) and
+ *    offers the two-step clear. Re-reads on every open, so a run named on
+ *    the win screen is fresh here the next time. Skipped whole under
+ *    ?gate=off: there the gate card is display:none and the board is off.
+ * -------------------------------------------------------------------------=*/
+const boardBtn = document.getElementById('gate-board-btn');
+if (boardBtn && !gateOff) {
+  const boardList = document.getElementById('gate-board-list');
+  const boardEmpty = document.getElementById('gate-board-empty');
+  const boardPanel = document.getElementById('gate-board-panel');
+  const clearBtn = document.getElementById('lb-clear');
+  const boardStore = LB.resolveStore();
+  const rowFor = (e, i) => {
+    const li = document.createElement('li');
+    const rank = document.createElement('span');
+    rank.className = 'lb-rank';
+    rank.textContent = `${i + 1}.`;
+    const name = document.createElement('span');
+    name.className = 'lb-name';
+    name.textContent = e.name;
+    const time = document.createElement('span');
+    time.className = 'lb-time';
+    time.textContent = LB.formatTime(e.time);
+    const meta = document.createElement('span');
+    meta.className = 'lb-meta';
+    meta.textContent = `${e.dags > 0 ? `${e.dags} DAG${e.dags === 1 ? '' : 's'} · ` : ''}${e.date}${e.seed !== null ? ` · seed ${e.seed}` : ''}`;
+    li.append(rank, name, time, meta);
+    return li;
+  };
+  let armed = false;
+  const disarm = () => {
+    armed = false;
+    if (clearBtn) {
+      clearBtn.classList.remove('armed');
+      clearBtn.textContent = 'clear times';
+    }
+  };
+  const renderBoard = () => {
+    if (!boardList) return;
+    const board = LB.loadBoard(boardStore); // every open reads the key afresh
+    while (boardList.firstChild) boardList.removeChild(boardList.firstChild);
+    board.forEach((e, i) => boardList.appendChild(rowFor(e, i)));
+    if (boardEmpty) boardEmpty.style.display = board.length ? 'none' : 'block';
+    if (clearBtn) {
+      clearBtn.style.display = board.length ? 'block' : 'none';
+      disarm(); // a fresh look is never a half-asked confirm
+    }
+  };
+  if (boardPanel) boardPanel.addEventListener('click', (ev) => ev.stopPropagation()); // scrolling the board never starts a run
+  boardBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation(); // the card's click starts the game; this one just unfolds
+    const open = body.classList.toggle('lbg-open');
+    boardBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open && howto && body.classList.contains('howto-open')) {
+      body.classList.remove('howto-open'); // one folded door at a time
+      howto.setAttribute('aria-expanded', 'false');
+    }
+    if (open) renderBoard();
+  });
+  if (clearBtn) {
+    clearBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if (!armed) {
+        armed = true; // two deliberate taps — the board is the player's own record
+        clearBtn.classList.add('armed');
+        clearBtn.textContent = 'really clear all?';
+        return;
+      }
+      LB.clearBoard(boardStore);
+      renderBoard();
+    });
+  }
 }
