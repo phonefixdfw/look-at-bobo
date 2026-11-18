@@ -28,6 +28,7 @@ import { OPENINGS, ROOM_BY_ID, ROOMS, WALL_DEFS, BAND_T, LEAF_W, SUPPORT_DEFS } 
 import { diningGapReport } from './full-dining.js';
 import { woodTextureAudit } from '../src/polish.js';
 import { SPLASH } from './splash.js';
+import * as LB from '../src/leaderboard.js'; // issue #95: the board's rules, for the checks (the engine does the wiring)
 
 /* ---- the ten moments, pose by pose ----
  * The engine runs the baseline idle right before this, only during `find`,
@@ -2623,6 +2624,102 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       'issue #86: faces made of fillText drift into trademark and uncanny territory at once; this ledger is painted shading only, on one 256 px canvas, and it is the same ledger the builder filled',
     );
   }
+
+  // 14. issue #95: the local leaderboard. The run clock is the loop itself —
+  //     it sleeps behind the single pause flag (#99/#102) — +5 s per DAG!
+  //     freezes with the win, `?gate=off` keeps the whole board inert, and
+  //     the rules module is the one `npm run leaderboard:selftest` proves.
+  {
+    const LC = window.LC;
+    const saved = { rt: game.runTime, dc: game.dagCount };
+    const key = LB.STORAGE_KEY;
+    const readStore = () => {
+      try { return localStorage.getItem(key); } catch { return '__blocked__'; }
+    };
+    const storedBefore = readStore();
+    // a) the clock is the loop: it earns exactly what the world stepped,
+    //    sleeps behind `paused` (0 s), and never starts before the first
+    //    spawn — a title-card page takes ZERO steps, so zero seconds.
+    game.phase = 'find';
+    game.paused = false;
+    const sim0 = LC.loopDebug().simSteps;
+    LC.loopTick(0.25);
+    const steps = LC.loopDebug().simSteps - sim0;
+    const ticking = game.runTime - saved.rt;
+    game.paused = true;
+    LC.loopTick(0.5);
+    const pausedAdded = game.runTime - saved.rt - ticking;
+    game.paused = false;
+    // b) +5 s per wrong cat, counted whether or not the world is ticking.
+    game.score = Math.max(0, TARGET - 3);
+    triggerEvent('wrong');
+    triggerEvent('wrong');
+    const clockMathOk = steps > 0
+      ? Math.abs(ticking - steps / 60) < 1e-9 && pausedAdded === 0 && game.dagCount - saved.dc === 2
+      : ticking === 0 && pausedAdded === 0 && game.dagCount - saved.dc === 2; // world asleep: the run has not started
+    const rec = LC.leaderboard();
+    let finalOk;
+    if (rec.recordable) {
+      // A live tool page (stress's live selfTest, the behind-the-card run):
+      // its board is REAL and a test win is not a run, so the board stayed
+      // blind through all of this — nothing was placed. The freeze itself is
+      // proven through the pure rule (the gate-off leg below fires a real
+      // win, where the board is off and cannot be polluted).
+      finalOk = rec.entry === -1 && rec.finalTime === game.finalTime
+        && Math.abs(LB.finalizeTime(game.runTime, game.dagCount) - (game.runTime + game.dagCount * LB.DAG_PENALTY)) < 1e-9;
+    } else {
+      game.phase = 'find'; // the wrong staging is not part of the maths
+      game.score = TARGET - 1;
+      triggerEvent('catch'); // the 10th point: the win lands and freezes it
+      finalOk = game.phase === 'win' && game.finalTime !== null
+        && Math.abs(game.finalTime - (game.runTime + game.dagCount * LB.DAG_PENALTY)) < 1e-9;
+    }
+    const noPenaltyOk = LB.finalizeTime(saved.rt, 0) === saved.rt; // 0 DAGs = no penalty
+    add(
+      'run-clock-dag-penalty',
+      `${steps ? `${ticking.toFixed(3)} s over ${steps} steps` : 'world asleep: 0 s'} · ${pausedAdded.toFixed(3)} s paused · +${(game.dagCount - saved.dc) * LB.DAG_PENALTY} s for 2 DAG! · final ${rec.recordable ? 'board blind (live page)' : game.finalTime === null ? 'MISSING' : game.finalTime.toFixed(3)}`,
+      'clock = the steps it took (0 before the first spawn), 0 s paused, +10 s for two DAG!, 0 DAGs adds nothing, the win freezes the final',
+      clockMathOk && finalOk && noPenaltyOk,
+      'issue #95: first spawn to the 10th point, +5 s per DAG!, paused time never counted (the clock only ever steps inside stepGame, behind game.paused)',
+    );
+    // c) inert where the tool gate is: nothing shown, nothing written. Under
+    //    ?gate=off the board is off AND this very check must leave the store
+    //    exactly as it found it. On the stress suite's live page the board is
+    //    legitimately on — but a selfTest win must never have touched it.
+    const lbWin = document.getElementById('lb-win');
+    const winTimeEl = document.getElementById('win-time');
+    const shown = lbWin ? getComputedStyle(lbWin).display !== 'none' : false;
+    const storedAfter = readStore();
+    const inertOk = rec.on === !GATE_OFF
+      && rec.recordable === !GATE_OFF
+      && !shown
+      && (!winTimeEl || winTimeEl.textContent === '')
+      && rec.entry === -1
+      && storedAfter === storedBefore; // no page may ever leave a test win in the store
+    add(
+      'leaderboard-selftest-inert',
+      `on ${rec.on} · card ${shown ? 'SHOWN' : 'hidden'} · store ${storedAfter === storedBefore ? 'untouched' : 'WRITTEN'}`,
+      GATE_OFF ? 'off · hidden · untouched' : 'on (live) · hidden · untouched by tests',
+      inertOk,
+      'issue #95: a selfTest never writes the board or paints the card — and ?gate=off (every capture page, bot and stress sim run) keeps the whole board off, so baselines and bots see an empty, hidden DOM',
+    );
+    // d) the rules module, read back from the page's own copy of the file.
+    const trim = (() => {
+      let b = [];
+      for (let i = 0; i < 13; i++) b = LB.addEntry(b, { name: 'AAA', time: 40 - i, dags: 0, date: '2026-11-17', seed: null }).board;
+      return b.length === 10 && b[0].time === 28 && b[9].time === 37;
+    })();
+    const rulesOk = LB.formatTime(75.04) === '1:15.0' && LB.formatPenalty(60) === '+1:00'
+      && LB.sanitizeName('Br@ndon x') === 'Brandon' && LB.sanitizeName('$$$') === LB.NAME_DEFAULT
+      && trim && LB.recordableRun({ gateOff: true, target: 10 }) === false;
+    add(
+      'leaderboard-rules',
+      `${LB.formatTime(75.04)} · ${LB.formatPenalty(60)} · "${LB.sanitizeName('Br@ndon x')}" · "${LB.sanitizeName('$$$')}" · top-10 ${trim ? 'kept' : 'BROKE'}`,
+      '1:15.0 · +1:00 · "Brandon" · "BOBO FAN" · top-10 kept',
+      rulesOk,
+      'issue #95: format, names, trimming and the write-gate, checked in-page against the same src/leaderboard.js the node selftest runs',
+    );
+  }
 }
 
 bootGame({
@@ -2636,4 +2733,5 @@ bootGame({
   hintFade: { fadeStart: 12, fadeEnd: 18 }, // the hint teaches, then gets out of the way
   splash: SPLASH, // issue #57: the title screen; pause/win hand back to it
   music: true, // issue #71: the original bardcore soundtrack plays on this page
+  leaderboard: true, // issue #95: local best times — this page keeps them (live only, never under ?gate=off)
 });

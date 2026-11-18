@@ -50,7 +50,7 @@
     "capture:full:lap:determinism": "node tools/capture.mjs game/full.html --times 1.2 --views diorama --moments couch-loaf.lap --out captures/full-lap-determinism --determinism --param gate=off --param lap=on",
     "check:mobile": "node tools/mobile-check.mjs",
     "seed:coverage": "node tools/seed-coverage.mjs",
-    "playtest:stress:full": "node tools/stress-playtest.mjs --page game/full.html --checks 134"
+    "playtest:stress:full": "node tools/stress-playtest.mjs --page game/full.html --checks 137"
   },
   "devDependencies": {
     "playwright-core": "^1.65.1",

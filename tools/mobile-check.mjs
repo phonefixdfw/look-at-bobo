@@ -62,6 +62,13 @@
 //       the menu door), a DENIED pointer lock still pauses with a free cursor
 //       and a MISSING one resumes without ever a dead state, the touch card is
 //       unchanged, and the card fits a 740×360 window clear of the gear
+//   16  #95 the local best-times board: a phone win freezes its time and the
+//       +5 s-per-DAG! penalty onto the win card and the top-10, the name box
+//       renames the row and folds, the shout button stays clear of the card,
+//       the menu's best-times panel reads the same key and clears in two
+//       deliberate taps (fitting a 740×360 card), ?timer=on shows a HUD clock
+//       that starts at spawn and freezes on the final, and ?gate=off keeps
+//       the whole board absent, inert and unwritten
 //
 //   npm run check:mobile
 
@@ -1466,6 +1473,197 @@ try {
     });
     check('#99 short window 740×360: the pause card fits and clears the gear', lay.shown && lay.inView && lay.overlap === false, JSON.stringify(lay));
     check('#99 short-window page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // ===========================================================================
+  // 16. Issue #95: the local best-times board. A real phone win carries a
+  //     final time and its DAG! penalty onto the card and the board; the
+  //     name box renames the row and folds; the menu's best-times panel
+  //     reads the same key and clears in two deliberate taps; ?gate=off
+  //     keeps the whole thing absent and inert; ?timer=on shows the clock.
+  // ===========================================================================
+
+  // 16a. The phone win, end to end: two DAG!s on the way, then the board.
+  {
+    const page = await phonePage('?seed=11&timer=on', { dsf: 2 });
+    await page.tap('#gate-btn');
+    await waitPhase(page, 'find');
+    const pill0 = await page.evaluate(() => ({
+      shown: getComputedStyle(document.getElementById('hud-timer')).display !== 'none',
+      text: document.getElementById('hud-timer').textContent,
+    }));
+    check('#95 phone: ?timer=on shows the HUD clock, started at zero with the spawn', pill0.shown && /^0:0\d\.\d$/.test(pill0.text), JSON.stringify(pill0));
+    const scores = [];
+    const dagsWanted = 2;
+    let dagsDone = 0;
+    let n = 0;
+    while (n++ < 40) {
+      const now = await st(page);
+      if (now.phase === 'win') break;
+      await waitPhase(page, 'find');
+      if (dagsDone < dagsWanted && scores.length === dagsDone + 1) {
+        dagsDone++;
+        await page.evaluate(() => window.LC.aimAt('decoy'));
+        await page.tap('#shout-btn');
+        await waitPhase(page, 'wrong');
+        scores.push((await st(page)).score);
+        continue;
+      }
+      await page.evaluate(() => window.LC.aimAt('bobo'));
+      await page.tap('#shout-btn');
+      await waitCatchOrWin(page);
+      scores.push((await st(page)).score);
+    }
+    const win = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      const rec = window.LC.leaderboard();
+      const el = (id) => document.getElementById(id);
+      const card = el('lb-win');
+      return {
+        phase: window.LC.state().phase,
+        lbOn: document.body.classList.contains('lb-on'),
+        cardShown: getComputedStyle(card).display !== 'none',
+        time: el('win-time').textContent,
+        timeFmt: LB.formatTime(rec.finalTime),
+        dags: el('win-dags').textContent,
+        dagsShown: getComputedStyle(el('win-dags')).display !== 'none',
+        best: getComputedStyle(el('win-newbest')).display !== 'none',
+        rows: [...el('win-board').children].map((li) => ({ hi: li.classList.contains('lb-hi'), text: li.textContent })),
+        runTime: rec.runTime,
+        dagCount: rec.dagCount,
+        finalTime: rec.finalTime,
+        pen: rec.dagCount * 5,
+        pill: el('hud-timer').textContent,
+        stored: (() => { try { return localStorage.getItem(LB.STORAGE_KEY); } catch { return null; } })(),
+        key: LB.STORAGE_KEY,
+        shout: el('shout-btn').getBoundingClientRect(),
+        cardBox: card.getBoundingClientRect(),
+      };
+    });
+    check('#95 phone win: run clock froze with +5 s per DAG!', win.phase === 'win' && win.dagCount === 2 && win.pen === 10 && Math.abs(win.finalTime - (win.runTime + 10)) < 1e-9, `run ${win.runTime.toFixed(2)} + ${win.pen} → ${win.finalTime.toFixed(2)}`);
+    check('#95 phone win: the win card shows the time, the penalty and NEW BEST', win.lbOn && win.cardShown && win.time === win.timeFmt && /^\d+:\d{2}\.\d$/.test(win.time) && win.dagsShown && win.dags === '2 DAGs: +0:10' && win.best, JSON.stringify({ time: win.time, dags: win.dags, best: win.best }));
+    check('#95 phone win: the run sits on the board, highlighted, default name', win.rows.length === 1 && win.rows[0].hi && win.rows[0].text.includes('BOBO FAN') && win.stored !== null, JSON.stringify(win.rows));
+    check('#95 phone win: the HUD clock froze on the final time (body.lb-timer)', win.pill === win.time, `pill "${win.pill}" vs card "${win.time}"`);
+    const over = await page.evaluate(() => {
+      const a = document.getElementById('lb-win').getBoundingClientRect();
+      const b = document.getElementById('shout-btn').getBoundingClientRect();
+      return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    });
+    check('#95 phone win: the card never covers the shout button (the play-again door)', over === false, 'card bottom-left, shout bottom-right');
+    await page.fill('#lb-name', 'BRANDON!'); // 8 chars: maxlength holds, sanitize drops the !
+    await page.tap('#lb-save');
+    const named = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      const board = LB.loadBoard(LB.resolveStore());
+      return {
+        row: document.querySelector('#win-board li').textContent,
+        saved: document.getElementById('lb-form').classList.contains('lb-saved'),
+        disabled: document.getElementById('lb-name').disabled,
+        storedName: board[0] ? board[0].name : null,
+        seed: board[0] ? board[0].seed : null,
+        dags: board[0] ? board[0].dags : null,
+      };
+    });
+    check('#95 phone win: naming the run rewrites the row and the key, then folds away', named.row.includes('BRANDON') && !named.row.includes('BRANDON!') && named.saved && named.disabled && named.storedName === 'BRANDON' && named.seed === 11 && named.dags === 2, JSON.stringify(named));
+    await page.waitForTimeout(700); // past WIN_RESTART_AFTER
+    await page.tap('#shout-btn'); // back to the menu
+    await waitPhase(page, 'find');
+    const menu = await page.evaluate(() => ({
+      shown: !document.getElementById('gate').classList.contains('hidden'),
+      boardBtn: getComputedStyle(document.getElementById('gate-board-btn')).display !== 'none',
+      cardGone: getComputedStyle(document.getElementById('lb-win')).display === 'none',
+    }));
+    check('#95 phone menu: back at the title card the win card is gone, the board door is up', menu.shown && menu.boardBtn && menu.cardGone, JSON.stringify(menu));
+    await page.tap('#gate-board-btn');
+    const panel = await page.evaluate(() => {
+      const p = document.getElementById('gate-board-panel');
+      return {
+        open: getComputedStyle(p).display !== 'none',
+        aria: document.getElementById('gate-board-btn').getAttribute('aria-expanded'),
+        rows: [...document.getElementById('gate-board-list').children].map((li) => li.textContent),
+        armed: document.getElementById('lb-clear').textContent,
+      };
+    });
+    check('#95 phone menu: best times unfolds with the renamed run on it', panel.open && panel.aria === 'true' && panel.rows.length === 1 && panel.rows[0].includes('BRANDON') && panel.armed === 'clear times', JSON.stringify(panel));
+    await page.tap('#lb-clear'); // first tap: only asks
+    const ask = await page.evaluate(() => ({ text: document.getElementById('lb-clear').textContent, rows: document.getElementById('gate-board-list').children.length }));
+    await page.tap('#lb-clear'); // second tap: clears
+    const cleared = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      return {
+        rows: document.getElementById('gate-board-list').children.length,
+        empty: getComputedStyle(document.getElementById('gate-board-empty')).display !== 'none',
+        btn: getComputedStyle(document.getElementById('lb-clear')).display === 'none',
+        stored: (() => { try { return localStorage.getItem(LB.STORAGE_KEY); } catch { return 'x'; } })(),
+      };
+    });
+    check('#95 phone menu: clearing takes two deliberate taps, then the board is empty', ask.text === 'really clear all?' && ask.rows === 1 && cleared.rows === 0 && cleared.empty && cleared.btn && cleared.stored === null, JSON.stringify({ ask, cleared }));
+    check('#95 phone win page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // 16b. The short desktop pocket 740×360: the board panel fits the stepped
+  //      title card, and the ?timer=on pill shares the top edge in peace.
+  {
+    const page = await desktopPage('?seed=11&timer=on', { viewport: { width: 740, height: 360 } });
+    const pre = await page.evaluate(() => ({
+      pill: getComputedStyle(document.getElementById('hud-timer')).display !== 'none',
+      boardBtn: getComputedStyle(document.getElementById('gate-board-btn')).display !== 'none',
+      howto: getComputedStyle(document.getElementById('gate-howto-panel')).display !== 'none',
+    }));
+    check('#95 pocket: timer pill and board door are up, nothing is unfolded', !pre.pill && pre.boardBtn && !pre.howto, JSON.stringify(pre)); // pill rests while the card is up
+    await page.click('#gate-board-btn');
+    const lay = await page.evaluate(() => {
+      const card = document.querySelector('#gate .gate-card').getBoundingClientRect();
+      const panel = document.getElementById('gate-board-panel').getBoundingClientRect();
+      const howto = getComputedStyle(document.getElementById('gate-howto-panel')).display !== 'none';
+      return { panelOpen: panel.height > 0, howto, cardFits: card.top >= -1 && card.bottom <= innerHeight + 1, empty: getComputedStyle(document.getElementById('gate-board-empty')).display !== 'none' };
+    });
+    check('#95 pocket 740×360: the best-times panel unfolds INSIDE a card that still fits', lay.panelOpen && lay.cardFits && lay.empty && !lay.howto, JSON.stringify(lay));
+    await page.click('#gate-board-btn'); // fold it back
+    await page.click('#gate-btn');
+    await waitPhase(page, 'find');
+    const play = await page.evaluate(() => {
+      const pill = document.getElementById('hud-timer').getBoundingClientRect();
+      const score = document.getElementById('hud-score').getBoundingClientRect();
+      const gear = document.getElementById('settings-btn').getBoundingClientRect();
+      const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return {
+        shown: getComputedStyle(document.getElementById('hud-timer')).display !== 'none',
+        text: document.getElementById('hud-timer').textContent,
+        clear: !hit(pill, score) && !hit(pill, gear),
+        inView: pill.top >= -1 && pill.bottom <= innerHeight + 1 && pill.left >= -1 && pill.right <= innerWidth + 1,
+      };
+    });
+    check('#95 pocket: mid-play the clock pill is visible, in view, clear of the score pill and the gear', play.shown && /^\d+:\d{2}\.\d$/.test(play.text) && play.clear && play.inView, JSON.stringify(play));
+    check('#95 pocket page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // 16c. ?gate=off — the tool page: nothing painted, nothing written, and
+  //      the three #95 selfTests pass right there, in capture conditions.
+  {
+    const page = await desktopPage('?gate=off&timer=on');
+    const off = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      const st = window.LC.selfTest();
+      return {
+        classes: ['lb-on', 'lb-timer', 'lbg-open'].filter((c) => document.body.classList.contains(c)),
+        winCard: document.getElementById('lb-win').offsetParent === null ? 'unpainted' : 'painted',
+        timer: document.getElementById('hud-timer').offsetParent === null ? 'unpainted' : 'painted',
+        boardBtn: document.getElementById('gate-board-btn').offsetParent === null ? 'unpainted' : 'painted',
+        winTime: document.getElementById('win-time').textContent,
+        rec: window.LC.leaderboard(),
+        stored: (() => { try { return localStorage.getItem(LB.STORAGE_KEY); } catch { return 'blocked'; } })(),
+        mine: st.checks.filter((c) => ['run-clock-dag-penalty', 'leaderboard-selftest-inert', 'leaderboard-rules'].includes(c.name)).map((c) => ({ n: c.name, v: c.value, p: c.pass })),
+        all: st.pass,
+      };
+    });
+    check('#95 ?gate=off: board chrome fully absent — no body classes, nothing painted', off.classes.length === 0 && off.winCard === 'unpainted' && off.timer === 'unpainted' && off.boardBtn === 'unpainted' && off.winTime === '', JSON.stringify(off.classes) + ` ${off.winCard}/${off.timer}/${off.boardBtn}`);
+    check('#95 ?gate=off: off, inert, and the store stays untouched', off.rec.on === false && off.rec.recordable === false && off.rec.entry === -1 && off.stored === null, JSON.stringify({ rec: off.rec, stored: off.stored }));
+    check('#95 ?gate=off: the three #95 selfTests pass in capture conditions', off.all && off.mine.length === 3 && off.mine.every((c) => c.p), JSON.stringify(off.mine.map((c) => `${c.n}=${c.v}${c.p ? '' : ' FAIL'}`)));
+    check('#95 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
   }
 } finally {
