@@ -249,7 +249,7 @@ see "The spot pool" below (issue #53).
 
 ## The spot pool (`SPOTS`, 48 — wired up by issue #53, dining added by #81, cat furniture by #82, spread by #88)
 
-`full-level.js` exports `SPOTS`: 48 authored places Bobo can actually be,
+`full-level.js` exports `SPOTS`: 49 authored places Bobo can actually be,
 each with the moment `type` it belongs to, its `room`, `pose`, `spot`
 [x, y, z] and `faceYaw`. Every moment's canonical capture spot is one of
 them, named by `MOMENTS[i].canonical` (★ below); the rest are alternates
@@ -270,6 +270,7 @@ furniture the flat already draws (and one new prop, the parcel box).
 | `couch-loaf.couch` ★ | living | side | (−2.75, cushion, −0.1) | −0.73 |
 | `couch-loaf.sofa-back` | living | loaf | (−3.16, sofaBackTop, 0.35) | −1.6 |
 | `couch-loaf.heatpad` § | living | loaf | (−2.73, heatPad, 0.355) | −1.57 |
+| `couch-loaf.lap` ⌂ | living | loaf | (−2.60, lap, −0.515) | −0.73 |
 | `window-bird.n-window` ★ ‡ | living | sit | (−1.35, floor, −2.5) | 1.71 |
 | `window-bird.balcony-door` | living | sit | (1.5, floor, −2.45) | 3.04 |
 | `box-sit.box` ★ | living | sit | (−2.075, boxFloor, 1.575) | −1.57 |
@@ -319,7 +320,9 @@ furniture the flat already draws (and one new prop, the parcel box).
 † — issue #81's two dining spots; § — issue #82's six cat-furniture spots
 (the chairs face the aisle a player will stand on, not the roast — see
 the #82 note in the git history; `cats-face-the-room` re-derives every
-one of these yaws). ◊ — issue #88's fifteen. They ride the same rule as
+one of these yaws). ⌂ — issue #86's lap: a `sceneOnly` spot, never drawn
+by the spot cycle; Bobo is swapped onto it only when the lap scene plans
+("Issue #86" below). ◊ — issue #88's fifteen. They ride the same rule as
 the chairs: the yaw is whatever the measured `bestApproach` vantage
 accepts, not a guess. Notes worth keeping:
 
@@ -940,3 +943,44 @@ walks through it. Three checks close that hole (116 → **119**):
 - `dining-spots-from-both-sides` — every dining spot's `nearestStandable`
   must be reachable from a kitchen standable AND a living standable,
   walked through the collision code from the correct side.
+
+## Issue #86 — Brandon on the sofa (the lap scene)
+
+One rare scene adds the flat's first human: Brandon seated on the sofa with
+Bobo loafing on his lap (`docs/CHARACTERS.md` "Brandon on the sofa",
+`docs/ART_STYLE.md` §14). Everything about it is one seeded dice and a pile
+of conservative rectangles.
+
+**The plan (`game/full-human-scene.js`).** `LAP_RULE` rolls one `mulberry32`
+dice per run, tagged `lap-scene`, `chance` 1/5 — same determinism contract
+as the Patriot roll and the vacuum ride. When it fires, Bobo's `couch-loaf`
+find swaps from its drawn spot onto `couch-loaf.lap`: the man appears at
+`SEAT` (−2.60, −0.515) yaw −1.34, and the lap spot is `LAP` — loaf top
+0.615 m (pelvis sinks ~0.035 m *into* the cushion, so he reads as sat, not
+perched), facing yaw −0.73, into the room like the canonical couch spot.
+Never the run's first find (`firstFind: 2`), never without a couch-loaf
+find to swap into. Seed 11's roll is 0.821 ≥ 0.2: the baselines never see
+him, and `capture:full` is untouched.
+
+**The spot is `sceneOnly`.** `couch-loaf.lap` lives in `SPOTS` (49 rows) so
+every clearance/visibility tool can see it, but `pickSpotCycle` filters
+`sceneOnly` spots out of the draw — the engine puts Bobo there, the cycle
+never can. The pool-coverage and pool-spread checks therefore measure the
+48 drawn spots; the lap spot is exempt because no seed could ever draw it.
+
+**Clearance, measured (`game/full-living.js` footprints).** The man's
+conservative world AABB is x [−2.783, −1.952], z [−0.888, −0.22], y
+[0, 1.338] (cap button). Against that box:
+
+| rule | number | check |
+|---|---|---|
+| coffee table west face (x ≥ −1.90) | zero AABB overlap; 0.052 m between his knees and the table | `lap-clearance`, `lap-leaves-room` |
+| heat pad on the south cushion | zero overlap; 0.30 m of floor between him and the pad lane (≥ 0.20 m) | `lap-clearance`, `lap-leaves-room` |
+| side table / floor lamp | zero overlap | `lap-clearance` |
+| everything west of the back cushion (x ≤ −2.80) | his east edge −2.783 is cushion *front*; nothing crosses into the cushion slab x [−3.02, −2.80] above y 0.42; lean allowance ≤ 0.08 m | `lap-clearance` |
+| aim ray | the hit-test raycasts Bobo and the decoy only — a human cannot block a find **by construction** | engine (`game/engine.js`) |
+
+**Cost.** +1 draw call at most (one merged mesh, one atlas, no shadow), and
+only on the ~20 % of runs that plan it — see `docs/ART_STYLE.md` §14 and the
+`lap-one-draw` / `lap-atlas-ops` checks. `?lap=off` disables the scene;
+`?lap=on` forces it (used by `capture:full:lap`).

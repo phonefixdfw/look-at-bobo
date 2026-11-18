@@ -120,6 +120,33 @@ Nintendo's characters, tracks, logos or name appear anywhere — the check
 promise mechanically. The joke the screen tells is the genre's, not one
 company's; the person playing it is yours.
 
+## Brandon on the sofa (issue #86)
+
+Brandon asked for one more rare scene in the flat: **himself, sitting on the
+living-room sofa, with Bobo loafing on his lap.** This is the first human in
+the game, and it is a deliberate exception, granted by the owner, to the
+long-standing "no invented facts about people" line: **it depicts Brandon at
+his own request** — nothing about him is invented beyond what he asked for,
+and the character is never given opinions, dialogue, habits or a face story
+that he didn't supply.
+
+- **What he is:** a calm seated man on the sofa's left cushion, cap worn
+  backwards, watching the TV (the KART DASH game from issue #84). He is
+  scenery with a heartbeat: still, unbothered, occasionally blinking.
+- **The scene:** about **one seed in five**, a run plans it; the find that
+  lands on `couch-loaf` swaps Bobo onto the lap (spot `couch-loaf.lap`).
+  Same shout, same +1, same DAG! rules — a lap is just where the cat is.
+- **The one draw:** the man is built as a single merged mesh with one 256 px
+  painted atlas (no text, no images) and never casts a shadow, so the whole
+  scene costs **+1 draw call** — the project's draw budget is a shared cap
+  (`tools/check-cap.mjs`), and this scene spends one call of it, no more.
+- **He stays out of the way:** he clears the coffee table, stays behind the
+  sofa's back cushion, leaves both walkways open, and cannot block a find —
+  the aim ray only ever tests Bobo and the decoy. `docs/LEVEL_LAYOUT.md`
+  "Issue #86" owns the numbers; `lap-*` checks in `game/full.js` pin them.
+- **Off by default:** on seed 11 (every baseline capture) the dice plans no
+  lap scene and the man is not in the scene at all.
+
 ## The robot vacuum (issue #85)
 
 A household appliance, not a character — but it is *alive-ish* scenery the

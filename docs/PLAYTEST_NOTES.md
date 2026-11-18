@@ -2525,3 +2525,78 @@ queue 10/10 distinct, console clean · build **73 files, 3.18 MB**, graph
 touch their subjects, and the two captures that could notice (living,
 kitchen) are in the 585-frame run that passed.
 
+
+## 40. Issue #86 — Brandon on the sofa, Bobo on his lap (2026-11-17)
+
+Issue #86 asked for one rare scene: the owner sitting on the living-room
+sofa with Bobo loafing on his lap. An earlier pass built it, and Brandon's
+eyes caught what no check could: **a dark blob floated above the man's
+head.** Diagnosis against the mesh, part by part: the neck column started
+**0.09 m above the chest top** (a visible air gap), the head sat another
+**0.15 m** above that, the backwards cap's brim was a flat plate whose
+front edge reached **0.08 m into open air** in front of the face, a boxy
+nape-hair slab hung off the skull, and the chest leaned back 0.16 rad —
+so the skull's ball, painted dark on its back half, read as a detached
+object when the torso leaned away from it. Fixed **anatomically, not by
+moving the head**: neck lowered to overlap the chest top (no air seam),
+head lowered onto the neck, a trapezius plate widened to the full shoulder
+span tying column to shoulders, brim radius pulled in to hug the skull,
+nape hair softened into a cap-edge tuft, lean halved. The seated crown
+stays at **1.338 m** (the cap button), so every `HUMAN_BANDS`/clearance
+number below kept its meaning — the fix took parts down to the body, not
+the body out from under them.
+
+Second bug, same scene: the man **was missing from the scene's very first
+frame** — the lap gate raised *after* the cull pass had already classified
+him, so the staged t=0 capture (and a real first frame) showed an empty
+sofa. `renderNow()` raises the gate **before** culling now; the t=0 frames
+of `capture:full:lap` are the frame-one proof, and `lap-gate-shows-hides`
+asks the *culler* who is visible, not just the flag.
+
+**The scene, measured.** `lap-seeded-roll` measures the dice at **1/5 of
+600 probe seeds** (its own `lap-scene` stream, ±4 points); the scene never
+fires as find #1 (`firstFind: 2`, pinned live by `lap-first-find`); seed 11
+rolls **0.821** — off (`lap-seed11-off`), so every baseline capture still
+sees no man. The man is **ONE merged
+mesh + one 256 px painted atlas** (no text, no image ops — `lap-atlas-ops`)
+that **never casts a shadow**: the lap-scene frames draw **79 calls, 62 356
+tris**, and the worst baseline frame is untouched at **152 of 250** (seed
+11 never builds him). Clearance against his conservative world box
+(x [−2.783, −1.952], z [−0.888, −0.22]): coffee table **0.052 m** clear of
+his knees with zero AABB overlap anywhere, **0.30 m** left to the heat-pad
+lane, nothing crosses the back cushion (measured lean 0 against a 0.08 m
+allowance). The aim ray
+tests Bobo and the decoy only — he cannot block a find **by construction**
+(the engine's ray list has no third entry). The lap spot `couch-loaf.lap`
+is **`sceneOnly`**: it
+lives in `SPOTS` (49) for tools, but the seeded cycle can never draw it —
+`pool-coverage`, `spot-pool-spread` and `npm run seed:coverage` all
+measure the 48 drawn spots and say why.
+
+**Fifteen new live selfTests (119 → 134, `--checks 134`):** the anatomy
+column (`lap-head-column`, `lap-traps-tie-shoulders`, `lap-cap-hugs-head`,
+`lap-nape-tuft`, `lap-seated-pose`), the furniture book (`lap-sinks-in` —
+pelvis 0.035 m into the cushion, `lap-clearance`, `lap-leaves-room`), the
+dice (`lap-seeded-roll`, `lap-seed11-off`, `lap-first-find`), the stage
+(`lap-gate-shows-hides`, `lap-swap-into-lap`) and the budget
+(`lap-one-draw`, `lap-atlas-ops`). A page that **forces** the scene
+(`?lap=on`) has no "off" to measure and a page that **deletes** it
+(`?lap=off`) has no "on" — those rows stand down honestly there, and all
+three page modes pass **134/134**: the stress page (dice default), the
+`capture:full:lap` selftest (`?lap=on`), and a one-off `?lap=off` probe.
+
+Suites at this HEAD: `capture:full` 585 frames **134/134**, worst frame
+152/250, console clean · `capture:full:determinism` **8/8 byte-identical**
+(seed-11 frames: the man is not in them — he does not exist on that seed) ·
+`capture:full:lap` **PASS** at 79 draws (134/134, `?lap=on`) ·
+`capture:full:lap:determinism` **1/1 byte-identical** · `?lap=off` one-off
+selftest **134/134** · `playtest:stress:full` **77/0** live selfTest **134**
+· `gate` PASS · `check:mobile` PASS · `playtest:bot:full` **10/10** win,
+exact ending, console clean · `playtest:bot:patriot:full` **5/5** ·
+`seed:coverage` PASS (rarest drawn spot `sink-sit.bar` 8.8%; the lap spot
+listed as sceneOnly-excluded) · `build` PASS 75 files 3.24 MB.
+`capture:slice:determinism` and `capture:demo:determinism` (8/8 each at
+#100 HEAD) were not re-run: the slice and talking-demo pages carry none of
+this issue's code.
+Records: `docs/CHARACTERS.md` "Brandon on the sofa", `docs/ART_STYLE.md`
+§14, `docs/LEVEL_LAYOUT.md` "Issue #86", `docs/STORY.md`.

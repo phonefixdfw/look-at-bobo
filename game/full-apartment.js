@@ -55,6 +55,8 @@ import { buildFullDecor } from './full-decor-mesh.js';
 import { mergeStaticMeshes } from './full-merge.js';
 import { buildFullStreet } from './full-street-mesh.js';
 import { buildFullRoomba } from './full-roomba-mesh.js';
+import { buildFullHuman } from './full-human-mesh.js';
+import { LAP, LAP_RULE } from './full-human-scene.js';
 import { buildRoombaRoute, roombaAt, roombaRoomAt, ROOMBA } from './full-roomba-route.js';
 import { autoLowQuality } from '../src/touch.js';
 import { createRoomCull } from './full-cull.js';
@@ -703,6 +705,45 @@ export function buildFullApartment(scene, boot = {}) {
     console.info(`[look-at-bobo] issue #85 vacuum: loop ${route.length.toFixed(1)} m · ${roomba.stats.triangles} tris in ${roomba.stats.drawCalls} draw · seed ${boot.seed ?? 11}`);
   }
 
+  // ── issue #86: the owner, on the sofa, Bobo on his lap ────────────────────
+  // Brandon sits in his own living room about one run in five (the engine
+  // rolls the dice; the rule lives in game/full-human-scene.js). He is ONE
+  // merged mesh + one 256 px face atlas (+1 draw, no shadow pass — the #85
+  // lesson), filed before the cull and gated (`cullGate`) so he costs nothing
+  // at all when the scene is not running: the group starts hidden and the
+  // engine's gate is the only thing that ever shows him. `?lap=off` deletes
+  // the man outright — the capture baselines' guarantee.
+  const lapParam = new URLSearchParams(location.search).get('lap');
+  let lap = null;
+  if (lapParam !== 'off') {
+    const art = buildFullHuman({ THREE, quality: street.tier });
+    art.group.userData.cullGate = () => Boolean(lap && lap.active); // hidden until the engine says so
+    flat.add(art.group);
+    lap = {
+      spotId: LAP.spotId,
+      momentType: LAP.momentType,
+      replaceRooms: LAP.replaceRooms,
+      chance: LAP_RULE.chance,
+      seedTag: LAP_RULE.seedTag,
+      firstFind: LAP_RULE.firstFind,
+      stats: art.stats,
+      group: art.group,
+      mesh: art.mesh,
+      active: false,
+      /** The engine's one switch: show or hide the whole scene. */
+      setActive(on) {
+        lap.active = Boolean(on);
+        if (!lap.active) art.idle(0, { calm: true }); // hands off the controller, still
+        return lap.active;
+      },
+      /** Breathing, settling, blinking — a pure function of game time. */
+      idle(t, opts) {
+        if (lap.active) art.idle(t, opts);
+      },
+    };
+    console.info(`[look-at-bobo] issue #86 owner: ${lap.stats.triangles} tris in ${lap.stats.drawCalls} draw · ${lap.stats.texture} · 1-in-${Math.round(1 / LAP_RULE.chance)} runs`);
+  }
+
   // ── issue #61: stop submitting rooms the camera cannot see ────────────────
   // Filed now, before game/full.js adds the cast: everything in this list is
   // flat, and anything added afterwards is nobody's room to hide.
@@ -788,6 +829,9 @@ export function buildFullApartment(scene, boot = {}) {
     // place/reroute/poseAt interface the engine's odometer drives (null
     // under `?roomba=off`, which is also the engine's cue to never ride).
     roomba,
+    // issue #86: the owner's scene handle — null under `?lap=off`, which is
+    // also the engine's cue that the scene can never run this session.
+    lap,
     // issue #84: the TV's kart screen and the engine's once-a-frame nudge.
     // tick() repaints and re-uploads the one texture only while the screen
     // is on camera (per-room cull's visible flags + a frustum test) and the

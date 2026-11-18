@@ -416,3 +416,36 @@ string it ever draws and `kart-words-original` scans the list — "mario" and
   the invented title, the invented course are what make the genre joke
   land; nothing on the screen depicts, copies or names a Nintendo asset.
   See `docs/CHARACTERS.md` for who is actually holding the controller.
+
+## 14. Brandon on the sofa — one human, one draw (issue #86)
+
+The flat has exactly one human: Brandon, seated on the living-room sofa with
+Bobo loafing on his lap (about one seed in five; see `docs/CHARACTERS.md`
+"Issue #86"). He is built to this document's rules, and to the project's
+draw budget:
+
+- **Softly stylized, never a photograph.** Round volumes over a simple
+  skeleton — barrel chest, sphere shoulders, capsule forearms, a ball-head
+  under a backwards cap — the same construction language as the cats. No
+  fingers, no facial features beyond painted hints: at 4–6 m of search
+  distance a face is noise, and inventing one is not this character's job.
+- **One merged mesh, one material, one 256 px painted atlas** (`ATLAS_OPS`:
+  cloth blocks, hair strokes, a soft shading wash — **no text, no images**),
+  merged with vertex colours like Bobo's fur. The scene's whole cost is
+  **1 draw call**, `castShadow=false` (a 1.3 m shadow caster under the lamp
+  would eat the room's light budget for nothing).
+- **Anatomy is a style rule here.** The earlier build floated the head off
+  the trunk — a dark blob above the shoulders — so `lap-head-column` and
+  `lap-traps-tie-shoulders` now pin the column: neck overlaps chest top, head
+  overlaps neck top, trapezius spans the shoulders and overlaps both neck
+  and chest. If a future edit moves a part, those checks fail with the
+  measured gap in the note.
+- **Palette:** his clothes reuse room tokens (denim `#3f5d82`-family, tee
+  grey, cap mustard) picked to sit next to the sofa's greens without
+  competing; skin/hair are flat provisional tokens, deliberately featureless
+  (see `docs/CHARACTERS.md`: granted by the owner, nothing invented).
+- **Seated by construction:** his pelvis sits *in* the cushion (sink
+  ≈ 0.035 m), feet on the floor inside the sofa's footprint, knees under the
+  coffee-table's underside line. He never blocks a find (`lap-clearance`,
+  `lap-leaves-room`; the aim raycast only lists Bobo and the decoy, so it is
+  clear **by construction**).

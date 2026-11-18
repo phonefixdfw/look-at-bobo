@@ -191,6 +191,17 @@ export function bootGame(cfg) {
   const ROOMBA_PARAM = params.get('roomba');
   const ROOMBA_MODE = ROOMBA_PARAM === 'off' ? 'off' : ROOMBA_PARAM === 'on' ? 'force' : 'default';
 
+  /** Issue #86: the owner on his own sofa, about one run in five. The man
+   *  himself is the level's (apt.lap: game/full-human-{scene,mesh}.js); the
+   *  ENGINE owns the dice and the moment: one seeded roll per run against
+   *  apt.lap.chance on its own stream tag, and once a run's scene is on it
+   *  stays on from find ≥2 (never the first find) and swaps every
+   *  living-room couch-loaf find onto his lap. `?lap=off` deletes the man
+   *  and the scene outright. `?lap=on` forces every run — and staged pages
+   *  (the capture showcase). `?lap=N` starts the scene at find N. */
+  const LAP_PARAM = params.get('lap');
+  const LAP_MODE = LAP_PARAM === 'off' ? 'off' : LAP_PARAM === 'on' ? 'force' : 'default';
+
   // Step 9 comfort/accessibility (issue #19). Every default keeps the game
   // exactly as the suites captured it. The settings panel writes these same
   // params into the URL, so a choice survives refresh and shares as a link:
@@ -710,9 +721,14 @@ export function bootGame(cfg) {
     // board before that (rollRoombaRide), and never on the first find.
     if (rollRoombaRide()) { startRoombaRide(); return; }
     const rec0 = nextRoundRecord();
-    const rec = game.patriot ? { ...rec0, pose: PATRIOT.pose } : rec0; // the costume's nearest allowed pose (see PATRIOT.pose)
-    game.momentId = POOL ? rec0.type : rec0.id;
-    game.spotId = POOL ? rec0.id : null;
+    // Issue #86: while the owner's scene runs this run, a living-room
+    // couch-loaf find happens on his lap instead of on the cushion. The spot
+    // is the pool's; the swap is the only way in, so seeded streams, the
+    // spread tables and seed 11's baselines never see it.
+    const recLap = lapSwapInto(rec0);
+    const rec = game.patriot ? { ...recLap, pose: PATRIOT.pose } : recLap; // the costume's nearest allowed pose (see PATRIOT.pose)
+    game.momentId = POOL ? recLap.type : rec0.id;
+    game.spotId = POOL ? recLap.id : null;
     placeBoboAt(rec);
     setBoboCostume(game.patriot);
     placeDecoyAt(chooseDecoySpot(rec, rng));
@@ -814,6 +830,58 @@ export function bootGame(cfg) {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 5d. The owner's lap scene (issue #86). The man and his face atlas are the
+  //     level's (apt.lap, game/full-human-{scene,mesh}.js); these lines are
+  //     the whole engine side: one seeded dice per run, the active window
+  //     (never the first find), the serve-time swap of a living-room
+  //     couch-loaf find onto the lap, and the idle the cull gate rides on.
+  //     Nothing here moves a seeded spot cycle: the lap spot is `sceneOnly`
+  //     in the pool and is only ever reached through the swap below.
+  // ---------------------------------------------------------------------------
+  const LAP_LVL = apt.lap ?? null;
+  const LAP_FORCE_FIND = /^\d+$/.test(LAP_PARAM ?? '') ? Number(LAP_PARAM) : null;
+  let lapPlanned = false; // this run's dice says the scene runs
+  let lapForced = null; // checks only: LC.lap({ on: true }) pins the scene
+  /** Is the man on the sofa as of this moment? Staged pages with ?lap=on
+   *  see him from boot; a dice-planned run from find `firstFind` onward. */
+  function lapActiveNow() {
+    if (!LAP_LVL || LAP_MODE === 'off') return false;
+    if (LAP_MODE === 'force') return true;
+    if (lapForced != null) return lapForced;
+    if (LAP_FORCE_FIND != null) return game.findNum >= LAP_FORCE_FIND;
+    return lapPlanned && game.findNum >= LAP_LVL.firstFind;
+  }
+  /** New run: reroll the scene dice off this run's seed. Called wherever
+   *  resetRoombaRunState is — the run-start chokepoints. */
+  function resetLapRunState() {
+    if (!LAP_LVL) return;
+    lapForced = null;
+    lapPlanned = LAP_MODE === 'force'
+      || mulberry32(hashId(`${LAP_LVL.seedTag} ${SEED}`))() < LAP_LVL.chance;
+    LAP_LVL.setActive(lapActiveNow());
+  }
+  /** A living-room couch-loaf find plays on the lap while the scene runs;
+   *  every other find (and every find elsewhere, balcony chair included)
+   *  serves untouched. */
+  function lapSwapInto(rec) {
+    if (!POOL || !LAP_LVL || !lapActiveNow()) return rec;
+    if (rec.type !== LAP_LVL.momentType || !LAP_LVL.replaceRooms.includes(rec.room)) return rec;
+    return POOL.get(LAP_LVL.spotId) ?? rec;
+  }
+  /** Once per render, after the cull: show/hide through the same predicate
+   *  the cull gate reads, and run the breathing/blink idle — a pure function
+   *  of game time, so staged seeks are byte-perfect. */
+  function updateLapScene() {
+    if (!LAP_LVL) return;
+    const on = lapActiveNow();
+    if (on !== LAP_LVL.active) {
+      LAP_LVL.setActive(on);
+      if (!apt.cull?.enabled) LAP_LVL.group.visible = on; // gated groups only re-check inside the cull
+    }
+    if (on) LAP_LVL.idle(game.time, { calm: SETTINGS.reducedMotion });
+  }
+
   function spawnPlayerAt(spawn) {
     player.x = spawn.pos[0];
     player.z = spawn.pos[1];
@@ -912,6 +980,7 @@ export function bootGame(cfg) {
     queue = [];
     resetPatriotRunState();
     resetRoombaRunState(); // issue #85: new run, new circuit, new dice
+    resetLapRunState(); // issue #86: new run, new dice on the owner's scene
     game.score = 0;
     game.phase = 'find';
     game.time = 0;
@@ -2206,7 +2275,7 @@ export function bootGame(cfg) {
     // moment's contact band, room coverage). The slice adds none. Issue #58
     // hands the Patriot pieces (rule, reward, costume, pop) down the same way.
     if (cfg.extraChecks) {
-      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, aptTv: apt.tv ?? null, aptRoomba: apt.roomba ?? null, roombaCtl: { get planned() { return roombaPlanned; }, set planned(v) { roombaPlanned = !!v; }, get active() { return roombaActive; }, get used() { return roombaUsed; }, metres: roombaMetres, advance: (m) => { roombaOdo += Number(m) || 0; }, teleport: (m) => { roombaForced = Number(m); updateRoombaPose(); }, sync: () => updateRoombaPose(), ride: () => { if (ROOMBA_LVL) startRoombaRide(); }, roll: () => rollRoombaRide(), reset: () => resetRoombaRunState(), clearRide: () => { roombaActive = false; roombaUsed = false; roombaForced = null; game.momentId = MOMENTS[0].id; game.spotId = POOL ? MOMENTS[0].canonical : null; setBoboCostume(false); game.patriot = false; }, rideSpot: (id) => rideSpot(id) }, boboPos: () => ({ x: bobo.root.position.x, y: bobo.root.position.y, z: bobo.root.position.z }), boboYaw: () => bobo.root.rotation.y, boboRoot: bobo.root, GATE_OFF, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, afterCatchFn: afterCatch, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
+      cfg.extraChecks({ add, THREE, scene, renderer, supports, buildCat, setCatPose, contactGap, MOMENTS, MOMENT_IDS, DECOY_SPOTS, DECOY_MIN_DIST, SPAWNS, wallBoxes: apt.wallBoxes ?? [], doorLeaves: apt.doorLeaves ?? [], aptStreet: apt.street ?? null, aptCull: apt.cull ?? null, aptTv: apt.tv ?? null, aptRoomba: apt.roomba ?? null, roombaCtl: { get planned() { return roombaPlanned; }, set planned(v) { roombaPlanned = !!v; }, get active() { return roombaActive; }, get used() { return roombaUsed; }, metres: roombaMetres, advance: (m) => { roombaOdo += Number(m) || 0; }, teleport: (m) => { roombaForced = Number(m); updateRoombaPose(); }, sync: () => updateRoombaPose(), ride: () => { if (ROOMBA_LVL) startRoombaRide(); }, roll: () => rollRoombaRide(), reset: () => resetRoombaRunState(), clearRide: () => { roombaActive = false; roombaUsed = false; roombaForced = null; game.momentId = MOMENTS[0].id; game.spotId = POOL ? MOMENTS[0].canonical : null; setBoboCostume(false); game.patriot = false; }, rideSpot: (id) => rideSpot(id) }, aptHuman: apt.lap ?? null, lapCtl: { get planned() { return lapPlanned; }, set planned(v) { lapPlanned = !!v; }, get active() { return lapActiveNow(); }, force: (v) => { lapForced = v === null ? null : !!v; updateLapScene(); }, clear: () => { lapPlanned = false; lapForced = null; updateLapScene(); }, reset: () => resetLapRunState(), activeNow: () => lapActiveNow(), swap: (rec) => lapSwapInto(rec), roll: (seed) => mulberry32(hashId(`${LAP_LVL ? LAP_LVL.seedTag : 'lap-scene'} ${seed}`))() }, boboPos: () => ({ x: bobo.root.position.x, y: bobo.root.position.y, z: bobo.root.position.z }), boboYaw: () => bobo.root.rotation.y, boboRoot: bobo.root, GATE_OFF, SPOTS, SPOT_IDS, ROOM_LABELS, MOMENT_ROOMS: cfg.level.MOMENT_ROOMS ?? null, pickSpotCycle, pickDecoySpot, mulberry32, hashId, game, TARGET, triggerEvent, afterCatchFn: afterCatch, PATRIOT, runPatriotPlan, SEED, SETTINGS, confetti, stageSet, stageSeek, bonusPopEl: el.bonusPop, camera, addPatriotCostume, removePatriotCostume, isPatriotAttached });
     }
 
     game.score = savedScore;
@@ -2280,6 +2349,9 @@ export function bootGame(cfg) {
       },
       renderNow() {
         resizeIfNeeded();
+        // #86: the lap gate goes UP before the cull reads it, so a scene's
+        // very first frame (the t=0 capture) already shows the man.
+        updateLapScene(); // issue #86: the owner's gate, breathing and blink
         // Issue #61: rooms the camera cannot reach are hidden before the pass,
         // so three prunes them instead of submitting and frustum-rejecting
         // them one box at a time. A level with no cull (the slice, the demo)
@@ -2496,6 +2568,27 @@ export function bootGame(cfg) {
           planned: roombaPlanned, riding: roombaActive, used: roombaUsed,
           pose: p, drawCalls: ROOMBA_LVL.stats.drawCalls, tris: ROOMBA_LVL.stats.triangles,
           stations: ROOMBA_LVL.route.stationsVisited.join(','),
+        };
+      },
+      /** Issue #86: the owner's lap scene, live and inspectable.
+       *  LC.lap() → the whole picture: mode (from ?lap=), this run's dice,
+       *  whether the man sits now, and the mesh's budget.
+       *  LC.lap({ plan: true })  → set this run's scene plan (what the dice
+       *                            decided is exposed above; the checks drive).
+       *  LC.lap({ on: true })    → pin the scene open until cleared (null).
+       *  LC.lap({ reset: true }) → reroll for a fresh run. */
+      lap(cmd) {
+        if (!LAP_LVL) return { off: true };
+        if (cmd && typeof cmd === 'object') {
+          if (cmd.plan != null) lapPlanned = !!cmd.plan;
+          if (cmd.on !== undefined) lapForced = cmd.on === null ? null : !!cmd.on;
+          if (cmd.reset) resetLapRunState();
+        }
+        return {
+          off: false, mode: LAP_MODE, seed: SEED, spotId: LAP_LVL.spotId,
+          chance: LAP_LVL.chance, firstFind: LAP_LVL.firstFind,
+          planned: lapPlanned, active: lapActiveNow(), visible: LAP_LVL.group.visible,
+          stats: LAP_LVL.stats, replaceRooms: LAP_LVL.replaceRooms.join(','),
         };
       },
       /** The seed the current run plays (issue #66) — the number the gear
@@ -2826,6 +2919,7 @@ export function bootGame(cfg) {
     queue = [];
     resetPatriotRunState();
     resetRoombaRunState(); // issue #85: new run, new circuit, new dice
+    resetLapRunState(); // issue #86: new run, new dice on the owner's scene
     startLiveRound();
     spawnPlayerAt(SPAWNS[0]);
     standClearOfCats();

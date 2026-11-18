@@ -25,7 +25,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStaticServer } from './serve.mjs';
-import { SPOTS, SPOT_IDS, MOMENT_IDS, spotRoom, ROOM_LABELS } from '../game/full-level.js';
+import { SPOTS, MOMENT_IDS, spotRoom, ROOM_LABELS } from '../game/full-level.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(REPO, 'package.json'));
@@ -75,6 +75,11 @@ try {
   // Counting happens in the page, against the engine's own draws: nothing here
   // reimplements a rule, so nothing here can drift from one. The room table is
   // handed in as data (game/full-level.js is a table, not logic).
+  // #86: `sceneOnly` spots (the owner's lap) are never drawn by the cycle —
+  // the engine swaps into them when the lap scene plans — so they are not
+  // part of what this tool measures ("what a seeded cycle draws").
+  const drawn = SPOTS.filter((s) => !s.sceneOnly);
+  const sceneOnlyIds = SPOTS.filter((s) => s.sceneOnly).map((s) => s.id);
   const roomOf = new Map(SPOTS.map((s) => [s.id, s.room]));
   const agg = await page.evaluate(([seedList, finds, roomEntries]) => {
     const roomOf = new Map(roomEntries);
@@ -115,7 +120,7 @@ try {
   console.log(`Look at Bobo — random-seed coverage (issue #66)`);
   console.log(`page ${PAGE} · ${n} random seeds (base 0x${BASE.toString(16)}) · 10 finds per run\n`);
   console.log('SHARE OF RUNS EACH SPOT APPEARS IN');
-  const rows = SPOT_IDS.map((id) => [id, agg.spotRuns[id] ?? 0]).sort((a, b) => b[1] - a[1]);
+  const rows = drawn.map((s) => [s.id, agg.spotRuns[s.id] ?? 0]).sort((a, b) => b[1] - a[1]);
   for (const [id, count] of rows) {
     const room = roomOf.get(id) ?? '?';
     const label = ROOM_LABELS?.[room] ?? room;
@@ -132,7 +137,7 @@ try {
   }
   console.log('\nONE SPOT PER MOMENT TYPE PER RUN (so every type plays in 100% of runs)');
   const perType = MOMENT_IDS.map((t) => {
-    const own = SPOTS.filter((s) => s.type === t).map((s) => s.id);
+    const own = drawn.filter((s) => s.type === t).map((s) => s.id);
     const shares = own.map((id) => (agg.spotRuns[id] ?? 0) / n);
     return { t, own: own.length, min: Math.min(...shares), max: Math.max(...shares) };
   });
@@ -151,6 +156,10 @@ try {
   console.log(`  patriot finds: ${agg.planOfEleven.filter(Boolean).length}`);
 
   console.log('\nREAD IT LIKE THIS');
+  if (sceneOnlyIds.length) {
+    console.log(`  * excluded (sceneOnly — the cycle can never draw them, the engine`);
+    console.log(`    swaps in): ${sceneOnlyIds.join(', ')} · the lap scene plans ~1 run in 5`);
+  }
   console.log(`  * every spot is drawn: ${never.length === 0 ? 'yes' : `NO — never drawn: ${never.join(', ')}`}`);
   console.log(`  * rarest spot: ${rarest[0]} at ${pct(rarest[1])} of runs`);
   console.log('  * the one-spot-per-moment-type rule is what caps a room: hall-chase owns');
