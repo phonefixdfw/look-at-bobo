@@ -2737,6 +2737,30 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       rulesOk,
       'issue #95: format, names, trimming and the write-gate, checked in-page against the same src/leaderboard.js the node selftest runs',
     );
+    // e) issue #107: the HUD clock's DEFAULT rule, read from inside the page.
+    //    Live play: ON unless the URL says ?timer=off. A ?gate=off page: off
+    //    whatever the URL says, never painted, no body class — the
+    //    byte-identical frame every baseline rests on. The `lb-timer` body
+    //    class is the single door the CSS watches, so engine flag, class and
+    //    URL rule all agreeing IS the feature. (Live-eyes-on verification —
+    //    the pill ticking, +5 pops, safe-area layout — lives in check:mobile.)
+    {
+      const tp = new URLSearchParams(location.search);
+      const want = !GATE_OFF && tp.get('timer') !== 'off';
+      const pill = document.getElementById('hud-timer');
+      const stOn = rec.timerOn;
+      const cls = document.body.classList.contains('lb-timer');
+      const unpainted = pill ? getComputedStyle(pill).display === 'none' : true;
+      add(
+        'hud-timer-default',
+        GATE_OFF
+          ? `tool page · url timer="${tp.get('timer') ?? '(none)'}" · off · pill ${unpainted ? 'unpainted' : 'PAINTED'}`
+          : `live page · url timer="${tp.get('timer') ?? '(default)'}" · ${want ? 'ON' : 'off'} · class ${cls ? 'on' : 'off'}`,
+        GATE_OFF ? 'tool page: off, unpainted, no class — whatever the URL says' : 'live play: ON by default; ?timer=off is the only way to hide it',
+        stOn === want && cls === want && (GATE_OFF ? unpainted : true),
+        'issue #107: the run clock shows by default while a person plays, and never enters a capture frame — default frames stay byte-identical',
+      );
+    }
   }
 }
 
