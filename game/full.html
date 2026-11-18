@@ -44,9 +44,12 @@
                  ?touch=on|off      force touch controls on / off (QA)
                  ?motion=off        calm: no logo blink/ear-flick/bob, no rain
                  ?contrast=high     high-contrast UI
-                 ?timer=on          live run clock in the HUD (issue #95; the
-                                    board itself needs no flag — it is on for
-                                    live full-game play and off for every
+                 ?timer=off         hide the live run clock (issue #107: it is
+                                    ON by default in live play; ?timer=on is a
+                                    no-op since the default, and NO url shows
+                                    it on a ?gate=off page — the board itself
+                                    needs no flag, it is on for live
+                                    full-game play and off for every
                                     ?gate=off tool page)
     Faults to prove the checks bite (selfTest / budget must FAIL):
       ?plant=text | audio | score | repeats | decoy-share | over-budget |
@@ -478,13 +481,15 @@
       .lb-ui {
         display: none;
       }
-      /* The optional HUD clock (?timer=on): a small pill top-centre, away
-         from the score pill, the gear and the "+3!" pop. */
+      /* The HUD clock (issue #107, on by default): a small pill in the TOP-RIGHT
+         corner, stacked under the score pill so the two form one corner cluster —
+         the gear owns top-left, the notch owns top-centre, and nothing here ever
+         lands under a thumb (touch controls stay bottom). Soft dark pill, same
+         style as the score, readable on bright and dark rooms alike. */
       #hud-timer {
         position: fixed;
-        top: calc(16px + var(--safe-t, 0px));
-        left: 50%;
-        transform: translateX(-50%);
+        top: 76px; /* sits just under the score pill (top 18 + ~52 tall) */
+        right: 18px;
         padding: 5px 13px;
         border-radius: 999px;
         background: rgba(16, 21, 28, 0.78);
@@ -495,6 +500,46 @@
         letter-spacing: 0.03em;
         font-variant-numeric: tabular-nums;
         opacity: 0.92;
+      }
+      /* The "+5" a DAG! leaves beside the clock (issue #107): a ::after on the
+         pill (never a DOM child — the engine owns the pill's textContent). It
+         rides to the pill's LEFT so it never crowds the score above, fades in
+         and away ONCE (a breath, not a flash), and holds at nothing between
+         DAG!s. The engine re-triggers it by re-adding .pen-on. */
+      #hud-timer::after {
+        content: "+5";
+        position: absolute;
+        right: calc(100% + 8px);
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0;
+        color: var(--ui-mustard);
+        font-size: 13px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 1px 0 rgba(16, 21, 28, 0.6);
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      #hud-timer.pen-on::after {
+        animation: timer-pen 1.6s ease-out forwards;
+      }
+      @keyframes timer-pen {
+        0% { opacity: 0; transform: translateY(-50%) translateX(4px); }
+        18% { opacity: 0.95; transform: translateY(-50%) translateX(0); }
+        70% { opacity: 0.95; }
+        100% { opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #hud-timer.pen-on::after {
+          animation: timer-pen 1.6s linear forwards; /* no drift, same gentle breath */
+        }
+      }
+      /* While the clock is on, the "+3!" pop lands BELOW it (the corner reads
+         top-down: score, clock, bonus). body.lb-timer is never set on a tool
+         page, so every captured frame keeps the pop exactly where it was. */
+      body.lb-timer #score-bonus {
+        top: 128px;
       }
       body.lb-timer #hud-timer {
         display: block;
@@ -1195,14 +1240,21 @@
         top: calc(40% + 76px);
         padding: 16px 10px 40px;
       }
-      /* Issue #95 on a phone: the clock pill stays top-centre, just smaller
-         (top-right belongs to the score pill, bottom-right to the shout),
-         and the win card sits bottom-LEFT — the shout button owns the
-         bottom-right corner (it doubles as "play again"), and the card
-         must never land under a thumb. */
+      /* Issue #107 on a phone: the clock keeps the TOP-RIGHT too, stacked under
+         the score pill (which moves with it) and clear of the notch by the safe
+         insets — top-centre is exactly where the notch lives, and the shout
+         owns the bottom-right corner. Smaller, same pill. */
       body.touch #hud-timer {
+        top: calc(66px + var(--safe-t, 0px));
+        right: calc(14px + var(--safe-r, 0px));
         font-size: 13px;
         padding: 4px 10px;
+      }
+      body.touch #hud-timer::after {
+        font-size: 11px;
+      }
+      body.touch.lb-timer #score-bonus {
+        top: calc(122px + var(--safe-t, 0px));
       }
       body.touch #lb-win {
         left: calc(12px + var(--safe-l, 0px));
@@ -1343,8 +1395,11 @@
 
     <div id="hud">
       <div id="hud-score"><span class="num">00</span><span class="max">/ 10</span></div>
-      <!-- issue #95: the optional run clock (?timer=on, live only — CSS
-           shows it only under body.lb-timer). Empty until the first spawn. -->
+      <!-- issue #107: the run clock, ON by default in live play (CSS shows it
+           only under body.lb-timer, which a live page adds unless ?timer=off;
+           a ?gate=off page never gets the class). Empty until the first spawn;
+           the engine writes its textContent, so the brief "+5" a DAG! leaves
+           beside it is a CSS ::after on this pill — never a DOM child. -->
       <div id="hud-timer" class="lb-ui" aria-hidden="true"></div>
       <div id="score-bonus" aria-hidden="true">+3!</div>
       <div id="reticle"></div>
@@ -1398,6 +1453,9 @@
       <label>Invert up/down <input id="set-invertY" type="checkbox" /></label>
       <label>Calm motion <input id="set-motion" type="checkbox" title="No confetti, rain, fireworks or screen flashes. The cats still breathe." /></label>
       <label>High contrast <input id="set-contrast" type="checkbox" /></label>
+      <!-- issue #107: the run clock is on by default; unchecking writes
+           ?timer=off, so the choice survives refresh like every switch here -->
+      <label>Show timer <input id="set-timer" type="checkbox" title="The run clock in the top corner. A wrong cat adds +5 s to it, exactly as on the best-times board." /></label>
       <label>Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
       <label>Mute <input id="set-mute" type="checkbox" /></label>
       <!-- issue #71: the music has its own knobs under the master pair -->
@@ -1456,6 +1514,7 @@
           <span class="only-touch"><b>left thumb</b> stick · <b>right side</b> drag to look · <b>yellow button</b> shout · turn your phone sideways for the best view<br /></span>
           ten moments, living room to bathroom — find Bobo (forehead dash, chest bib),
           put the dot on him, shout. ten finds wins it; the wrong cat earns a DAG! and a point off.
+          the clock in the top corner runs the whole time and a DAG! adds +5 s to it — the gear can hide it.
         </div>
         <!-- issue #95: the local board, readable from the menu. Opened by
              game/title.js (best times ⇄), rows re-read from localStorage on
