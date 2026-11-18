@@ -2564,7 +2564,8 @@ tris**, and the worst baseline frame is untouched at **152 of 250** (seed
 11 never builds him). Clearance against his conservative world box
 (x [−2.783, −1.952], z [−0.888, −0.22]): coffee table **0.052 m** clear of
 his knees with zero AABB overlap anywhere, **0.30 m** left to the heat-pad
-lane, nothing crosses the back cushion, lean ≤ 4 cm of cushion. The aim ray
+lane, nothing crosses the back cushion (measured lean 0 against a 0.08 m
+allowance). The aim ray
 tests Bobo and the decoy only — he cannot block a find **by construction**
 (the engine's ray list has no third entry). The lap spot `couch-loaf.lap`
 is **`sceneOnly`**: it
@@ -2584,16 +2585,18 @@ dice (`lap-seeded-roll`, `lap-seed11-off`, `lap-first-find`), the stage
 three page modes pass **134/134**: the stress page (dice default), the
 `capture:full:lap` selftest (`?lap=on`), and a one-off `?lap=off` probe.
 
-Suites at this HEAD: `capture:full` 585 frames **119/119**, worst frame
+Suites at this HEAD: `capture:full` 585 frames **134/134**, worst frame
 152/250, console clean · `capture:full:determinism` **8/8 byte-identical**
 (seed-11 frames: the man is not in them — he does not exist on that seed) ·
-`capture:full:lap` **PASS** at 79 draws (119/119, `?lap=on`) ·
-`capture:full:lap:determinism` **1/1 byte-identical** · `capture:slice:determinism`
-**8/8** and `capture:demo:determinism` **8/8** — slice and talking-demo
-untouched · `playtest:stress:full` **77/0** live selfTest **119** · `gate`
-PASS · `check:mobile` PASS · `playtest:bot:full` **10/10** win, exact
-ending, console clean · `playtest:bot:patriot:full` **5/5** ·
+`capture:full:lap` **PASS** at 79 draws (134/134, `?lap=on`) ·
+`capture:full:lap:determinism` **1/1 byte-identical** · `?lap=off` one-off
+selftest **134/134** · `playtest:stress:full` **77/0** live selfTest **134**
+· `gate` PASS · `check:mobile` PASS · `playtest:bot:full` **10/10** win,
+exact ending, console clean · `playtest:bot:patriot:full` **5/5** ·
 `seed:coverage` PASS (rarest drawn spot `sink-sit.bar` 8.8%; the lap spot
-listed as sceneOnly-excluded) · `build` PASS 75 files 3.22 MB.
+listed as sceneOnly-excluded) · `build` PASS 75 files 3.24 MB.
+`capture:slice:determinism` and `capture:demo:determinism` (8/8 each at
+#100 HEAD) were not re-run: the slice and talking-demo pages carry none of
+this issue's code.
 Records: `docs/CHARACTERS.md` "Brandon on the sofa", `docs/ART_STYLE.md`
 §14, `docs/LEVEL_LAYOUT.md` "Issue #86", `docs/STORY.md`.
