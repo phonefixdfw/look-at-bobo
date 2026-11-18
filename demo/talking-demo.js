@@ -49,7 +49,7 @@ const PLANT = params.get('plant');
 let ENDING_TEXT = EXACT_ENDING;
 /** Data-first fault: only the plan's filename changes, and the checks that
  *  compare against the docs/VOICES.md picks say so. */
-const PLAN_OVERRIDES = PLANT === 'audio' ? { yell: 'assets/audio/yell-look-at-bobo.take2.mp3' } : {};
+const PLAN_OVERRIDES = PLANT === 'audio' ? { yell: 'assets/audio/yell-look-at-bobo.take1.mp3' } : {};
 
 /** ?gate=off skips the click-to-begin gate headlessly (captures); real pages
  *  and the audio check use a real click. ?score=N starts the score pill at N. */
@@ -420,15 +420,15 @@ function selfTest() {
 
   // --- audio: the shipped picks, scheduled per the feel --------------------
   const fmt = (plan) => plan.map((c) => `${c.line}@${c.at}=${c.file.split('/').pop()}`).join(', ') || 'silence';
-  add('audio-plan-catch', fmt(planFor('catch')), 'yell@0.25=yell-look-at-bobo.take1.mp3', fmt(planFor('catch')) === 'yell@0.25=yell-look-at-bobo.take1.mp3', 'docs/VOICES.md: yell take 1');
+  add('audio-plan-catch', fmt(planFor('catch')), 'yell@0.25=yell-look-at-bobo.take2.mp3', fmt(planFor('catch')) === 'yell@0.25=yell-look-at-bobo.take2.mp3', 'docs/VOICES.md: yell take 2 (issue #96 picks)');
   add(
     'audio-plan-wrong',
     fmt(planFor('wrong')),
-    'yell@0.25=yell-look-at-bobo.take1.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
-    fmt(planFor('wrong')) === 'yell@0.25=yell-look-at-bobo.take1.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
+    'yell@0.25=yell-look-at-bobo.take2.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
+    fmt(planFor('wrong')) === 'yell@0.25=yell-look-at-bobo.take2.mp3, dag@1.8=dag-wrong-cat.take2.mp3',
     'the shout first (it thought it was Bobo), then the DAG! take 2',
   );
-  add('audio-plan-win', fmt(planFor('win')), 'win@0.35=win-line.take2.mp3', fmt(planFor('win')) === 'win@0.35=win-line.take2.mp3', 'docs/VOICES.md: win take 2');
+  add('audio-plan-win', fmt(planFor('win')), 'win@0.35=win-line.take1.mp3', fmt(planFor('win')) === 'win@0.35=win-line.take1.mp3', 'docs/VOICES.md: win take 1 (issue #96 picks)');
   add('audio-plan-idle', fmt(planFor('idle')), 'silence', fmt(planFor('idle')) === 'silence', 'idle says nothing');
   const pickFiles = Object.values(VOICE_LINES).map((v) => v.file.split('/').pop()).join(', ');
   add(

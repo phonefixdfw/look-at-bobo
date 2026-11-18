@@ -1,0 +1,78 @@
+{
+  "runId": "2026-11-18T00-21-05-610Z",
+  "command": [
+    "--buy",
+    "--max-credits",
+    "200",
+    "--allow-rebuy",
+    "all"
+  ],
+  "maxCredits": 200,
+  "ceiling": 2000,
+  "estimate": {
+    "chars": 154,
+    "usd": 0.01232,
+    "credits": 154,
+    "requests": 6
+  },
+  "balanceCharsBefore": 310,
+  "balanceCharsAfter": 310,
+  "creditsBilledActual": 0,
+  "requests": [
+    {
+      "key": "yell-look-at-bobo#take1",
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "status": "ok",
+      "chars": 13,
+      "bytes": 18851,
+      "ms": 475,
+      "requestId": "M2uVgcTLDjE28BtJbaOJ"
+    },
+    {
+      "key": "yell-look-at-bobo#take2",
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "status": "ok",
+      "chars": 13,
+      "bytes": 18015,
+      "ms": 341,
+      "requestId": "bxMpyEAWrS536VljP9vJ"
+    },
+    {
+      "key": "dag-wrong-cat#take1",
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "status": "ok",
+      "chars": 41,
+      "bytes": 18015,
+      "ms": 429,
+      "requestId": "LpqssqC1kMX2sI0SC3Wz"
+    },
+    {
+      "key": "dag-wrong-cat#take2",
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "status": "ok",
+      "chars": 41,
+      "bytes": 12999,
+      "ms": 385,
+      "requestId": "lZ8e3VqSCqhDpeGWjGqF"
+    },
+    {
+      "key": "win-line#take1",
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "status": "ok",
+      "chars": 23,
+      "bytes": 26374,
+      "ms": 360,
+      "requestId": "SIVHhCDvdqiSz4GF1ArZ"
+    },
+    {
+      "key": "win-line#take2",
+      "voiceId": "cgSgspJ2msm6clMCkdW9",
+      "status": "ok",
+      "chars": 23,
+      "bytes": 24284,
+      "ms": 323,
+      "requestId": "EoXkvv74LOg5CxEiVVOZ"
+    }
+  ],
+  "finishedAt": "2026-11-18T00:21:08.964Z"
+}
