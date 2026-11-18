@@ -2686,6 +2686,13 @@ paused, +10 s for two DAG!, the win freezes the final) — plus
 One subtlety the checks forced: `selfTest` FIRES real catch/win events (the
 Patriot checks do it on every page, live ones included), so `lbSelfTesting`
 blinds the board while a self-test is in flight — a test win is not a run.
+A second trap, caught by `capture:full:determinism` while this shipped: the
+clock check *drives the loop* (`loopTick`), and its paused `loopTick` raises
+the pause card through the engine's own HUD sync — a capture page has no
+rAF left to lower it again, so the card sat raised into every later frame
+and re-rendering drifted against it. The check now puts the pause card back
+exactly as it found it, and `leaderboard-selftest-inert` proves it (pause
+card untouched, store untouched, board card hidden — on every page kind).
 
 **Phone layout.** The shout button owns the bottom-right (it doubles as the
 play-again door), so the win card sits **bottom-left** on touch — verified
