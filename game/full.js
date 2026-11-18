@@ -2632,6 +2632,12 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
   {
     const LC = window.LC;
     const saved = { rt: game.runTime, dc: game.dagCount };
+    // loopTick renders AND syncs the HUD, so the paused tick below can raise
+    // the pause card on a page the tool has stopped its rAF loop on — and
+    // nothing would ever take it back down. Snapshot the card; leave it as found.
+    const pauseEl = document.getElementById('pause');
+    const pausedBefore = game.paused;
+    const cardBefore = pauseEl ? pauseEl.classList.contains('show') : false;
     const key = LB.STORAGE_KEY;
     const readStore = () => {
       try { return localStorage.getItem(key); } catch { return '__blocked__'; }
@@ -2695,16 +2701,23 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const winTimeEl = document.getElementById('win-time');
     const shown = lbWin ? getComputedStyle(lbWin).display !== 'none' : false;
     const storedAfter = readStore();
+    // put the world back exactly as this check found it — game flag AND DOM:
+    // the paused tick above may have raised the pause card, and a capture
+    // page's stopped rAF loop means nothing else would ever lower it.
+    game.paused = pausedBefore;
+    if (pauseEl) pauseEl.classList.toggle('show', cardBefore);
+    const cardAfter = pauseEl ? pauseEl.classList.contains('show') : false;
     const inertOk = rec.on === !GATE_OFF
       && rec.recordable === !GATE_OFF
       && !shown
       && (!winTimeEl || winTimeEl.textContent === '')
       && rec.entry === -1
+      && cardAfter === cardBefore // the pause card left exactly as found
       && storedAfter === storedBefore; // no page may ever leave a test win in the store
     add(
       'leaderboard-selftest-inert',
-      `on ${rec.on} · card ${shown ? 'SHOWN' : 'hidden'} · store ${storedAfter === storedBefore ? 'untouched' : 'WRITTEN'}`,
-      GATE_OFF ? 'off · hidden · untouched' : 'on (live) · hidden · untouched by tests',
+      `on ${rec.on} · card ${shown ? 'SHOWN' : 'hidden'} · pause ${cardAfter === cardBefore ? 'untouched' : 'MOVED'} · store ${storedAfter === storedBefore ? 'untouched' : 'WRITTEN'}`,
+      GATE_OFF ? 'off · hidden · pause untouched · store untouched' : 'on (live) · hidden · pause untouched · store untouched by tests',
       inertOk,
       'issue #95: a selfTest never writes the board or paints the card — and ?gate=off (every capture page, bot and stress sim run) keeps the whole board off, so baselines and bots see an empty, hidden DOM',
     );
