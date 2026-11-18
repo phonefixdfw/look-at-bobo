@@ -2637,15 +2637,18 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       try { return localStorage.getItem(key); } catch { return '__blocked__'; }
     };
     const storedBefore = readStore();
-    // a) the clock is the loop: it earns exactly what the world stepped,
-    //    sleeps behind `paused` (0 s), and never starts before the first
-    //    spawn — a title-card page takes ZERO steps, so zero seconds.
+    // a) the clock IS the loop: over one tick window it adds EXACTLY what the
+    //    world's own clock adds — same guards, same steps — so behind the
+    //    title card (world asleep: game.time adds 0) it adds 0 s, and a
+    //    started page adds the 15 steps it took. Paused time never counts.
     game.phase = 'find';
     game.paused = false;
     const sim0 = LC.loopDebug().simSteps;
+    const world0 = game.time;
     LC.loopTick(0.25);
     const steps = LC.loopDebug().simSteps - sim0;
     const ticking = game.runTime - saved.rt;
+    const worldAdd = game.time - world0;
     game.paused = true;
     LC.loopTick(0.5);
     const pausedAdded = game.runTime - saved.rt - ticking;
@@ -2655,8 +2658,10 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     triggerEvent('wrong');
     triggerEvent('wrong');
     const clockMathOk = steps > 0
-      ? Math.abs(ticking - steps / 60) < 1e-9 && pausedAdded === 0 && game.dagCount - saved.dc === 2
-      : ticking === 0 && pausedAdded === 0 && game.dagCount - saved.dc === 2; // world asleep: the run has not started
+      && Math.abs(ticking - worldAdd) < 1e-9 // same steps, same guards: the clock tracks the world
+      && pausedAdded === 0
+      && (worldAdd > 0 ? Math.abs(ticking - steps / 60) < 1e-9 : ticking === 0) // asleep: 0 s; awake: the steps it took
+      && game.dagCount - saved.dc === 2;
     const rec = LC.leaderboard();
     let finalOk;
     if (rec.recordable) {
@@ -2677,8 +2682,8 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
     const noPenaltyOk = LB.finalizeTime(saved.rt, 0) === saved.rt; // 0 DAGs = no penalty
     add(
       'run-clock-dag-penalty',
-      `${steps ? `${ticking.toFixed(3)} s over ${steps} steps` : 'world asleep: 0 s'} · ${pausedAdded.toFixed(3)} s paused · +${(game.dagCount - saved.dc) * LB.DAG_PENALTY} s for 2 DAG! · final ${rec.recordable ? 'board blind (live page)' : game.finalTime === null ? 'MISSING' : game.finalTime.toFixed(3)}`,
-      'clock = the steps it took (0 before the first spawn), 0 s paused, +10 s for two DAG!, 0 DAGs adds nothing, the win freezes the final',
+      `${steps} steps · clock +${ticking.toFixed(3)} s, world +${worldAdd.toFixed(3)} s${worldAdd === 0 ? ' (asleep: 0 s earned)' : ''} · ${pausedAdded.toFixed(3)} s paused · +${(game.dagCount - saved.dc) * LB.DAG_PENALTY} s for 2 DAG! · final ${rec.recordable ? 'board blind (live page)' : game.finalTime === null ? 'MISSING' : game.finalTime.toFixed(3)}`,
+      'clock adds exactly what the world adds (0 s behind the title card, the steps it took once started), 0 s paused, +10 s for two DAG!s, 0 DAGs adds nothing, the win freezes the final',
       clockMathOk && finalOk && noPenaltyOk,
       'issue #95: first spawn to the 10th point, +5 s per DAG!, paused time never counted (the clock only ever steps inside stepGame, behind game.paused)',
     );

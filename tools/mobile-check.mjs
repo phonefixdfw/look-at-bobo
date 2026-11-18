@@ -967,7 +967,7 @@ try {
     before.lay = lay;
     const tc = before.st.checks.filter((c) => c.name.startsWith('title-'));
     check('#57 desktop: title screen up before the start — logo named, START ready', before.lay.n >= 6 && before.lay.bad.length === 0 && before.covers && before.start === 'START' && before.logo.label === 'Look at Bobo' && before.logo.title === 'Look at Bobo' && before.logo.w > 60, JSON.stringify({ bad: before.lay.bad, start: before.start, logo: before.logo }));
-    check('#57 desktop: selfTest runs from behind the title card', before.st.pass && tc.length === 3 && tc.every((c) => c.pass && c.value !== 'n/a (card down)'), tc.map((c) => `${c.name}=${c.value}${c.pass ? '' : ' FAIL'}`).join(' | ') || before.st.checks.filter((c) => !c.pass).map((c) => c.name).join(', '));
+    check('#57 desktop: selfTest runs from behind the title card', before.st.pass && tc.length === 3 && tc.every((c) => c.pass && c.value !== 'n/a (card down)'), (before.st.pass ? '' : `suite-failed: ${before.st.checks.filter((c) => !c.pass).map((c) => `${c.name}=${c.value}`).join(', ') || '(none — pass flag false)'} || `) + tc.map((c) => `${c.name}=${c.value}${c.pass ? '' : ' FAIL'}`).join(' | '));
     await page.click('#gate-btn');
     await waitPhase(page, 'find');
     const gone = await page.evaluate(() => ({
