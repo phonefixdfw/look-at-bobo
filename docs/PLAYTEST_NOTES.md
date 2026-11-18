@@ -2600,3 +2600,34 @@ listed as sceneOnly-excluded) · `build` PASS 75 files 3.24 MB.
 this issue's code.
 Records: `docs/CHARACTERS.md` "Brandon on the sofa", `docs/ART_STYLE.md`
 §14, `docs/LEVEL_LAYOUT.md` "Issue #86", `docs/STORY.md`.
+
+## 41. Issue #96 — the voice is female now, and the spoken "wind" is the breeze (2026-11-17)
+
+Brandon played a win and heard two wrong notes: the voice was **male**, and
+"you wind" came out like **winding a clock** — he wants the sound of *the
+wind is blowing* (the joke is a breeze, not a mechanism). The on-screen
+string `your did it! you wind` stays byte-exact (VISION.md; the
+`ending-text-exact` check never moves).
+
+**What changed** (full record `docs/VOICES.md`): the whole cast re-bought
+with **Jessica — "Playful, Bright, Warm"**, the female voice already on the
+account's own premade list (one field in the manifest — the cast lives in
+`tools/audio/manifest/step4.json` and nowhere else). For the homograph, the
+provider docs (2026-11-17) are explicit that `eleven_multilingual_v2` has
+**no phoneme-tag support**, so the supported lever is a respelling in the
+generation input: the tool learned one field, `speakText` — the API now
+receives `your did it! you winned` ("winned" rhymes with "pinned/sinned"),
+while `text` stays the guard-enforced game string. Second paid run: dry-run
+estimate 154 credits first, then 6/6 takes ok, **62 credits ≈ $0.005**
+measured (account counter 310 → 372). Shipped picks re-measured on the new
+files: **yell t2 · DAG t2 · win t1** (durations now 1.07 / 0.74 / 1.58 s —
+all inside the ±0.25 s checks after the deliberate expected-value update).
+
+**Listen for these** (audition page: `npm run serve` →
+`tools/audio/voice-test.html`, both takes per line, flipping costs $0): the
+win line must read "your DID it, you WIHND" with the same vowel as "did"; the
+yell should feel like a delighted friend across the room, not an announcement
+— Jessica sits a shade warmer and lower than the old Liam takes. Nobody on
+the team can hear the files: a free local re-transcribe (faster-whisper)
+hears the old takes as "you wind" and the new as "you win" — the respelling
+working as intended, but stated plainly: transcript evidence, not a listen.

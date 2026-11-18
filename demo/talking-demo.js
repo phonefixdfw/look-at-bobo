@@ -434,8 +434,8 @@ function selfTest() {
   add(
     'audio-picks-match-docs',
     pickFiles,
-    'yell t1, dag t2, win t2',
-    pickFiles === 'yell-look-at-bobo.take1.mp3, dag-wrong-cat.take2.mp3, win-line.take2.mp3' && Object.values(VOICE_LINES).every((v) => v.dur > 0),
+    'yell t2, dag t2, win t1',
+    pickFiles === 'yell-look-at-bobo.take2.mp3, dag-wrong-cat.take2.mp3, win-line.take1.mp3' && Object.values(VOICE_LINES).every((v) => v.dur > 0),
     'the docs/VOICES.md shipped takes, referenced not copied',
   );
 
