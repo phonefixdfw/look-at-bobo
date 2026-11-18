@@ -2704,3 +2704,77 @@ a scrolling window that never stretches the stepped-down title card.
 celebration plus a small gold receipt under it — time, any DAG! penalty,
 one tap to put your name on it. The clock is OFF by default: if a run is
 never timed on screen the game is unchanged, and that is the point.
+*(#107 has since turned that default around — the clock shows while you
+play now; see §43.)*
+
+## 43. Issue #107 — the run timer shows in the top corner while you play (2026-11-17)
+
+Brandon's issue: *"Can we add a timer in top corner? It shows on leaderboard
+but not as you play."* The clock #95 built was already running under every
+run — it was just opt-in (`?timer=on`). This issue flips the default and
+gives the pill a corner of its own. No new numbers, no new maths: every
+rule stays in `src/leaderboard.js` and `stepGame`.
+
+**Default ON, capture contract untouched.** The engine's one line is now
+`TIMER_ON = !GATE_OFF && params.get('timer') !== 'off' && #hud-timer
+exists`. Live pages start ON; `?timer=off` (or the gear's new **Show
+timer** checkbox, which writes exactly that param — the panel's memory is
+the URL, like every other comfort switch) hides it; and a `?gate=off` page
+— the URL *every* capture, determinism run, bot and stress sim loads —
+never paints the pill **whatever the URL says**. That is how default-ON
+and byte-identical baselines coexist: the capture flag wins over the
+default, so not one of the 585 full-game frames changed a pixel, and
+`capture:full:determinism` still returns 8/8. The new `hud-timer-default`
+selfTest (137 → **138**) proves the whole rule from inside every page kind:
+engine flag, `lb-timer` body class and URL rule must agree, and on a tool
+page the pill must be unpainted with no class.
+
+**Top-RIGHT, stacked under the score.** The score pill owns the top-right
+corner (#30's HUD), the gear owns top-left, and on an iPhone landscape the
+notch band owns top-centre — so the clock lands under the score, same right
+edge, same soft dark pill, `tabular-nums` so the tenths never wiggle. When
+the clock is on, the "+3!" bonus pop lands BELOW it (`body.lb-timer
+#score-bonus` — a class no tool page ever gets, so captured frames keep
+the pop exactly where it was). Touch: smaller pill, `top: calc(66px +
+--safe-t) / right: calc(14px + --safe-r)` — inside the safe band, clear of
+score, gear, stick and shout at 844×390 with the simulated notch
+(`?safe=notch`), verified in `check:mobile` scenario 17.
+
+**The same number the board keeps.** While playing the pill reads
+`formatTime(runTime + dagCount × DAG_PENALTY)` — active seconds plus the
++5 per wrong cat, exactly what `finalizeTime` freezes at the win. The #95
+clock rules carry unchanged: it starts at the first spawn, sleeps behind
+the one `game.paused` flag (pause card, hidden tab, portrait hint), rests
+while the title card is up (`body.splash`), and freezes on `finalTime`
+when the 10th point lands — the win card keeps its own big receipt.
+
+**The "+5" at the DAG!.** When `dagCount` ticks, the pill gets a brief
+mustard **"+5"** on its left edge: a single CSS `::after` fade-in-and-away
+(1.6 s, forwards to nothing, gentler under `prefers-reduced-motion`)
+re-triggered by class-off/reflow/on — never a flash, never a sound, never
+a DOM child (the engine owns the pill's `textContent`).
+
+**Checks (17 new rows in `check:mobile` scenario 17 + the selfTest).**
+Live desktop with NO url: pill on and resting behind the card, mid-play it
+equals `runTime + 5 × dags` (0.2 s frame tolerance), sits under the score,
+clear of score and gear; P pauses → the pill FREEZES on the same text and
+ticks again on resume; the panel opens CHECKED, unchecking reloads to
+`?seed=11&timer=off` and the clock stays hidden mid-play, re-checking
+cleans the url and restores ON. Phone `?safe=notch`: ON with no url help,
+inside the right safe band, under the score, clear of gear/score/stick/
+shout; one decoy shout → the pill carries the +5 at the DAG! itself, the
+"+5" rides beside it, and the **"DAG!"** text stays byte-exact. Plain
+`?gate=off`: no class, no pill, and `hud-timer-default` passes right there
+in capture conditions. "your did it! you wind" untouched.
+
+**Numbers at this HEAD:** `check:mobile` **182 PASS / 0 FAIL** (scenario
+17 included); `capture:full` **585 frames PASS, selfTest 138/138, worst
+152/250 draws** (the pill is HTML — zero new draw calls); `capture:full:
+determinism` **8/8 byte-identical**; `gate` PASS (every plant bites);
+slice **144 frames 51/51** + det **8/8**; demo det **8/8**; weak-GPU PASS
+(138/138); the planted-fault runs still **FAIL by design** on
+`ending-text-exact` (full 137/138, slice 50/51); build PASS (76 files /
+3.27 MB / 154 URLs); stress **77 PASS / 0 FAIL** (`--checks 138`); bots
+**10/10 win** + patriot **5/5**, ending "your did it! you wind" exact,
+console clean; `leaderboard:selftest` 30/30, music selftest + check PASS,
+`audio:fullcheck` 23/23.
