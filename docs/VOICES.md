@@ -5,6 +5,14 @@
 > files and **never** calls the API; every paid generation goes through this one
 > cost-guarded tool). Test page: `tools/audio/voice-test.html` (`npm run serve`).
 >
+> **Status (2026-11-17): ✅ REGENERATED — issue #96: all 6 takes re-bought
+> with a FEMALE voice (Jessica) and the win line respelled in the generation
+> input so the spoken "wind" is the breeze, not "wind it up" (display text
+> unchanged, byte-exact). Second paid run
+> `tools/audio/ledger/2026-11-18T00-21-05-610Z.json`: 6/6 ok, zero retries,
+> account counter 310 → 372 = **62 credits ≈ $0.005** (estimate 154).
+> Shipped picks re-measured from the new takes: yell t2 · DAG t2 · win t1.**
+>
 > **Status (2026-11-14): ✅ GENERATED — all 6 takes bought in ONE run**
 > (3 lines × 2 takes, zero failures, zero retries; ledger
 > `tools/audio/ledger/2026-11-14T22-17-51-472Z.json`). Files are on disk in
@@ -14,6 +22,8 @@
 > $0.012 worst-case estimate — see "What it actually cost".
 > **V5 resolved by delegation (Brandon: "You can pick which takes to use"):
 > picks below, swap is free** — both takes of every line are already paid for.
+> (The 2026-11-14 Liam cast and take table below are kept as the historical
+> record of that run; the live cast + tables are the #96 sections.)
 
 ## The three lines (byte-exact — never "fix" the spellings)
 
@@ -34,12 +44,13 @@ one voice covers the game — cheaper and more coherent.
 
 | Role | Recommended (default) | Alternatives | Why |
 |---|---|---|---|
-| The player (all 3 lines) | **Liam** — "Energetic, Social Media Creator" (`TX3LPaxmHKxFdv7VOQHJ`) | **Charlie** — "Deep, Confident, Energetic" (`IKne3meq5aSn9XLyUdCD`); **Jessica** — "Playful, Bright, Warm" (`cgSgspJ2msm6clMCkdW9`) | Liam is exactly the "watch my cat do a thing!" energy the game is built on. Charlie = deeper, more theatrical; Jessica = the player as a different person. Voice ids were read live from ElevenLabs' public default list (`GET /v1/voices`, 2026-11-14). |
+| The player (all 3 lines) | **Jessica** — "Playful, Bright, Warm" (`cgSgspJ2msm6clMCkdW9`) — **since issue #96 (2026-11-17): Brandon wants a female voice** | **Liam** — "Energetic, Social Media Creator" (`TX3LPaxmHKxFdv7VOQHJ`, the 2026-11-14 original cast); **Charlie** — "Deep, Confident, Energetic" (`IKne3meq5aSn9XLyUdCD`) | Jessica is the warm, bright, playful adult-female voice of the account's default premade set — the same "watch my cat do a thing!" energy, one voice for all three lines. Voice ids were read live from the account's own `GET /v1/voices` (2026-11-14 and re-confirmed 2026-11-17). |
 
-The voice **was resolved by name at buy time and it worked**: the account's own
+The voice **was resolved by name at buy time both times**: the account's own
 `GET /v1/voices` returned `Liam - Energetic, Social Media Creator`
-(`TX3LPaxmHKxFdv7VOQHJ`) and all 6 takes were bought with it (verified in
-`assets/audio/lock.json`). The idHint path was never needed.
+(`TX3LPaxmHKxFdv7VOQHJ`) for the 2026-11-14 run and
+`Jessica - Playful, Bright, Warm` (`cgSgspJ2msm6clMCkdW9`) for the #96 run
+(both verified in `assets/audio/lock.json`). The idHint path was never needed.
 
 The tool resolves the voice **by name against whatever account the key belongs
 to** at buy time (falls back to the id hint), so casting survives a different
@@ -59,11 +70,34 @@ docs (2026-11-14). Settings (from the manifest):
 |---|---|---|---|---|
 | yell | 0.30 | 0.65 | 0.8 | low stability = wider emotional range; high style pushes the excitement |
 | DAG! | 0.35 | 0.50 | 0.8 | one word; delivery context `previous_text: "You found a cat!"` / `next_text: "But that is not Bobo."` keeps it from coming out flat (build-a-game one-word-line rule) |
-| win line | 0.35 | 0.55 | 0.8 | giddy, a bit breathless; reads the mangled spelling as written ("wind" rhymes with "win") |
+| win line | 0.35 | 0.55 | 0.8 | giddy, a bit breathless; since #96 the API receives `speakText` "your did it! you winned" so "wind" is spoken like the breeze (see "Pronunciation" below) |
 
 Seeds are deterministic (`gen-audio.mjs` fnv-hash of line+take) so a take is
 reproducible in principle; take 1 and take 2 use different seeds so the two
 takes are genuinely different performances, not copies.
+
+## Pronunciation — the "wind" is the breeze (issue #96, 2026-11-17)
+
+The on-screen win text stays `your did it! you wind` byte-exact (VISION.md),
+but the OLD takes spoke "wynd" (like winding a clock); Brandon wants "wihnd"
+like the weather. ElevenLabs' docs (checked 2026-11-17) are explicit that
+`eleven_multilingual_v2` **does not support phoneme tags** — the supported
+lever is a **respelling in the text the API receives**. So `gen-audio.mjs`
+learned one new manifest field, `speakText`: when present it is what gets
+**sent** to the API, while `text` stays the byte-exact game string the
+exact-string guard enforces and the lock keeps. The win line's speakText is
+`your did it! you winned` — "winned" rhymes with "pinned/sinned", an
+unambiguous token, and the respelling lives in exactly one place
+(`tools/audio/manifest/step4.json`), nowhere else.
+
+Verification, plainly: nobody on the team can listen. A free local
+re-transcribe (faster-whisper `base.en`, /tmp only) heard the OLD takes as
+"you wind" and the NEW takes as "you win" — the two are audibly different and
+the new read matches the short-vowel target, but transcripts normalize
+spelling, so this is supportive, not proof; a crude F2-trajectory probe was
+inconclusive and is not cited. The guarantee is the mechanism: the model
+received only the unambiguous respelling. Both new takes are on the audition
+page for Brandon's ears — flipping takes or overruling costs $0.
 
 ## Cost — the estimate before anything is bought
 
@@ -77,8 +111,8 @@ punctuation mark), so the delivery context on DAG! counts in the worst case.
 |---|---|---|
 | `LOOK AT BOBO!` | 13 | 26 |
 | `DAG!` (incl. context, worst case) | 41 | 82 |
-| `your did it! you wind` | 21 | 42 |
-| **Total, all 6 requests** | | **150 chars ≈ 150 credits ≈ $0.012** |
+| `your did it! you wind` | 21 (23 from #96: billed on `speakText`) | 42 (46 from #96) |
+| **Total, all 6 requests** | | **150 chars ≈ 150 credits ≈ $0.012** (154 ≈ $0.0123 from #96) |
 
 Call it **pennies: about 1.2 cents, or ~150 of 100,000 credits** — even a
 Free plan (10k credits/month) absorbs it ~10× over. This is what
@@ -113,6 +147,17 @@ price printout can only confirm model availability — the balance delta remains
 the only real-rate instrument, and its reading must be taken minutes after the
 run, not inside it.
 
+### The #96 re-cast run (measured 2026-11-17, run `2026-11-18T00-21-05-610Z`)
+
+The second and only other paid run: 6 requests (Jessica × 3 lines × 2 takes,
+the win line carrying `speakText`), `--allow-rebuy all`, zero failures, zero
+retries. Dry-run estimate first, as always: **154 chars ≈ 154 credits ≈
+$0.0123 worst case**. In-run ledger delta again read 0 (same counter lag);
+minutes later the account counter showed **310 → 372 = 62 credits ≈ $0.005**,
+40 % of the worst case — the same measured rate as the first run. Cumulative
+for the whole project: **≈ 122 credits ≈ $0.010** of the 2,000-credit
+ceiling, 372/10,000 of the free-plan period.
+
 ### Spend guardrails (all enforced in code, all proven by `npm run audio:selftest`)
 
 - Default command is a **dry run**; buying needs `--buy` **and** `--max-credits N`.
@@ -125,7 +170,11 @@ run, not inside it.
   recorded line's text or settings is **refused** unless `--allow-rebuy <line>`
   is passed deliberately.
 - Fail-fast: the first API error stops the run before any further request.
-- Exact-string guard on the three lines (see above).
+- Exact-string guard on the three lines (see above). `speakText` (#96) is the
+  only allowed divergence between game string and sent text, is recorded in
+  every lock entry (`spoken`), is billed and hashed as part of the take, and
+  can never be used to change what is DISPLAYED — the guard keeps biting on
+  `text` (selftest `exact-string-guard`).
 - The API key never enters the browser, the repo, the chat, the tool's output,
   or the ledger (output is redacted even if a server echoed the key back).
 
@@ -140,22 +189,23 @@ assets/audio/
 tools/audio/ledger/2026-11-14T22-17-51-472Z.json  # the one paid run (committed)
 ```
 
-Actual takes (durations measured by ffprobe and re-measured by Chrome's decoder
-in the audition page — identical):
+Actual takes (regenerated 2026-11-17 with Jessica; durations measured by
+ffprobe and re-measured by Chrome's decoder in the audition page — identical;
+seeds unchanged from the 2026-11-14 plan, so a take stays reproducible):
 
-| File | Text | Duration | Size | Seed |
+| File | Text (spoken) | Duration | Size | Seed |
 |---|---|---|---|---|
-| `yell-look-at-bobo.take1.mp3` | `LOOK AT BOBO!` | 1.44 s | 23.7 KB | 1876062199 |
-| `yell-look-at-bobo.take2.mp3` | `LOOK AT BOBO!` | 1.25 s | 20.5 KB | 1892839818 |
-| `dag-wrong-cat.take1.mp3` | `DAG!` | 0.98 s | 16.4 KB | 633787340 |
-| `dag-wrong-cat.take2.mp3` | `DAG!` | 0.84 s | 13.9 KB | 684120197 |
-| `win-line.take1.mp3` | `your did it! you wind` | 1.67 s | 27.0 KB | 2452163117 |
-| `win-line.take2.mp3` | `your did it! you wind` | 1.86 s | 30.2 KB | 2401830260 |
+| `yell-look-at-bobo.take1.mp3` | `LOOK AT BOBO!` | 1.11 s | 18.4 KB | 1876062199 |
+| `yell-look-at-bobo.take2.mp3` | `LOOK AT BOBO!` | 1.07 s | 17.6 KB | 1892839818 |
+| `dag-wrong-cat.take1.mp3` | `DAG!` | 1.07 s | 17.6 KB | 633787340 |
+| `dag-wrong-cat.take2.mp3` | `DAG!` | 0.74 s | 12.7 KB | 684120197 |
+| `win-line.take1.mp3` | `your did it! you winned` (says "you wihnd") | 1.58 s | 25.8 KB | 2452163117 |
+| `win-line.take2.mp3` | `your did it! you winned` (says "you wihnd") | 1.44 s | 23.7 KB | 2401830260 |
 
-**131 KB total for the whole cast** — plain static files, small enough for the
-web with no build step. **No post-processing in step 4** (loudness and
-mix are step 9's job). Step 5 will add character-level timestamps for lip-sync
-(a different endpoint) — deliberately not paid for now.
+**116 KB total for the whole cast** — plain static files, small enough for the
+web with no build step. Same filenames/formats as the 2026-11-14 Liam cast they
+replace (nothing stale on disk or in the build); lengths within ~0.3 s of the
+old ones; levels in the same neighborhood (mean ≈ −21…−23 dBFS).
 
 ## Commands
 
@@ -165,7 +215,7 @@ mix are step 9's job). Step 5 will add character-level timestamps for lip-sync
 | `npm run audio:status` | which takes exist on disk; exit 1 if any missing |
 | `npm run audio:list` | the account's voices (free call, needs key) |
 | `npm run audio:buy` | **SPENDS**: buys exactly what's missing, capped (`--max-credits 200`) |
-| `npm run audio:selftest` | 23 checks against a local stub server — proves every guard and the "never pay twice" cache **without any spend** |
+| `npm run audio:selftest` | 25 checks against a local stub server — proves every guard, the "never pay twice" cache and the #96 `speakText` path (what is SENT vs what the game DISPLAYS) **without any spend** |
 | `npm run audio:pagecheck` | (`npm run serve` must be up) 24 headless-Chrome checks that the audition page really plays all six takes: 6/6 ready, every mp3 decodes, byte-exact strings, clean console — free, local, no key |
 | `npm run serve` → `tools/audio/voice-test.html` | play page for every take (pending/ready states; add `?dir=../../captures/voice-selftest/` to see a demo with placeholder tones) |
 
@@ -188,33 +238,36 @@ which is a deliberate, visible re-spend.
 **Decided by the takes now on disk** (changing any of them after the buy is a
 deliberate `--allow-rebuy` re-spend, i.e. real money again):
 
-1. **Voice:** bought with **Liam for all three lines** (the suggested default; alternatives Charlie / Jessica were priced the same and remain a one-field manifest edit + rebuy).
+1. **Voice:** since #96 (2026-11-17) bought with **Jessica for all three lines** (Brandon: female voice). Liam/Charlie remain priced-equal alternatives — a one-field manifest edit + rebuy.
 2. **Win line voiced vs text-only:** bought **voiced** (the exact text shows on screen either way).
-3. **"wind" pronunciation:** generated as written ("wihnd", rhymes with "win" — the joke). Audition both win takes and confirm you hear the joke; a "wynd" respell would be a rebuy.
+3. **"wind" pronunciation:** since #96 the API receives the respell `winned`, so the spoken word is the breeze ("wihnd"); the on-screen string is untouched. Audition both win takes and confirm — nothing left to rebuy if you hear it right.
 4. **"DAG!" flavour:** generated mock-stern and comic with delivery context. Audition both takes.
 
-**V5 — take picks: RESOLVED by delegation (2026-11-14).** Brandon answered
-the open question with *"You can pick which takes to use"*, so the picks below
-were made from measured properties of the files (loudness, dynamic swing,
-spectral brightness, speech/dead-air split via ffmpeg — **not** from hearing
-them; they're cheap to overrule: both takes are already paid for, the game just
-points at one filename per line, and trimming the small silences is Step 9's
-job). If a real listen says otherwise, say the word and the default flips —
-zero extra credits.
+**V5 — take picks: RESOLVED by delegation (2026-11-14), re-made on the #96
+takes (2026-11-17).** Brandon answered the open question with *"You can pick
+which takes to use"*, so the picks below were made from measured properties of
+the files (loudness, dynamic swing, spectral brightness via band split,
+speech/dead-air split via ffmpeg — **not** from hearing them; they're cheap to
+overrule: both takes are already paid for, the game just points at one
+filename per line, and trimming the small silences is Step 9's job). If a real
+listen says otherwise, say the word and the default flips — zero extra credits.
 
 | Line | **Shipped take** | Why (measured) | Fallback on disk |
 |---|---|---|---|
-| `LOOK AT BOBO!` | **take 1** (1.44 s) | Brighter delivery (mean centroid 2,991 Hz vs 2,563) and a longer, more drawn-out "looook" (1.14 s speech vs 1.00) = the delighted "look look LOOK" brief; lower peak (−6.8 vs −6.2 dB) keeps it away from harsh/scary | take 2 — snappier and darker if the game ever wants speed over glee |
-| `DAG!` | **take 2** (0.84 s) | The pettier, punchier dag: hottest level (RMS −21.6 vs −25.1), tightest package (0.38 s speech), less tail dead air (0.38 vs 0.51 s) — a quick comic correction under the gentle X | take 1 — bigger theatrical swing (crest 18.6 dB) if you want a deflating "Daaag…" |
-| `your did it! you wind` | **take 2** (1.86 s) | The giddier read: much brighter (centroid 4,018 vs 2,804 Hz) with more dynamic movement (crest 16.2 vs 14.8 dB) and room for the mangled-grin joke (1.51 s speech) | take 1 — calmer/cooler read if take 2 comes off too peaked |
+| `LOOK AT BOBO!` | **take 2** (1.07 s) | The delighted "look look LOOK" brief: longest speech (0.78 s vs 0.69 — the more drawn-out "looook") and the brighter delivery of the pair (>2.5 kHz band −9.9 vs −12.3 dB under the lows) | take 1 — softer peak (−5.1 vs −3.9 dB) and shorter if the game ever wants speed over glee |
+| `DAG!` | **take 2** (0.74 s) | The pettier, punchier dag again: tightest package (0.47 s speech) with far less tail dead air (0.27 vs 0.53 s) — a quick comic correction under the gentle X | take 1 — bigger theatrical swing (crest 21.3 vs 20.8 dB, 0.54 s speech) if you want a deflating "Daaag…" |
+| `your did it! you wind` | **take 1** (1.58 s) | The giddier read on every metric: brightest (−6.3 vs −8.9 dB high-band), most dynamic movement (crest 17.7 vs 17.3 dB), longest room for the mangled-grin joke (1.08 s speech) | take 2 — calmer/cooler read, snappier tail, if take 1 comes off too peaked |
 
-Mechanical audition numbers (ffmpeg, 2026-11-14):
+Mechanical audition numbers (ffmpeg, 2026-11-17, the Jessica cast; brightness =
+mean level above 2.5 kHz minus mean level below it — this run has no centroid
+readout, the band split replaces it; the 2026-11-14 Liam numbers left with the
+old files, recoverable from git history):
 
-| Take | dur | speech | mean dBFS | peak dBFS | crest | centroid | tail silence |
+| Take | dur | speech | mean dBFS | peak dBFS | crest | brightness (hi−lo dB) | tail silence |
 |---|---|---|---|---|---|---|---|
-| yell take1 ✅ | 1.44 s | 1.14 s | −21.3 | −6.8 | 14.5 dB | 2,991 Hz | 0.30 s |
-| yell take2 | 1.25 s | 1.00 s | −20.6 | −6.2 | 14.4 dB | 2,563 Hz | 0.25 s |
-| dag take1 | 0.98 s | 0.40 s | −25.1 | −6.5 | 18.6 dB | 5,456 Hz | 0.51 s |
-| dag take2 ✅ | 0.84 s | 0.38 s | −21.6 | −4.7 | 16.9 dB | 5,026 Hz | 0.38 s |
-| win take1 | 1.67 s | 1.34 s | −23.2 | −8.4 | 14.8 dB | 2,804 Hz | 0.28 s |
-| win take2 ✅ | 1.86 s | 1.51 s | −23.0 | −6.8 | 16.2 dB | 4,018 Hz | 0.31 s |
+| yell take1 | 1.11 s | 0.69 s | −21.1 | −5.1 | 16.0 dB | −12.3 | 0.31 s |
+| yell take2 ✅ | 1.07 s | 0.78 s | −20.6 | −3.9 | 16.7 dB | −9.9 | 0.29 s |
+| dag take1 | 1.07 s | 0.54 s | −22.5 | −1.2 | 21.3 dB | −7.1 | 0.53 s |
+| dag take2 ✅ | 0.74 s | 0.47 s | −22.6 | −1.8 | 20.8 dB | −7.6 | 0.27 s |
+| win take1 ✅ | 1.58 s | 1.08 s | −21.5 | −3.8 | 17.7 dB | −6.3 | 0.29 s |
+| win take2 | 1.44 s | 1.05 s | −22.1 | −4.8 | 17.3 dB | −8.9 | 0.26 s |
