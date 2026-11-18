@@ -1666,6 +1666,174 @@ try {
     check('#95 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
     await page.context().close();
   }
+
+  // ===========================================================================
+  // 17. Issue #107: the run clock is ON by default. A live page shows it
+  //     top-right under the score (soft pill, same style; "+5" beside it when
+  //     a DAG! lands; frozen by the pause card) and it reads EXACTLY the
+  //     number the board will keep — active seconds + 5 s per DAG!. ?timer=off
+  //     and the gear's "Show timer" put it away and stay away across reload;
+  //     a plain capture page never paints it. The tenth can tick between the
+  //     last frame's setText and a probe, so value compares carry 0.2 s.
+  // ===========================================================================
+
+  // 17a. Live desktop, NO timer param at all: on by default, top-right under
+  //      the score, frozen by the pause card, ticking again on resume, and
+  //      the settings round-trip (?timer=off <-> default) survives reload.
+  {
+    const page = await desktopPage('?seed=11');
+    const pre = await page.evaluate(() => ({
+      cls: document.body.classList.contains('lb-timer'),
+      shown: getComputedStyle(document.getElementById('hud-timer')).display !== 'none',
+    }));
+    check('#107 live default: the page boots ON (body.lb-timer) with the pill resting behind the title card', pre.cls && !pre.shown, JSON.stringify(pre));
+    await page.click('#gate-btn');
+    await waitPhase(page, 'find');
+    const tick = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      const s = window.LC.state();
+      const el = document.getElementById('hud-timer');
+      const r = el.getBoundingClientRect();
+      const score = document.getElementById('hud-score').getBoundingClientRect();
+      const gear = document.getElementById('settings-btn').getBoundingClientRect();
+      const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const [m, rest] = el.textContent.split(':');
+      const [sec, tenth] = rest.split('.');
+      return {
+        shown: getComputedStyle(el).display !== 'none',
+        text: el.textContent,
+        secs: Number(m) * 60 + Number(sec) + Number(tenth) / 10,
+        want: s.runTime + s.dagCount * LB.DAG_PENALTY,
+        clear: !hit(r, score) && !hit(r, gear),
+        below: r.top >= score.bottom - 1,
+        inView: r.top >= -1 && r.bottom <= innerHeight + 1 && r.left >= -1 && r.right <= innerWidth + 1,
+      };
+    });
+    check('#107 live default: mid-play the pill shows the board number (active seconds + 5 s per DAG!)', tick.shown && /^\d:\d\d\.\d$/.test(tick.text) && Math.abs(tick.secs - tick.want) < 0.2, JSON.stringify(tick));
+    check('#107 live layout: the pill sits in the top-right UNDER the score pill, clear of it and of the gear, in view', tick.clear && tick.below && tick.inView, JSON.stringify(tick));
+    await page.keyboard.press('KeyP'); // the pause card
+    await page.waitForFunction(() => window.LC.state().paused === true, null, { timeout: 8000 });
+    const p1 = await page.evaluate(() => document.getElementById('hud-timer').textContent);
+    await page.waitForTimeout(700);
+    const p2 = await page.evaluate(() => ({ text: document.getElementById('hud-timer').textContent, s: window.LC.state() }));
+    check('#107 pause: the card stops the clock and the pill FREEZES on the same number', p1 === p2.text && p2.s.paused, `${p1} = ${p2.text}`);
+    await page.click('#pause'); // the card resumes
+    await page.waitForFunction(() => window.LC.state().paused === false, null, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    const p3 = await page.evaluate(() => document.getElementById('hud-timer').textContent);
+    check('#107 resume: past the card the seconds run again', p3 !== p2.text, `${p2.text} -> ${p3}`);
+    // The gear's new switch: checked by default; unchecking writes ?timer=off
+    // and the reload keeps the choice (the URL is this panel's memory).
+    await page.keyboard.press('KeyP');
+    await page.waitForFunction(() => window.LC.state().paused === true, null, { timeout: 8000 });
+    await page.click('#settings-btn');
+    await page.waitForSelector('#settings-panel.show');
+    const boxOn = await page.evaluate(() => document.getElementById('set-timer').checked);
+    check('#107 settings: the panel opens with "Show timer" CHECKED by default', boxOn === true);
+    await page.click('#set-timer'); // off -> apply() rewrites the url and reloads
+    await page.waitForURL(/timer=off/, { timeout: 15000 });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    await page.click('#gate-btn');
+    await waitPhase(page, 'find');
+    const off = await page.evaluate(() => ({
+      cls: document.body.classList.contains('lb-timer'),
+      shown: getComputedStyle(document.getElementById('hud-timer')).display !== 'none',
+      url: location.search,
+    }));
+    check('#107 ?timer=off: the choice SURVIVES the reload and mid-play the clock stays hidden', /timer=off/.test(off.url) && !off.cls && !off.shown, JSON.stringify(off));
+    await page.keyboard.press('KeyP');
+    await page.waitForFunction(() => window.LC.state().paused === true, null, { timeout: 8000 });
+    await page.click('#settings-btn');
+    await page.waitForSelector('#settings-panel.show');
+    await page.click('#set-timer'); // back on -> the param goes away entirely
+    await page.waitForURL((u) => !u.search.includes('timer'), { timeout: 15000 });
+    await page.waitForFunction(() => window.LC?.ready === true, null, { timeout: 45000 });
+    const back = await page.evaluate(() => ({
+      cls: document.body.classList.contains('lb-timer'),
+      checked: document.getElementById('set-timer').checked,
+    }));
+    check('#107 settings: checking it again restores ON, cleans the url, and re-checks the box', back.cls && back.checked, JSON.stringify(back));
+    check('#107 live desktop page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // 17b. The phone with a simulated iPhone notch, no timer param: ON by
+  //      default, parked top-right inside the safe band under the score,
+  //      clear of gear/score/stick/shout. One decoy shout: the pill takes
+  //      the +5 with the DAG! and grows its brief "+5" beside it.
+  {
+    const page = await phonePage('?seed=11&safe=notch', { dsf: 2 });
+    await page.tap('#gate-btn');
+    await waitPhase(page, 'find');
+    const lay = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      const s = window.LC.state();
+      const el = (id) => document.getElementById(id);
+      const r = el('hud-timer').getBoundingClientRect();
+      const cs = getComputedStyle(document.documentElement);
+      const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const [m, rest] = el('hud-timer').textContent.split(':');
+      const [sec, tenth] = rest.split('.');
+      return {
+        notch: document.documentElement.classList.contains('safe-notch'),
+        shown: getComputedStyle(el('hud-timer')).display !== 'none',
+        text: el('hud-timer').textContent,
+        secs: Number(m) * 60 + Number(sec) + Number(tenth) / 10,
+        want: s.runTime + s.dagCount * LB.DAG_PENALTY,
+        safeR: Number.parseFloat(cs.getPropertyValue('--safe-r')) || 0,
+        rightGap: innerWidth - r.right,
+        clear: [el('settings-btn'), el('hud-score'), el('shout-btn'), el('stick-base')].every((b) => !hit(r, b.getBoundingClientRect())),
+        below: r.top >= el('hud-score').getBoundingClientRect().bottom - 1,
+        inView: r.top >= -1 && r.bottom <= innerHeight + 1 && r.left >= -1 && r.right <= innerWidth + 1,
+      };
+    });
+    check('#107 phone notch: the clock is ON with no url help and sits inside the right safe band', lay.notch && lay.shown && /^\d:\d\d\.\d$/.test(lay.text) && Math.abs(lay.secs - lay.want) < 0.2 && lay.rightGap >= lay.safeR - 1 && lay.inView, JSON.stringify(lay));
+    check('#107 phone notch: under the score pill, clear of score, gear, stick and shout', lay.clear && lay.below, JSON.stringify(lay));
+    await page.evaluate(() => window.LC.aimAt('decoy'));
+    await page.tap('#shout-btn');
+    await waitPhase(page, 'wrong');
+    const dag = await page.evaluate(async () => {
+      const LB = await import('/src/leaderboard.js');
+      const s = window.LC.state();
+      const el = document.getElementById('hud-timer');
+      const [m, rest] = el.textContent.split(':');
+      const [sec, tenth] = rest.split('.');
+      return {
+        dags: s.dagCount,
+        runTime: s.runTime,
+        text: el.textContent,
+        secs: Number(m) * 60 + Number(sec) + Number(tenth) / 10,
+        want: s.runTime + s.dagCount * LB.DAG_PENALTY,
+        pen: el.classList.contains('pen-on'),
+        dagText: document.getElementById('dag-label').textContent,
+      };
+    });
+    check('#107 DAG!: the pill carries the +5 the board will count, at the DAG! itself', dag.dags === 1 && Math.abs(dag.secs - dag.want) < 0.2 && dag.secs >= dag.runTime + 4.8, JSON.stringify(dag));
+    check('#107 DAG!: the quiet "+5" rides beside the pill and the DAG! text stays byte-exact', dag.pen && dag.dagText === 'DAG!', JSON.stringify({ pen: dag.pen, dagText: dag.dagText }));
+    check('#107 phone page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
+
+  // 17c. The DEFAULT tool page — plain ?gate=off, exactly what capture:full
+  //      and the bots load, no timer param at all: the pill is nowhere in the
+  //      frame, no class on the body, and the new selfTest row passes right
+  //      there under capture conditions.
+  {
+    const page = await desktopPage('?gate=off');
+    const off = await page.evaluate(() => ({
+      cls: document.body.classList.contains('lb-timer'),
+      timerOn: window.LC.leaderboard().timerOn,
+      painted: document.getElementById('hud-timer').offsetParent !== null,
+    }));
+    check('#107 capture: plain ?gate=off never paints the clock — default frames stay byte-identical', !off.cls && !off.timerOn && !off.painted, JSON.stringify(off));
+    const st107 = await page.evaluate(() => {
+      const st = window.LC.selfTest();
+      return { all: st.pass, mine: st.checks.filter((c) => c.name === 'hud-timer-default').map((c) => ({ v: c.value, p: c.pass })) };
+    });
+    check('#107 capture: the hud-timer-default selfTest passes in capture conditions', st107.all && st107.mine.length === 1 && st107.mine[0].p, JSON.stringify(st107));
+    check('#107 capture page: console clean', page.__errs.length === 0, page.__errs.join(' | '));
+    await page.context().close();
+  }
 } finally {
   for (const c of contexts) await c.close().catch(() => {});
   await browser.close().catch(() => {});

@@ -23,8 +23,10 @@
 //   cfg.leaderboard    — issue #95: this page keeps local best times (full
 //                        game only). The run clock counts everywhere, but
 //                        storage writes and the board DOM exist only with
-//                        this flag AND without ?gate=off. ?timer=on shows a
-//                        live run timer if the page ships #hud-timer.
+//                        this flag AND without ?gate=off. The HUD run timer
+//                        (issue #107) shows by default on live pages that
+//                        ship #hud-timer; ?timer=off hides it; a ?gate=off
+//                        (tool/capture) page never paints it at all.
 //   optional DOM: #pause-restart (restart button in the pause card) and
 //                 #ending-again (play-again line under the win text) — wired
 //                 when present, absent on the slice page = zero behaviour diff.
@@ -112,9 +114,14 @@ export function bootGame(cfg) {
    *  itself accumulates everywhere as a plain number (no pixels, no random):
    *  that is what lets selfTest prove its maths from inside a capture run. */
   const LB_ON = Boolean(cfg.leaderboard) && !GATE_OFF;
-  /** The optional HUD timer (`?timer=on`, default OFF so every baseline is
-   *  byte-identical): needs a page that ships #hud-timer and a live page. */
-  const TIMER_ON = !GATE_OFF && params.get('timer') === 'on' && Boolean(document.getElementById('hud-timer'));
+  /** The HUD clock (issue #107): ON by DEFAULT on a live page that ships
+   *  #hud-timer, so Brandon sees the run time top-right as he plays. The
+   *  capture contract holds the same way the board's does: a `?gate=off`
+   *  tool/capture page never paints it, whatever the URL says — default frames
+   *  stay byte-identical. `?timer=off` hides it in live play (that is what the
+   *  settings panel's "Show timer" checkbox writes), `?timer=on` is a shared
+   *  link's way of forcing it back on. */
+  const TIMER_ON = !GATE_OFF && params.get('timer') !== 'off' && Boolean(document.getElementById('hud-timer'));
   /** The run's seed (issue #66). The rules live in src/run-seed.js: `?seed=N`
    *  pins it (that is how a run is reproduced and how a bug report reads),
    *  `?gate=off` — every tool page, capture, determinism run, LC simulation —
@@ -957,6 +964,7 @@ export function bootGame(cfg) {
         game.score = PLANT === 'score' ? game.score - 1 : Math.max(0, game.score - 1);
         game.phase = 'wrong';
         game.dagCount++; // issue #95: every wrong-cat DAG! costs +5 s on the board
+        if (TIMER_ON) showTimerPenalty(); // issue #107: the clock shows the +5 it just took
       }
       if (game.phase === 'win') {
         game.winElapsed = 0; // the restart cooldown starts here
@@ -1060,9 +1068,10 @@ export function bootGame(cfg) {
    *  a selfTest is in flight the board takes nothing and paints nothing. */
   let lbSelfTesting = false;
   // Body classes gate ALL board CSS: `lb-on` means "this page keeps times"
-  // (live full game only — never ?gate=off), `lb-timer` means the player
-  // asked for the HUD clock. Both false on every tool page, so the board
-  // chrome is display:none there before and after any staging.
+  // (live full game only — never ?gate=off), `lb-timer` means the HUD clock
+  // is on (issue #107: default on in live play, only ?timer=off or the tool
+  // gate takes it away). Both false on every tool page, so the board chrome
+  // is display:none there before and after any staging.
   if (LB_ON) document.body.classList.add('lb-on');
   if (TIMER_ON) document.body.classList.add('lb-timer');
 
@@ -1074,6 +1083,21 @@ export function bootGame(cfg) {
     game.finalTime = null;
     lbEntry = null;
     if (el.hudTimer && TIMER_ON) setText(el.hudTimer, LB.formatTime(0));
+  }
+
+  /** Issue #107: the moment a DAG! lands, a soft "+5" rides beside the clock —
+   *  the penalty the run just took, the same +5 the leaderboard will count.
+   *  One gentle fade-in-and-away (never a flash, never a sound); re-triggerable
+   *  by the next DAG! via a class-off/reflow/class-on, the "+3!" pop's pattern.
+   *  The "+5" itself is a CSS ::after on the pill, because the engine owns the
+   *  pill's textContent. Pure DOM: nothing here touches the 3D frame or the
+   *  run clock itself. */
+  function showTimerPenalty() {
+    const pill = el.hudTimer;
+    if (!pill) return;
+    pill.classList.remove('pen-on');
+    void pill.offsetWidth; // restart the CSS animation from the top
+    pill.classList.add('pen-on');
   }
 
   /** One li per board row — built from nodes, never innerHTML, so a stored
@@ -1513,7 +1537,11 @@ export function bootGame(cfg) {
     // time does not count" asks. The win moment is excluded: finalTime was
     // frozen when it landed, and what follows is celebration, not running.
     if (game.phase !== 'win') game.runTime += dt;
-    if (TIMER_ON && game.phase !== 'win') setText(el.hudTimer, LB.formatTime(game.runTime));
+    // Issue #107: the pill shows the SAME number the leaderboard records —
+    // active seconds plus 5 s per DAG! so far — so what Brandon watches and
+    // what the board keeps can never disagree. (The win freeze, line ~1150,
+    // already writes the identical finalTime.)
+    if (TIMER_ON && game.phase !== 'win') setText(el.hudTimer, LB.formatTime(game.runTime + game.dagCount * LB.DAG_PENALTY));
 
     if (game.phase === 'find') stepPlayer(dt);
     if (game.phase === 'win') game.winElapsed += dt;
@@ -3365,6 +3393,11 @@ export function bootGame(cfg) {
       q('#set-mute').checked = SETTINGS.muted;
       q('#set-musicmute').checked = SETTINGS.musicMute;
       q('#set-contrast').checked = SETTINGS.highContrast;
+      // Issue #107: "Show timer" is ON by default — checked means "no URL
+      // param" (the default), unchecked writes ?timer=off, so the choice
+      // survives refresh and shares exactly like every comfort switch here.
+      const timerBox = q('#set-timer');
+      if (timerBox) timerBox.checked = TIMER_ON;
       const apply = () => {
         const p = new URLSearchParams(location.search);
         const setOr = (k, v, on) => (on ? p.set(k, v) : p.delete(k));
@@ -3382,6 +3415,12 @@ export function bootGame(cfg) {
         setOr('musicvol', String(mv), mv !== 1);
         setOr('musicmute', '1', q('#set-musicmute').checked);
         setOr('contrast', 'high', q('#set-contrast').checked);
+        // issue #107: the timer rides the same rails — checked is the default
+        // (no param), turning it off is an explicit ?timer=off
+        if (timerBox) {
+          if (timerBox.checked) p.delete('timer');
+          else p.set('timer', 'off');
+        }
         location.search = p.toString(); // reload: every setting is a URL param
       };
       for (const c of sPanel.querySelectorAll('input')) c.addEventListener('change', apply);
