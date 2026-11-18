@@ -2710,11 +2710,11 @@ function fullExtraChecks({ add, THREE, scene, renderer, supports, buildCat, setC
       return b.length === 10 && b[0].time === 28 && b[9].time === 37;
     })();
     const rulesOk = LB.formatTime(75.04) === '1:15.0' && LB.formatPenalty(60) === '+1:00'
-      && LB.sanitizeName('Br@ndon x') === 'Brandon' && LB.sanitizeName('$$$') === LB.NAME_DEFAULT
+      && LB.sanitizeName('Brandon!!') === 'Brandon' && LB.sanitizeName('$$$') === LB.NAME_DEFAULT
       && trim && LB.recordableRun({ gateOff: true, target: 10 }) === false;
     add(
       'leaderboard-rules',
-      `${LB.formatTime(75.04)} · ${LB.formatPenalty(60)} · "${LB.sanitizeName('Br@ndon x')}" · "${LB.sanitizeName('$$$')}" · top-10 ${trim ? 'kept' : 'BROKE'}`,
+      `${LB.formatTime(75.04)} · ${LB.formatPenalty(60)} · "${LB.sanitizeName('Br@ndon!')}" · "${LB.sanitizeName('$$$')}" · top-10 ${trim ? 'kept' : 'BROKE'}`,
       '1:15.0 · +1:00 · "Brandon" · "BOBO FAN" · top-10 kept',
       rulesOk,
       'issue #95: format, names, trimming and the write-gate, checked in-page against the same src/leaderboard.js the node selftest runs',
